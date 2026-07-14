@@ -1,0 +1,172 @@
+# =============================================================================
+# asoor-user-ui — Vite + React + pnpm + Turborepo
+# Authoritative product docs: ../documents/user-ui/ (monorepo), not this repo.
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Documentation (local stubs / copies — do not version in this app repo)
+# -----------------------------------------------------------------------------
+documents/
+docs/
+documentation/
+
+# Markdown and office docs (keep root README for clone/setup)
+*.md
+*.MD
+*.markdown
+!README.md
+
+*.pdf
+*.PDF
+*.doc
+*.docx
+*.xls
+*.xlsx
+*.ppt
+*.pptx
+*.md.bak
+*.md~
+
+# Common doc filename patterns (if present outside documents/)
+DOCUMENTATION_*.md
+*_DOCUMENTATION.md
+*_REFERENCE.md
+*_GUIDE.md
+*_ROADMAP.md
+*_SUMMARY.md
+*_PLAN.md
+*_OVERVIEW.md
+*_DESIGN.md
+*_ARCHITECTURE.md
+*_SPECIFICATION*.md
+*_SPEC*.md
+CHANGELOG*.md
+CONTRIBUTING*.md
+LICENSE*.md
+NOTES*.md
+
+# -----------------------------------------------------------------------------
+# Dependencies
+# -----------------------------------------------------------------------------
+node_modules/
+.pnp
+.pnp.js
+
+# pnpm: commit pnpm-lock.yaml — never ignore lockfiles
+.pnpm-store/
+.pnpm-debug.log*
+
+# Other package managers (this repo uses pnpm only)
+package-lock.json
+yarn.lock
+bun.lockb
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# -----------------------------------------------------------------------------
+# Build & bundler outputs (Vite, tsc, Turbo)
+# -----------------------------------------------------------------------------
+dist/
+build/
+out/
+*.tsbuildinfo
+
+# Vite
+.vite/
+vite.config.ts.timestamp-*
+
+# Turborepo
+.turbo/
+
+# -----------------------------------------------------------------------------
+# Environment & secrets (commit .env.example only)
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.local
+
+# -----------------------------------------------------------------------------
+# Test & quality tooling
+# -----------------------------------------------------------------------------
+coverage/
+.nyc_output/
+*.lcov
+.eslintcache
+
+# Playwright / Cypress (if added later)
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+cypress/videos/
+cypress/screenshots/
+
+# Storybook
+storybook-static/
+
+# -----------------------------------------------------------------------------
+# Logs & runtime temp
+# -----------------------------------------------------------------------------
+logs/
+*.log
+*.log.*
+*.log.gz
+tmp/
+temp/
+*.tmp
+*.temp
+*.bak
+*.backup
+*.old
+
+# -----------------------------------------------------------------------------
+# IDE & editors
+# -----------------------------------------------------------------------------
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+*~
+
+# -----------------------------------------------------------------------------
+# Docker — app repo: Dockerfile + nginx.conf for CI/local dev (target runtime)
+# Server deploy repo: custom Dockerfile / compose overrides stay out of this repo
+# -----------------------------------------------------------------------------
+docker-compose.override.yml
+Dockerfile.local
+docker-compose.local.yml
+
+# -----------------------------------------------------------------------------
+# OS
+# -----------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# -----------------------------------------------------------------------------
+# Deploy / hosting artifacts (optional CI outputs)
+# -----------------------------------------------------------------------------
+.vercel
+.netlify
+
+# -----------------------------------------------------------------------------
+# Archives & local uploads (not app source)
+# -----------------------------------------------------------------------------
+*.zip
+*.tar
+*.tar.gz
+*.rar
+uploads/
+upload/
+files/
