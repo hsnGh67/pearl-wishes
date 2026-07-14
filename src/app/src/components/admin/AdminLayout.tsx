@@ -1,9 +1,9 @@
 import { Outlet, Link, useLocation } from 'react-router';
-import { Users, Calendar, CreditCard, FileText, LayoutDashboard, LogOut, Scissors, Sparkles } from 'lucide-react';
+import { Users, Calendar, CreditCard, FileText, LayoutDashboard, LogOut, Scissors, Sparkles, Tag } from 'lucide-react';
 
 export function AdminLayout() {
   const location = useLocation();
-  
+
   const menuItems = [
     { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/admin/users', label: 'Users', icon: Users },
@@ -11,6 +11,7 @@ export function AdminLayout() {
     { path: '/admin/payments', label: 'Payments & Transactions', icon: CreditCard },
     { path: '/admin/services', label: 'Services', icon: Scissors },
     { path: '/admin/workshops', label: 'Workshops', icon: Sparkles },
+    { path: '/admin/promo-codes', label: 'Promo Codes', icon: Tag },
     { path: '/admin/content', label: 'Content Management', icon: FileText },
   ];
 

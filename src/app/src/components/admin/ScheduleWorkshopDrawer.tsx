@@ -29,9 +29,9 @@ import { Workshop } from "../../schema/workshop.schema";
 import {
   WorkshopBooking,
   WorkshopBookingStatus,
+  WorkshopSession,
 } from "../../schema/workshop-booking.schema";
 import {
-  createWorkshopBookingSession,
   createWorkshopBookingStudent,
   createWorkshopSession,
   getBookedCandidatesByMonth,
@@ -127,8 +127,7 @@ function generateSessions(
       });
     }
     cursor.setDate(cursor.getDate() + 1);
-    if (cursor.getTime() - firstDate.getTime() > 365 * 86400000)
-      break;
+    if (cursor.getTime() - firstDate.getTime() > 365 * 86400000) break;
   }
   return sessions;
 }
@@ -197,9 +196,9 @@ function WarningModal({
               Workshop setup not complete
             </h3>
             <p className="text-sm" style={{ color: "#6b7280" }}>
-              The workshop schedule has been created, but
-              student and payment details are not completed. You
-              can finish this later from the calendar.
+              The workshop schedule has been created, but student and payment
+              details are not completed. You can finish this later from the
+              calendar.
             </p>
           </div>
         </div>
@@ -243,14 +242,8 @@ function FinancialSummary({
   students: Student[];
   firstSessionDate: string;
 }) {
-  const expectedIncome = students.reduce(
-    (s, st) => s + st.baseFee,
-    0,
-  );
-  const totalPaid = students.reduce(
-    (s, st) => s + studentTotalPaid(st),
-    0,
-  );
+  const expectedIncome = students.reduce((s, st) => s + st.baseFee, 0);
+  const totalPaid = students.reduce((s, st) => s + studentTotalPaid(st), 0);
   const remaining = expectedIncome - totalPaid;
   const hasUnpaid = remaining > 0;
   const isUpcoming = firstSessionDate
@@ -314,26 +307,17 @@ function FinancialSummary({
               borderColor: c.border,
             }}
           >
-            <p
-              className="text-xs mb-0.5"
-              style={{ color: "#6b7280" }}
-            >
+            <p className="text-xs mb-0.5" style={{ color: "#6b7280" }}>
               {c.label}
             </p>
-            <p
-              className="text-sm font-semibold"
-              style={{ color: "#3D3935" }}
-            >
+            <p className="text-sm font-semibold" style={{ color: "#3D3935" }}>
               {fmt(c.value)}
             </p>
           </div>
         ))}
       </div>
       {students.length === 0 && (
-        <p
-          className="text-xs mt-2 text-center"
-          style={{ color: "#9ca3af" }}
-        >
+        <p className="text-xs mt-2 text-center" style={{ color: "#9ca3af" }}>
           Add students to see financial totals.
         </p>
       )}
@@ -354,8 +338,7 @@ function StudentCard({
 }) {
   const totalPaid = studentTotalPaid(student);
   const remaining = studentRemaining(student);
-  const overpaid =
-    totalPaid > student.baseFee && student.baseFee > 0;
+  const overpaid = totalPaid > student.baseFee && student.baseFee > 0;
 
   const addPayment = () => {
     const amt = parseFloat(student.newPaymentAmount);
@@ -441,10 +424,7 @@ function StudentCard({
           onClick={onRemove}
           className="p-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
         >
-          <Trash2
-            className="w-3.5 h-3.5"
-            style={{ color: "#9ca3af" }}
-          />
+          <Trash2 className="w-3.5 h-3.5" style={{ color: "#9ca3af" }} />
         </button>
       </div>
 
@@ -458,10 +438,7 @@ function StudentCard({
       >
         {/* Base Amount — read-only from workshop definition */}
         <div className="flex items-center justify-between">
-          <span
-            className="text-xs"
-            style={{ color: "#6b7280" }}
-          >
+          <span className="text-xs" style={{ color: "#6b7280" }}>
             Base Amount
           </span>
           <span
@@ -484,16 +461,10 @@ function StudentCard({
               border: "1px solid #DCD4CD",
             }}
           >
-            <p
-              className="text-xs mb-0.5"
-              style={{ color: "#6b7280" }}
-            >
+            <p className="text-xs mb-0.5" style={{ color: "#6b7280" }}>
               Total Paid
             </p>
-            <p
-              className="text-xs font-semibold"
-              style={{ color: "#3D3935" }}
-            >
+            <p className="text-xs font-semibold" style={{ color: "#3D3935" }}>
               {fmt(totalPaid)}
             </p>
           </div>
@@ -517,9 +488,7 @@ function StudentCard({
             step="0.01"
             placeholder="Amount (£)"
             value={student.newPaymentAmount}
-            onChange={(e) =>
-              onChange({ newPaymentAmount: e.target.value })
-            }
+            onChange={(e) => onChange({ newPaymentAmount: e.target.value })}
             className="flex-1 px-2 py-1.5 text-xs rounded border outline-none"
             style={{
               borderColor: "#DCD4CD",
@@ -530,9 +499,7 @@ function StudentCard({
           <input
             type="date"
             value={student.newPaymentDate}
-            onChange={(e) =>
-              onChange({ newPaymentDate: e.target.value })
-            }
+            onChange={(e) => onChange({ newPaymentDate: e.target.value })}
             className="flex-1 px-2 py-1.5 text-xs rounded border outline-none"
             style={{
               borderColor: "#DCD4CD",
@@ -568,22 +535,14 @@ function StudentCard({
         <div style={{ borderTop: "1px solid #e5e7eb" }}>
           <button
             type="button"
-            onClick={() =>
-              onChange({ showHistory: !student.showHistory })
-            }
+            onClick={() => onChange({ showHistory: !student.showHistory })}
             className="w-full flex items-center justify-between px-3 py-2 hover:bg-gray-50 transition-colors"
           >
-            <span
-              className="text-xs font-medium"
-              style={{ color: "#6b7280" }}
-            >
+            <span className="text-xs font-medium" style={{ color: "#6b7280" }}>
               Payment history ({student.payments.length})
             </span>
             {student.showHistory ? (
-              <ChevronUp
-                className="w-3.5 h-3.5"
-                style={{ color: "#9ca3af" }}
-              />
+              <ChevronUp className="w-3.5 h-3.5" style={{ color: "#9ca3af" }} />
             ) : (
               <ChevronDown
                 className="w-3.5 h-3.5"
@@ -608,17 +567,15 @@ function StudentCard({
                     >
                       {fmt(p.amount)}
                     </span>
-                    <span
-                      className="text-xs"
-                      style={{ color: "#9ca3af" }}
-                    >
-                      {new Date(
-                        p.date + "T00:00:00",
-                      ).toLocaleDateString("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
+                    <span className="text-xs" style={{ color: "#9ca3af" }}>
+                      {new Date(p.date + "T00:00:00").toLocaleDateString(
+                        "en-GB",
+                        {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        },
+                      )}
                     </span>
                   </div>
                   <button
@@ -626,10 +583,7 @@ function StudentCard({
                     onClick={() => removePayment(p.id)}
                     className="p-1 rounded hover:bg-gray-100 transition-colors"
                   >
-                    <X
-                      className="w-3 h-3"
-                      style={{ color: "#9ca3af" }}
-                    />
+                    <X className="w-3 h-3" style={{ color: "#9ca3af" }} />
                   </button>
                 </div>
               ))}
@@ -648,10 +602,8 @@ interface Props {
   onClose: () => void;
   workshops: Workshop[];
   workshopBookings: WorkshopBooking[];
-  onScheduleCreated: (
-    sessions: GeneratedSession[],
-    workshop: Workshop,
-  ) => void;
+  selectedWorkshopSession?: WorkshopSession;
+  onScheduleCreated: (sessions: GeneratedSession[], workshop: Workshop) => void;
 }
 
 type AvailableMonth = {
@@ -660,9 +612,7 @@ type AvailableMonth = {
   year: string;
 };
 
-export const getAvailableMonths = (
-  count: number = 4,
-): AvailableMonth[] => {
+export const getAvailableMonths = (count: number = 4): AvailableMonth[] => {
   const months: AvailableMonth[] = [];
 
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -672,11 +622,7 @@ export const getAvailableMonths = (
   const now = new Date();
 
   for (let i = 0; i < count; i++) {
-    const date = new Date(
-      now.getFullYear(),
-      now.getMonth() + i,
-      1,
-    );
+    const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
 
     const monthName = formatter.format(date);
 
@@ -695,46 +641,33 @@ const availableMonths = getAvailableMonths();
 export function ScheduleWorkshopDrawer({
   open,
   onClose,
+  selectedWorkshopSession,
   workshops,
   workshopBookings,
   onScheduleCreated,
 }: Props) {
   // ── form state ──
-  const [
-    isCreatingWorkshopSessions,
-    setIsCreatingWorkshopSessions,
-  ] = useState(false);
+  const [isCreatingWorkshopSessions, setIsCreatingWorkshopSessions] =
+    useState(false);
   const [
     isCreatingWorkshopBookingStudents,
     setIsCreatingWorkshopBookingStudents,
   ] = useState(false);
-  const [selectedWorkshopId, setSelectedWorkshopId] =
-    useState<string>("");
-  const [firstSessionDate, setFirstSessionDate] =
-    useState<string>("");
-  const [timeRange, setTimeRange] =
-    useState<string>("10:00 - 12:00");
-  const [selectedWeekdays, setSelectedWeekdays] = useState<
-    number[]
-  >([2, 4]);
-  const [sessions, setSessions] = useState<GeneratedSession[]>(
-    [],
+  const [selectedWorkshopId, setSelectedWorkshopId] = useState<string>(
+    () => selectedWorkshopSession?.workshop_id || "",
   );
-  const [editingIdx, setEditingIdx] = useState<number | null>(
-    null,
-  );
+  const [firstSessionDate, setFirstSessionDate] = useState<string>("");
+  const [timeRange, setTimeRange] = useState<string>("10:00 - 12:00");
+  const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([2, 4]);
+  const [sessions, setSessions] = useState<GeneratedSession[]>([]);
+  const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editDateVal, setEditDateVal] = useState<string>("");
-  const [selectedMonth, setSelectedMonth] =
-    useState<string>("");
-  const [bookedCandidates, setBookedCandidates] = useState<
-    Student[]
-  >([]);
-  const [loadingBookedCandidates, setLoadingBookedCandidates] =
-    useState(false);
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [bookedCandidates, setBookedCandidates] = useState<Student[]>([]);
+  const [loadingBookedCandidates, setLoadingBookedCandidates] = useState(false);
   // ── step / flow state ──
   const [step, setStep] = useState<DrawerStep>("form");
-  const [showCloseWarning, setShowCloseWarning] =
-    useState(false);
+  const [showCloseWarning, setShowCloseWarning] = useState(false);
 
   // ── details step state ──
   const [students, setStudents] = useState<Student[]>([]);
@@ -747,16 +680,11 @@ export function ScheduleWorkshopDrawer({
 
   const drawerRef = useRef<HTMLDivElement>(null);
 
-  const selectedWorkshop = workshops.find(
-    (w) => w.id === selectedWorkshopId,
-  );
+  const selectedWorkshop = workshops.find((w) => w.id === selectedWorkshopId);
   const sessionCount = selectedWorkshop
     ? parseSessionCount(selectedWorkshop)
     : 6;
   const basePrice = selectedWorkshop?.price ?? 0;
-  const capacityNum = parseCapacity(
-    selectedWorkshop?.class_type,
-  );
 
   // Regenerate sessions
   useEffect(() => {
@@ -766,19 +694,9 @@ export function ScheduleWorkshopDrawer({
     }
     const first = new Date(firstSessionDate + "T00:00:00");
     setSessions(
-      generateSessions(
-        first,
-        selectedWeekdays,
-        sessionCount,
-        timeRange,
-      ),
+      generateSessions(first, selectedWeekdays, sessionCount, timeRange),
     );
-  }, [
-    firstSessionDate,
-    selectedWeekdays,
-    timeRange,
-    sessionCount,
-  ]);
+  }, [firstSessionDate, selectedWeekdays, timeRange, sessionCount]);
 
   // Full reset on close
   useEffect(() => {
@@ -795,14 +713,41 @@ export function ScheduleWorkshopDrawer({
       setStudents([]);
       setAddingStudent(false);
       setNewStudent({ name: "", email: "", phone: "" });
+      setIsCreatingWorkshopBookingStudents(false);
+      setIsCreatingWorkshopSessions(false);
     }
   }, [open]);
 
   useEffect(() => {
-    if (!selectedMonth || !selectedWorkshopId)
-      return setBookedCandidates([]);
+    if (!selectedMonth || !selectedWorkshopId) return setBookedCandidates([]);
     getBookedCandidates();
   }, [selectedMonth, selectedWorkshopId]);
+
+  const isEditMode = !!selectedWorkshopSession;
+
+  useEffect(() => {
+    if (!open || !selectedWorkshopSession) return;
+
+    setSelectedWorkshopId(selectedWorkshopSession.workshop_id);
+
+    const sessionDate = new Date(
+      selectedWorkshopSession.date.includes("T")
+        ? selectedWorkshopSession.date
+        : selectedWorkshopSession.date + "T00:00:00",
+    );
+    if (!Number.isNaN(sessionDate.getTime())) {
+      const monthName = sessionDate
+        .toLocaleDateString("en-US", { month: "long" })
+        .toLowerCase();
+      setSelectedMonth(monthName);
+    }
+
+    if (selectedWorkshopSession.starts_at && selectedWorkshopSession.ends_at) {
+      setTimeRange(
+        `${selectedWorkshopSession.starts_at} - ${selectedWorkshopSession.ends_at}`,
+      );
+    }
+  }, [open, selectedWorkshopSession]);
 
   // ── handlers ──
 
@@ -817,25 +762,18 @@ export function ScheduleWorkshopDrawer({
         `${fullMonth.label}-${fullMonth.year}`,
       );
       setBookedCandidates(
-        bookedCandidates.map((bc) =>
-          makeStudent(bc, basePrice),
-        ),
+        bookedCandidates.map((bc) => makeStudent(bc, basePrice)),
       );
       setLoadingBookedCandidates(false);
     } catch (e) {
       setLoadingBookedCandidates(false);
-      console.error(
-        "Error getting booked candidates for month:",
-        e,
-      );
+      console.error("Error getting booked candidates for month:", e);
     }
   };
 
   const toggleWeekday = (val: number) =>
     setSelectedWeekdays((prev) =>
-      prev.includes(val)
-        ? prev.filter((d) => d !== val)
-        : [...prev, val],
+      prev.includes(val) ? prev.filter((d) => d !== val) : [...prev, val],
     );
 
   const commitEditDate = (idx: number) => {
@@ -853,60 +791,68 @@ export function ScheduleWorkshopDrawer({
 
   const handleCreateWorkshopSessions = async () => {
     if (!selectedWorkshop || !sessions.length) return;
-    setIsCreatingWorkshopSessions(true);
-    let newSessions: any[] = [];
-    for (const session of sessions) {
-      const startTime = session.time.split("-")[0]?.trim();
-      const endTime = session.time.split("-")[1]?.trim();
-      const date = `${session.date.getFullYear()}-${session.date.getMonth() + 1}-${session.date.getDate()}`;
+    try {
+      setIsCreatingWorkshopSessions(true);
+      let newSessions: any[] = [];
+      for (const session of sessions) {
+        const startTime = session.time.split("-")[0]?.trim();
+        const endTime = session.time.split("-")[1]?.trim();
+        const date = `${session.date.getFullYear()}-${session.date.getMonth() + 1}-${session.date.getDate()}`;
 
-      const newSession = await createWorkshopSession({
-        workshop_id: selectedWorkshop.id,
-        starts_at: startTime,
-        ends_at: endTime,
-        date: date,
-        status: "scheduled",
-      });
+        const newSession = await createWorkshopSession({
+          workshop_id: selectedWorkshop.id,
+          weekdays: selectedWeekdays,
+          starts_at: startTime,
+          ends_at: endTime,
+          date: date,
+          status: "scheduled",
+        });
 
-      newSessions.push({ ...session, id: newSession.id });
-      console.log("newSessions ===>", newSessions);
+        newSessions.push({ ...session, id: newSession.id });
+        console.log("newSessions ===>", newSessions);
+      }
+      setSessions(newSessions);
+      setIsCreatingWorkshopSessions(false);
+      onScheduleCreated(sessions, selectedWorkshop);
+      setStep("created");
+      setIsCreatingWorkshopSessions(false);
+    } catch (e) {
+      alert("Error creating workshop sessions: " + e);
+      setIsCreatingWorkshopSessions(false);
     }
-    setSessions(newSessions);
-    setIsCreatingWorkshopSessions(false);
-    onScheduleCreated(sessions, selectedWorkshop);
-    setStep("created");
   };
 
   const handleSaveSchedule = async () => {
     if (!selectedWorkshop || !sessions.length) return;
-    setIsCreatingWorkshopBookingStudents(true);
-    console.log("sessions ===>", sessions);
-    console.log("students ===>", students);
-    let promises: Promise<void>[] = [];
-    for (const student of students) {
-      for (const session of sessions) {
-        console.log("session ===>", session);
-        console.log("student ===>", student);
+    try {
+      setIsCreatingWorkshopBookingStudents(true);
+      let promises: Promise<void>[] = [];
+      for (const student of students) {
+        for (const session of sessions) {
+          console.log("session ===>", session);
+          console.log("student ===>", student);
+          promises.push(
+            createWorkshopBookingStudent({
+              workshop_id: selectedWorkshop.id,
+              workshop_session_id: session.id,
+              user_id: student.id,
+              name: student.name,
+              email: student.email,
+              phone: student.phone,
+            }),
+          );
+        }
         promises.push(
-          createWorkshopBookingStudent({
-            workshop_id: selectedWorkshop.id,
-            workshop_session_id: session.id,
-            user_id: student.id,
-            name: student.name,
-            email: student.email,
-            phone: student.phone,
-          }),
+          updateWorkshopBookingStatusToScheduled(student.bookingId),
         );
       }
-      promises.push(
-        updateWorkshopBookingStatusToScheduled(
-          student.bookingId,
-        ),
-      );
+      await Promise.all(promises);
+      setIsCreatingWorkshopBookingStudents(false);
+      onClose();
+    } catch (e) {
+      alert("Error saving schedule: " + e);
     }
-    await Promise.all(promises);
     setIsCreatingWorkshopBookingStudents(false);
-    onClose();
   };
 
   const handleCloseRequest = () => {
@@ -923,8 +869,7 @@ export function ScheduleWorkshopDrawer({
     setStudents((prev) => prev.filter((s) => s.id !== id));
 
   const addManualStudent = () => {
-    if (!newStudent.name.trim() || !newStudent.phone.trim())
-      return;
+    if (!newStudent.name.trim() || !newStudent.phone.trim()) return;
     setStudents((prev) => [
       ...prev,
       makeStudent(
@@ -944,7 +889,8 @@ export function ScheduleWorkshopDrawer({
 
   // ── render ──
 
-  const isFull = students.length >= capacityNum;
+  const isFull =
+    students.length >= (selectedWorkshop ? selectedWorkshop?.capacity || 1 : 1);
 
   const selectedMonthName = selectedMonth
     ? new Date(selectedMonth + "-01T00:00:00")
@@ -952,16 +898,13 @@ export function ScheduleWorkshopDrawer({
         .toLowerCase()
     : null;
   const assignedBookingIds = new Set(
-    students
-      .filter((s) => s.source === "booked")
-      .map((s) => s.id),
+    students.filter((s) => s.source === "booked").map((s) => s.id),
   );
 
   const addFromBooking = (wb: WorkshopBooking) => {
     if (isFull) return;
     const monthLabel = wb.preferred_month
-      ? wb.preferred_month.charAt(0).toUpperCase() +
-        wb.preferred_month.slice(1)
+      ? wb.preferred_month.charAt(0).toUpperCase() + wb.preferred_month.slice(1)
       : "";
     setStudents((prev) => [
       ...prev,
@@ -1010,15 +953,16 @@ export function ScheduleWorkshopDrawer({
               >
                 {step === "details"
                   ? "Workshop Details"
-                  : "Schedule Workshop"}
+                  : isEditMode
+                    ? "Edit Session"
+                    : "Schedule Workshop"}
               </h2>
-              <p
-                className="text-sm mt-0.5"
-                style={{ color: "#6b7280" }}
-              >
+              <p className="text-sm mt-0.5" style={{ color: "#6b7280" }}>
                 {step === "details"
                   ? `${selectedWorkshop?.title ?? "Workshop"} · ${sessions.length} sessions`
-                  : "Create a scheduled run for an existing workshop"}
+                  : isEditMode
+                    ? "Update this workshop session"
+                    : "Create a scheduled run for an existing workshop"}
               </p>
             </div>
             <button
@@ -1026,18 +970,13 @@ export function ScheduleWorkshopDrawer({
               onClick={handleCloseRequest}
               className="p-1.5 rounded-md hover:bg-gray-100 transition-colors mt-0.5"
             >
-              <X
-                className="w-4 h-4"
-                style={{ color: "#6b7280" }}
-              />
+              <X className="w-4 h-4" style={{ color: "#6b7280" }} />
             </button>
           </div>
 
           {/* Step indicator */}
           <div className="flex items-center gap-2 mt-3">
-            {(
-              ["form", "created", "details"] as DrawerStep[]
-            ).map((s, i) => (
+            {(["form", "created", "details"] as DrawerStep[]).map((s, i) => (
               <div key={s} className="flex items-center gap-2">
                 <div
                   className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-semibold"
@@ -1045,23 +984,20 @@ export function ScheduleWorkshopDrawer({
                     backgroundColor:
                       step === s
                         ? "#3D3935"
-                        : (step === "created" &&
-                              s === "form") ||
+                        : (step === "created" && s === "form") ||
                             step === "details"
                           ? "#E9CFCA"
                           : "#DCD4CD",
                     color:
                       step === s
                         ? "#FEFCFA"
-                        : (step === "created" &&
-                              s === "form") ||
+                        : (step === "created" && s === "form") ||
                             step === "details"
                           ? "#3D3935"
                           : "#9ca3af",
                   }}
                 >
-                  {(step === "created" && s === "form") ||
-                  step === "details"
+                  {(step === "created" && s === "form") || step === "details"
                     ? "✓"
                     : i + 1}
                 </div>
@@ -1071,8 +1007,7 @@ export function ScheduleWorkshopDrawer({
                     style={{
                       backgroundColor:
                         (i === 0 &&
-                          (step === "created" ||
-                            step === "details")) ||
+                          (step === "created" || step === "details")) ||
                         (i === 1 && step === "details")
                           ? "#E9CFCA"
                           : "#DCD4CD",
@@ -1081,10 +1016,7 @@ export function ScheduleWorkshopDrawer({
                 )}
               </div>
             ))}
-            <span
-              className="ml-1 text-xs"
-              style={{ color: "#9ca3af" }}
-            >
+            <span className="ml-1 text-xs" style={{ color: "#9ca3af" }}>
               {step === "form"
                 ? "Set schedule"
                 : step === "created"
@@ -1112,6 +1044,14 @@ export function ScheduleWorkshopDrawer({
                 >
                   Workshop
                 </label>
+                <>
+                  {" "}
+                  {console.log(
+                    "selectedWorkshopId =======>",
+                    selectedWorkshopId,
+                  )}
+                </>
+
                 <Select
                   value={selectedWorkshopId}
                   onValueChange={setSelectedWorkshopId}
@@ -1136,15 +1076,10 @@ export function ScheduleWorkshopDrawer({
                   </SelectContent>
                 </Select>
                 {selectedWorkshop && (
-                  <p
-                    className="mt-2 text-xs"
-                    style={{ color: "#9ca3af" }}
-                  >
-                    Capacity:{" "}
-                    {parseCapacity(selectedWorkshop.class_type)}{" "}
+                  <p className="mt-2 text-xs" style={{ color: "#9ca3af" }}>
+                    Capacity: {parseCapacity(selectedWorkshop.class_type)}{" "}
                     students
-                    {" • "}Sessions:{" "}
-                    {parseSessionCount(selectedWorkshop)}
+                    {" • "}Sessions: {parseSessionCount(selectedWorkshop)}
                     {selectedWorkshop.session_duration_hours
                       ? ` × ${selectedWorkshop.session_duration_hours}h`
                       : ""}
@@ -1172,33 +1107,23 @@ export function ScheduleWorkshopDrawer({
                         onClick={() => setSelectedMonth(m.id)}
                         className="flex-1 flex flex-col items-center justify-center py-3 rounded-lg border text-xs font-medium transition-colors"
                         style={{
-                          backgroundColor: isSel
-                            ? "#F1DFC0"
-                            : "#FAF7F5",
-                          borderColor: isSel
-                            ? "#3D3935"
-                            : "#DCD4CD",
+                          backgroundColor: isSel ? "#F1DFC0" : "#FAF7F5",
+                          borderColor: isSel ? "#3D3935" : "#DCD4CD",
                           color: "#3D3935",
                           borderWidth: isSel ? "2px" : "1px",
                         }}
                       >
                         {isSel && (
-                          <span className="mb-1 text-base leading-none">
-                            ✓
-                          </span>
+                          <span className="mb-1 text-base leading-none">✓</span>
                         )}
                         {m.label}
                       </button>
                     );
                   })}
                 </div>
-                <p
-                  className="mt-1.5 text-xs"
-                  style={{ color: "#9ca3af" }}
-                >
-                  Students who booked this workshop for this
-                  month will be suggested when adding
-                  participants.
+                <p className="mt-1.5 text-xs" style={{ color: "#9ca3af" }}>
+                  Students who booked this workshop for this month will be
+                  suggested when adding participants.
                 </p>
 
                 {!selectedMonth ||
@@ -1213,20 +1138,13 @@ export function ScheduleWorkshopDrawer({
                   </div>
                 ) : bookedCandidates.length > 0 ? (
                   <div className="flex items-center justify-center mt-2">
-                    <p
-                      className="mt-1.5 text-sm"
-                      style={{ color: "#9ca3af" }}
-                    >
-                      {bookedCandidates.length} booked
-                      candidates found
+                    <p className="mt-1.5 text-sm" style={{ color: "#9ca3af" }}>
+                      {bookedCandidates.length} booked candidates found
                     </p>
                   </div>
                 ) : (
                   <div className="flex items-center justify-center mt-2">
-                    <p
-                      className="mt-1.5 text-sm"
-                      style={{ color: "#9ca3af" }}
-                    >
+                    <p className="mt-1.5 text-sm" style={{ color: "#9ca3af" }}>
                       No booked candidates found
                     </p>
                   </div>
@@ -1242,27 +1160,27 @@ export function ScheduleWorkshopDrawer({
                   Session Schedule
                 </p>
                 <div className="space-y-4">
-                  <div>
-                    <label
-                      className="block text-xs font-medium mb-1.5"
-                      style={{ color: "#3D3935" }}
-                    >
-                      First Session Date
-                    </label>
-                    <input
-                      type="date"
-                      value={firstSessionDate}
-                      onChange={(e) =>
-                        setFirstSessionDate(e.target.value)
-                      }
-                      className="w-full px-3 py-2 rounded-md border text-sm outline-none"
-                      style={{
-                        borderColor: "#DCD4CD",
-                        backgroundColor: "#FEFCFA",
-                        color: "#3D3935",
-                      }}
-                    />
-                  </div>
+                  {!isEditMode && (
+                    <div>
+                      <label
+                        className="block text-xs font-medium mb-1.5"
+                        style={{ color: "#3D3935" }}
+                      >
+                        First Session Date
+                      </label>
+                      <input
+                        type="date"
+                        value={firstSessionDate}
+                        onChange={(e) => setFirstSessionDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-md border text-sm outline-none"
+                        style={{
+                          borderColor: "#DCD4CD",
+                          backgroundColor: "#FEFCFA",
+                          color: "#3D3935",
+                        }}
+                      />
+                    </div>
+                  )}
                   <div>
                     <label
                       className="block text-xs font-medium mb-1.5"
@@ -1273,9 +1191,7 @@ export function ScheduleWorkshopDrawer({
                     <input
                       type="text"
                       value={timeRange}
-                      onChange={(e) =>
-                        setTimeRange(e.target.value)
-                      }
+                      onChange={(e) => setTimeRange(e.target.value)}
                       placeholder="10:00 - 12:00"
                       className="w-full px-3 py-2 rounded-md border text-sm outline-none"
                       style={{
@@ -1285,48 +1201,98 @@ export function ScheduleWorkshopDrawer({
                       }}
                     />
                   </div>
-                  <div>
-                    <label
-                      className="block text-xs font-medium mb-2"
-                      style={{ color: "#3D3935" }}
-                    >
-                      Repeat on
-                    </label>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {WEEKDAYS.map((day) => {
-                        const active =
-                          selectedWeekdays.includes(day.value);
-                        return (
-                          <button
-                            key={day.value}
-                            type="button"
-                            onClick={() =>
-                              toggleWeekday(day.value)
-                            }
-                            className="w-9 h-9 rounded-md text-xs font-medium border transition-colors"
-                            style={{
-                              backgroundColor: active
-                                ? "#3D3935"
-                                : "#FAF7F5",
-                              borderColor: active
-                                ? "#3D3935"
-                                : "#DCD4CD",
-                              color: active
-                                ? "#FEFCFA"
-                                : "#3D3935",
-                            }}
-                          >
-                            {day.label}
-                          </button>
-                        );
-                      })}
+                  {!isEditMode && (
+                    <div>
+                      <label
+                        className="block text-xs font-medium mb-2"
+                        style={{ color: "#3D3935" }}
+                      >
+                        Repeat on
+                      </label>
+                      <div className="flex gap-1.5 flex-wrap">
+                        {WEEKDAYS.map((day) => {
+                          const active = selectedWeekdays.includes(day.value);
+                          return (
+                            <button
+                              key={day.value}
+                              type="button"
+                              onClick={() => toggleWeekday(day.value)}
+                              className="w-9 h-9 rounded-md text-xs font-medium border transition-colors"
+                              style={{
+                                backgroundColor: active ? "#3D3935" : "#FAF7F5",
+                                borderColor: active ? "#3D3935" : "#DCD4CD",
+                                color: active ? "#FEFCFA" : "#3D3935",
+                              }}
+                            >
+                              {day.label}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </section>
 
-              {/* Generated Sessions */}
-              {sessions.length > 0 ? (
+              {/* Selected / Generated Sessions */}
+              {isEditMode && selectedWorkshopSession ? (
+                <section>
+                  <div className="flex items-center justify-between mb-3">
+                    <p
+                      className="text-xs font-semibold uppercase tracking-wide"
+                      style={{ color: "#3D3935" }}
+                    >
+                      Session
+                    </p>
+                    <span
+                      className="text-xs px-2 py-0.5 rounded"
+                      style={{
+                        backgroundColor: "#E9CFCA",
+                        color: "#3D3935",
+                      }}
+                    >
+                      1 session
+                    </span>
+                  </div>
+                  <div
+                    className="rounded-md border"
+                    style={{
+                      borderColor: "#DCD4CD",
+                      backgroundColor: "#FAF7F5",
+                    }}
+                  >
+                    <div className="flex items-center justify-between px-3 py-2.5">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="text-xs font-medium w-16 flex-shrink-0"
+                          style={{ color: "#9ca3af" }}
+                        >
+                          Session
+                        </span>
+                        <span
+                          className="text-xs"
+                          style={{ color: "#3D3935" }}
+                        >
+                          {formatSessionDate(
+                            new Date(
+                              selectedWorkshopSession.date.includes("T")
+                                ? selectedWorkshopSession.date
+                                : selectedWorkshopSession.date + "T00:00:00",
+                            ),
+                          )}
+                        </span>
+                        <span
+                          className="text-xs"
+                          style={{ color: "#6b7280" }}
+                        >
+                          {timeRange ||
+                            `${selectedWorkshopSession.starts_at} - ${selectedWorkshopSession.ends_at}`}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              ) : sessions.length > 0 ? (
                 <section>
                   <div className="flex items-center justify-between mb-3">
                     <p
@@ -1369,18 +1335,14 @@ export function ScheduleWorkshopDrawer({
                             <input
                               type="date"
                               value={editDateVal}
-                              onChange={(e) =>
-                                setEditDateVal(e.target.value)
-                              }
+                              onChange={(e) => setEditDateVal(e.target.value)}
                               className="flex-1 px-2 py-1 text-xs rounded border"
                               style={{ borderColor: "#DCD4CD" }}
                               autoFocus
                             />
                             <button
                               type="button"
-                              onClick={() =>
-                                commitEditDate(s.index)
-                              }
+                              onClick={() => commitEditDate(s.index)}
                               className="p-1 rounded hover:bg-gray-200"
                             >
                               <Check
@@ -1416,9 +1378,7 @@ export function ScheduleWorkshopDrawer({
                               onClick={() => {
                                 setEditingIdx(s.index);
                                 setEditDateVal(
-                                  s.date
-                                    .toISOString()
-                                    .split("T")[0],
+                                  s.date.toISOString().split("T")[0],
                                 );
                               }}
                               className="p-1 rounded hover:bg-gray-200"
@@ -1443,12 +1403,9 @@ export function ScheduleWorkshopDrawer({
                     className="w-6 h-6 mx-auto mb-2"
                     style={{ color: "#DCD4CD" }}
                   />
-                  <p
-                    className="text-xs"
-                    style={{ color: "#9ca3af" }}
-                  >
-                    Select a workshop, first session date, and
-                    repeat days to preview generated sessions.
+                  <p className="text-xs" style={{ color: "#9ca3af" }}>
+                    Select a workshop, first session date, and repeat days to
+                    preview generated sessions.
                   </p>
                 </div>
               )}
@@ -1463,31 +1420,19 @@ export function ScheduleWorkshopDrawer({
                 className="w-16 h-16 rounded-full flex items-center justify-center"
                 style={{ backgroundColor: "#E9CFCA" }}
               >
-                <CheckCircle
-                  className="w-9 h-9"
-                  style={{ color: "#3D3935" }}
-                />
+                <CheckCircle className="w-9 h-9" style={{ color: "#3D3935" }} />
               </div>
               <div className="text-center">
-                <h3
-                  className="font-semibold mb-1"
-                  style={{ color: "#3D3935" }}
-                >
+                <h3 className="font-semibold mb-1" style={{ color: "#3D3935" }}>
                   Workshop run created!
                 </h3>
-                <p
-                  className="text-sm"
-                  style={{ color: "#6b7280" }}
-                >
+                <p className="text-sm" style={{ color: "#6b7280" }}>
                   {sessions.length} session
-                  {sessions.length !== 1 ? "s" : ""} have been
-                  added to the calendar.
+                  {sessions.length !== 1 ? "s" : ""} have been added to the
+                  calendar.
                 </p>
                 {selectedWorkshop && (
-                  <p
-                    className="text-xs mt-1"
-                    style={{ color: "#9ca3af" }}
-                  >
+                  <p className="text-xs mt-1" style={{ color: "#9ca3af" }}>
                     {selectedWorkshop.title}
                   </p>
                 )}
@@ -1510,26 +1455,17 @@ export function ScheduleWorkshopDrawer({
                     >
                       Session {s.index}
                     </span>
-                    <span
-                      className="text-xs"
-                      style={{ color: "#3D3935" }}
-                    >
+                    <span className="text-xs" style={{ color: "#3D3935" }}>
                       {formatSessionDate(s.date)}
                     </span>
-                    <span
-                      className="text-xs"
-                      style={{ color: "#6b7280" }}
-                    >
+                    <span className="text-xs" style={{ color: "#6b7280" }}>
                       {s.time}
                     </span>
                   </div>
                 ))}
                 {sessions.length > 4 && (
                   <div className="px-3 py-2 text-center">
-                    <span
-                      className="text-xs"
-                      style={{ color: "#9ca3af" }}
-                    >
+                    <span className="text-xs" style={{ color: "#9ca3af" }}>
                       +{sessions.length - 4} more session
                       {sessions.length - 4 !== 1 ? "s" : ""}
                     </span>
@@ -1587,18 +1523,11 @@ export function ScheduleWorkshopDrawer({
                   >
                     {selectedWorkshop?.title}
                   </p>
-                  <p
-                    className="text-xs"
-                    style={{ color: "#6b7280" }}
-                  >
+                  <p className="text-xs" style={{ color: "#6b7280" }}>
                     {sessions.length} sessions ·{" "}
-                    {sessions[0] &&
-                      formatSessionDate(sessions[0].date)}{" "}
-                    –{" "}
+                    {sessions[0] && formatSessionDate(sessions[0].date)} –{" "}
                     {sessions[sessions.length - 1] &&
-                      formatSessionDate(
-                        sessions[sessions.length - 1].date,
-                      )}
+                      formatSessionDate(sessions[sessions.length - 1].date)}
                   </p>
                 </div>
                 <span
@@ -1636,14 +1565,13 @@ export function ScheduleWorkshopDrawer({
                   <span
                     className="text-xs px-2.5 py-1 rounded-full font-semibold border"
                     style={{
-                      backgroundColor: isFull
-                        ? "#DCD4CD"
-                        : "#E9CFCA",
+                      backgroundColor: isFull ? "#DCD4CD" : "#E9CFCA",
                       borderColor: "#3D3935",
                       color: "#3D3935",
                     }}
                   >
-                    Seats: {students.length} / {capacityNum}
+                    Seats: {students.length} /
+                    {selectedWorkshop ? selectedWorkshop?.capacity || 1 : 1}
                   </span>
                 </div>
                 {isFull && (
@@ -1671,95 +1599,93 @@ export function ScheduleWorkshopDrawer({
                       className="rounded-md border divide-y"
                       style={{ borderColor: "#DCD4CD" }}
                     >
-                      {bookedCandidates.map((wb) => (
-                        <div
-                          key={wb.id}
-                          className="flex items-center gap-3 px-3 py-2.5"
-                        >
+                      {bookedCandidates
+                        .filter(
+                          (wb) =>
+                            students.length === 0 ||
+                            students.some((s) => s.id !== wb.user_id),
+                        )
+                        .map((wb) => (
                           <div
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0"
-                            style={{
-                              backgroundColor: "#F1DFC0",
-                              color: "#3D3935",
-                            }}
+                            key={wb.id}
+                            className="flex items-center gap-3 px-3 py-2.5"
                           >
-                            {wb.participant_name
-                              .charAt(0)
-                              .toUpperCase()}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className="text-xs font-medium truncate"
-                              style={{ color: "#3D3935" }}
+                            <div
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0"
+                              style={{
+                                backgroundColor: "#F1DFC0",
+                                color: "#3D3935",
+                              }}
                             >
-                              {wb.participant_name}
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5">
-                              {wb.phone ? (
-                                <span
-                                  className="flex items-center gap-1 text-xs"
-                                  style={{ color: "#9ca3af" }}
-                                >
-                                  <Phone className="w-2.5 h-2.5" />
-                                  {wb.phone}
-                                </span>
-                              ) : wb.email ? (
-                                <span
-                                  className="flex items-center gap-1 text-xs"
-                                  style={{ color: "#9ca3af" }}
-                                >
-                                  <Mail className="w-2.5 h-2.5" />
-                                  {wb.email}
-                                </span>
-                              ) : null}
-                              {wb.preferred_month && (
-                                <span
-                                  className="text-xs"
-                                  style={{ color: "#9ca3af" }}
-                                >
-                                  ·{" "}
-                                  {wb.preferred_month
-                                    .charAt(0)
-                                    .toUpperCase() +
-                                    wb.preferred_month.slice(1)}
-                                </span>
-                              )}
+                              {wb.participant_name.charAt(0).toUpperCase()}
                             </div>
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className="text-xs font-medium truncate"
+                                style={{ color: "#3D3935" }}
+                              >
+                                {wb.participant_name}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {wb.phone ? (
+                                  <span
+                                    className="flex items-center gap-1 text-xs"
+                                    style={{ color: "#9ca3af" }}
+                                  >
+                                    <Phone className="w-2.5 h-2.5" />
+                                    {wb.phone}
+                                  </span>
+                                ) : wb.email ? (
+                                  <span
+                                    className="flex items-center gap-1 text-xs"
+                                    style={{ color: "#9ca3af" }}
+                                  >
+                                    <Mail className="w-2.5 h-2.5" />
+                                    {wb.email}
+                                  </span>
+                                ) : null}
+                                {wb.preferred_month && (
+                                  <span
+                                    className="text-xs"
+                                    style={{ color: "#9ca3af" }}
+                                  >
+                                    ·{" "}
+                                    {wb.preferred_month
+                                      .charAt(0)
+                                      .toUpperCase() +
+                                      wb.preferred_month.slice(1)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <span
+                              className="text-xs px-2 py-0.5 rounded font-medium flex-shrink-0"
+                              style={{
+                                backgroundColor: "#E9CFCA",
+                                color: "#3D3935",
+                              }}
+                            >
+                              Booked
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => addFromBooking(wb)}
+                              disabled={isFull}
+                              className="flex items-center gap-1 text-xs px-2 py-1.5 rounded border font-medium transition-colors flex-shrink-0"
+                              style={{
+                                backgroundColor: isFull
+                                  ? "transparent"
+                                  : "#3D3935",
+                                borderColor: isFull ? "#DCD4CD" : "#3D3935",
+                                color: isFull ? "#9ca3af" : "#FEFCFA",
+                                cursor: isFull ? "not-allowed" : "pointer",
+                              }}
+                            >
+                              <UserPlus className="w-3 h-3" />
+                              Add
+                            </button>
                           </div>
-                          <span
-                            className="text-xs px-2 py-0.5 rounded font-medium flex-shrink-0"
-                            style={{
-                              backgroundColor: "#E9CFCA",
-                              color: "#3D3935",
-                            }}
-                          >
-                            Booked
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => addFromBooking(wb)}
-                            disabled={isFull}
-                            className="flex items-center gap-1 text-xs px-2 py-1.5 rounded border font-medium transition-colors flex-shrink-0"
-                            style={{
-                              backgroundColor: isFull
-                                ? "transparent"
-                                : "#3D3935",
-                              borderColor: isFull
-                                ? "#DCD4CD"
-                                : "#3D3935",
-                              color: isFull
-                                ? "#9ca3af"
-                                : "#FEFCFA",
-                              cursor: isFull
-                                ? "not-allowed"
-                                : "pointer",
-                            }}
-                          >
-                            <UserPlus className="w-3 h-3" />
-                            Add
-                          </button>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 )}
@@ -1778,12 +1704,8 @@ export function ScheduleWorkshopDrawer({
                         <StudentCard
                           key={student.id}
                           student={student}
-                          onChange={(patch) =>
-                            updateStudent(student.id, patch)
-                          }
-                          onRemove={() =>
-                            removeStudent(student.id)
-                          }
+                          onChange={(patch) => updateStudent(student.id, patch)}
+                          onRemove={() => removeStudent(student.id)}
                         />
                       ))}
                     </div>
@@ -1791,26 +1713,22 @@ export function ScheduleWorkshopDrawer({
                 )}
 
                 {/* Empty state */}
-                {students.length === 0 &&
-                  bookedCandidates.length === 0 && (
-                    <div
-                      className="rounded-md border border-dashed py-5 text-center mb-4"
-                      style={{ borderColor: "#DCD4CD" }}
-                    >
-                      <UserCheck
-                        className="w-5 h-5 mx-auto mb-1.5"
-                        style={{ color: "#DCD4CD" }}
-                      />
-                      <p
-                        className="text-xs"
-                        style={{ color: "#9ca3af" }}
-                      >
-                        {selectedMonth
-                          ? "No bookings found for this month. Add students manually below."
-                          : "No booking month selected. Add students manually below."}
-                      </p>
-                    </div>
-                  )}
+                {students.length === 0 && bookedCandidates.length === 0 && (
+                  <div
+                    className="rounded-md border border-dashed py-5 text-center mb-4"
+                    style={{ borderColor: "#DCD4CD" }}
+                  >
+                    <UserCheck
+                      className="w-5 h-5 mx-auto mb-1.5"
+                      style={{ color: "#DCD4CD" }}
+                    />
+                    <p className="text-xs" style={{ color: "#9ca3af" }}>
+                      {selectedMonth
+                        ? "No bookings found for this month. Add students manually below."
+                        : "No booking month selected. Add students manually below."}
+                    </p>
+                  </div>
+                )}
 
                 {/* Add manually */}
                 {!addingStudent && !isFull && (
@@ -1916,14 +1834,12 @@ export function ScheduleWorkshopDrawer({
                         type="button"
                         onClick={addManualStudent}
                         disabled={
-                          !newStudent.name.trim() ||
-                          !newStudent.phone.trim()
+                          !newStudent.name.trim() || !newStudent.phone.trim()
                         }
                         className="flex-1 py-1.5 text-xs rounded font-medium"
                         style={{
                           backgroundColor:
-                            !newStudent.name.trim() ||
-                            !newStudent.phone.trim()
+                            !newStudent.name.trim() || !newStudent.phone.trim()
                               ? "#DCD4CD"
                               : "#3D3935",
                           color: "#FEFCFA",
@@ -1965,9 +1881,7 @@ export function ScheduleWorkshopDrawer({
             <Button
               type="button"
               onClick={handleCreateWorkshopSessions}
-              disabled={
-                !selectedWorkshop || sessions.length === 0
-              }
+              disabled={!selectedWorkshop || sessions.length === 0}
               style={{
                 backgroundColor:
                   !selectedWorkshop ||
@@ -2015,10 +1929,9 @@ export function ScheduleWorkshopDrawer({
               type="button"
               onClick={handleSaveSchedule}
               style={{
-                backgroundColor:
-                  isCreatingWorkshopBookingStudents
-                    ? "#DCD4CD"
-                    : "#3D3935",
+                backgroundColor: isCreatingWorkshopBookingStudents
+                  ? "#DCD4CD"
+                  : "#3D3935",
                 color: isCreatingWorkshopBookingStudents
                   ? "#9ca3af"
                   : "#FEFCFA",
@@ -2033,9 +1946,7 @@ export function ScheduleWorkshopDrawer({
                   : "pointer",
               }}
             >
-              {isCreatingWorkshopBookingStudents
-                ? "Saving..."
-                : "Save &amp; Close"}
+              {isCreatingWorkshopBookingStudents ? "Saving..." : "Save & Close"}
             </Button>
           </div>
         )}

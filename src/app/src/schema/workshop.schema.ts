@@ -30,6 +30,7 @@ export interface Workshop {
   session_count: number; // e.g. 3
   session_duration_hours: number; // e.g. 240 (= 4 hours)
   level: WorkshopLevel;
+  capacity: number;
   class_type: string;
   highlights: string[];
   price?: number;
@@ -51,6 +52,7 @@ export interface WorkshopDisplay {
   sessionDurationHours: number;
   level: string;
   levelValue: WorkshopLevel;
+  capacity: number;
   classType: string;
   highlights: string[];
   price?: number;
@@ -68,6 +70,7 @@ export interface WorkshopInput {
   session_count: number;
   session_duration_hours: number;
   level: WorkshopLevel;
+  capacity: number;
   class_type: string;
   highlights: string[];
   price?: number;
@@ -92,9 +95,7 @@ export function formatDurationLabel(
   if (!sessionCount || !sessionDurationHours) return "–";
   const perSession = sessionDurationHours;
   const totalH = sessionCount * sessionDurationHours;
-  const total = Number.isInteger(totalH)
-    ? `${totalH}`
-    : totalH.toFixed(1);
+  const total = Number.isInteger(totalH) ? `${totalH}` : totalH.toFixed(1);
   const sessWord = sessionCount === 1 ? "session" : "sessions";
   return `${sessionCount} ${sessWord} × ${perSession} (${total} hrs total)`;
 }
@@ -110,18 +111,16 @@ export function formatDurationCompact(
   return `${sessionCount} ${sessWord} × ${perSession}`;
 }
 
-export function formatWorkshopForDisplay(
-  workshop: Workshop,
-): WorkshopDisplay {
+export function formatWorkshopForDisplay(workshop: Workshop): WorkshopDisplay {
   return {
     id: workshop.id,
     title: workshop.title,
     description: workshop.description,
     sessionCount: workshop.session_count ?? 1,
     sessionDurationHours: workshop.session_duration_hours ?? 0,
-    level:
-      WORKSHOP_LEVEL_LABELS[workshop.level] || workshop.level,
+    level: WORKSHOP_LEVEL_LABELS[workshop.level] || workshop.level,
     levelValue: workshop.level,
+    capacity: workshop.capacity,
     classType: workshop.class_type,
     highlights: workshop.highlights,
     price: workshop.price,
@@ -139,6 +138,7 @@ export function formatWorkshopForDatabase(
     description: input.description,
     session_count: input.session_count,
     session_duration_hours: input.session_duration_hours,
+    capacity: input.capacity,
     level: input.level,
     class_type: input.class_type,
     highlights: input.highlights,

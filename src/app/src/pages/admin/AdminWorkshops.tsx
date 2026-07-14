@@ -1,9 +1,4 @@
-import {
-  Plus,
-  Edit,
-  Trash2,
-  GraduationCap,
-} from "lucide-react";
+import { Plus, Edit, Trash2, GraduationCap } from "lucide-react";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { useState, useEffect } from "react";
@@ -37,29 +32,22 @@ import {
 import { subscribeToWorkshops } from "../../lib/db/realtime";
 
 export function AdminWorkshops() {
-  const [isAddingWorkshop, setIsAddingWorkshop] =
-    useState(false);
+  const [isAddingWorkshop, setIsAddingWorkshop] = useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] =
-    useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] =
-    useState(false);
-  const [workshopImageFile, setWorkshopImageFile] =
-    useState<File | null>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [workshopImageFile, setWorkshopImageFile] = useState<File | null>(null);
   const [selectedWorkshop, setSelectedWorkshop] =
     useState<WorkshopDisplay | null>(null);
-  const [workshops, setWorkshops] = useState<WorkshopDisplay[]>(
-    [],
-  );
+  const [workshops, setWorkshops] = useState<WorkshopDisplay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { getContent, setContent } = useWorkshopTabAdmin();
-  const [tabData, setTabData] = useState<WorkshopTabContent>(
-    COMPLETE_DEFAULTS,
-  );
+  const [tabData, setTabData] = useState<WorkshopTabContent>(COMPLETE_DEFAULTS);
   const [showTabSection, setShowTabSection] = useState(false);
 
   const [formData, setFormData] = useState({
     title: "",
+    capacity: 1,
     description: "",
     session_count: "",
     session_duration_hours: "",
@@ -92,9 +80,7 @@ export function AdminWorkshops() {
     try {
       setIsLoading(true);
       const data = await getAllWorkshops();
-      const displayWorkshops = data.map(
-        formatWorkshopForDisplay,
-      );
+      const displayWorkshops = data.map(formatWorkshopForDisplay);
       setWorkshops(displayWorkshops);
     } catch (error) {
       console.error("Failed to load workshops:", error);
@@ -158,13 +144,10 @@ export function AdminWorkshops() {
       session_count: sessionCount,
       session_duration_hours: sessionDurationHours,
       level: formData.level as WorkshopLevel,
+      capacity: formData.capacity,
       class_type: formData.class_type,
-      highlights: formData.highlights
-        .split("\n")
-        .filter((h) => h.trim()),
-      price: formData.price
-        ? parseFloat(formData.price)
-        : undefined,
+      highlights: formData.highlights.split("\n").filter((h) => h.trim()),
+      price: formData.price ? parseFloat(formData.price) : undefined,
       image_url: formData.image_url || undefined,
       is_active: formData.is_active,
       display_order: formData.display_order,
@@ -191,9 +174,7 @@ export function AdminWorkshops() {
     },
     {
       label: "Active Workshops",
-      value: workshops
-        .filter((w) => w.is_active)
-        .length.toString(),
+      value: workshops.filter((w) => w.is_active).length.toString(),
     },
     {
       label: "Avg. Price",
@@ -204,9 +185,7 @@ export function AdminWorkshops() {
     },
     {
       label: "Levels",
-      value: new Set(
-        workshops.map((w) => w.levelValue),
-      ).size.toString(),
+      value: new Set(workshops.map((w) => w.levelValue)).size.toString(),
     },
   ];
 
@@ -215,12 +194,8 @@ export function AdminWorkshops() {
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-gray-800 mb-2">
-            Workshops & Training
-          </h1>
-          <p className="text-gray-600">
-            Manage your training courses
-          </p>
+          <h1 className="text-gray-800 mb-2">Workshops & Training</h1>
+          <p className="text-gray-600">Manage your training courses</p>
         </div>
         <Button
           className="flex items-center gap-2 border-2"
@@ -244,13 +219,8 @@ export function AdminWorkshops() {
             className="p-6 border-2"
             style={{ borderColor: "#DCD4CD" }}
           >
-            <p className="text-gray-600 text-sm mb-1">
-              {stat.label}
-            </p>
-            <p
-              className="text-2xl font-semibold"
-              style={{ color: "#3D3935" }}
-            >
+            <p className="text-gray-600 text-sm mb-1">{stat.label}</p>
+            <p className="text-2xl font-semibold" style={{ color: "#3D3935" }}>
               {stat.value}
             </p>
           </Card>
@@ -283,18 +253,13 @@ export function AdminWorkshops() {
 
             <div className="p-6">
               <div className="flex items-start justify-between mb-3">
-                <h3
-                  className="flex-1"
-                  style={{ color: "#3D3935" }}
-                >
+                <h3 className="flex-1" style={{ color: "#3D3935" }}>
                   {workshop.title}
                 </h3>
                 <span
                   className="px-3 py-1 text-sm font-semibold ml-2"
                   style={{
-                    backgroundColor: workshop.is_active
-                      ? "#E9CFCA"
-                      : "#DCD4CD",
+                    backgroundColor: workshop.is_active ? "#E9CFCA" : "#DCD4CD",
                     color: "#3D3935",
                   }}
                 >
@@ -314,32 +279,23 @@ export function AdminWorkshops() {
                 <span>👥 {workshop.classType}</span>
               </div>
 
-              <p className="text-gray-600 mb-4">
-                {workshop.description}
-              </p>
+              <p className="text-gray-600 mb-4">{workshop.description}</p>
 
               {workshop.highlights.length > 0 && (
                 <div className="mb-4">
-                  <div
-                    className="text-sm mb-2"
-                    style={{ color: "#3D3935" }}
-                  >
+                  <div className="text-sm mb-2" style={{ color: "#3D3935" }}>
                     Course Highlights:
                   </div>
                   <ul className="grid grid-cols-2 gap-2">
-                    {workshop.highlights.map(
-                      (highlight, idx) => (
-                        <li
-                          key={idx}
-                          className="text-sm text-gray-600 flex items-start gap-2"
-                        >
-                          <span className="text-gray-400 mt-1">
-                            •
-                          </span>
-                          <span>{highlight}</span>
-                        </li>
-                      ),
-                    )}
+                    {workshop.highlights.map((highlight, idx) => (
+                      <li
+                        key={idx}
+                        className="text-sm text-gray-600 flex items-start gap-2"
+                      >
+                        <span className="text-gray-400 mt-1">•</span>
+                        <span>{highlight}</span>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               )}
@@ -391,12 +347,9 @@ export function AdminWorkshops() {
           style={{ borderColor: "#DCD4CD" }}
         >
           <GraduationCap className="w-16 h-16 mx-auto mb-4 text-gray-400" />
-          <h3 className="mb-2 text-gray-800">
-            No workshops yet
-          </h3>
+          <h3 className="mb-2 text-gray-800">No workshops yet</h3>
           <p className="text-gray-600 mb-6">
-            Get started by adding your first workshop or
-            training course.
+            Get started by adding your first workshop or training course.
           </p>
           <Button
             className="inline-flex items-center gap-2 border-2"
@@ -414,10 +367,7 @@ export function AdminWorkshops() {
       )}
 
       {/* Add Workshop Dialog */}
-      <Dialog
-        open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
-      >
+      <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Workshop</DialogTitle>
@@ -528,27 +478,22 @@ export function AdminWorkshops() {
               </div>
             </div>
             {/* Live preview */}
-            {formData.session_count &&
-              formData.session_duration_hours && (
-                <div
-                  className="text-sm px-3 py-2 rounded-md"
-                  style={{
-                    backgroundColor: "#FAF7F5",
-                    color: "#6b7280",
-                    border: "1px solid #DCD4CD",
-                  }}
-                >
-                  Total:{" "}
-                  {formatDurationLabel(
-                    parseInt(formData.session_count) || 0,
-                    Math.round(
-                      parseFloat(
-                        formData.session_duration_hours,
-                      ) || 0,
-                    ),
-                  )}
-                </div>
-              )}
+            {formData.session_count && formData.session_duration_hours && (
+              <div
+                className="text-sm px-3 py-2 rounded-md"
+                style={{
+                  backgroundColor: "#FAF7F5",
+                  color: "#6b7280",
+                  border: "1px solid #DCD4CD",
+                }}
+              >
+                Total:{" "}
+                {formatDurationLabel(
+                  parseInt(formData.session_count) || 0,
+                  Math.round(parseFloat(formData.session_duration_hours) || 0),
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div></div>
               <div className="grid gap-2">
@@ -573,27 +518,42 @@ export function AdminWorkshops() {
                   }
                 >
                   <option value="">Select level</option>
-                  <option value={WorkshopLevel.BEGINNER}>
-                    Beginner
-                  </option>
+                  <option value={WorkshopLevel.BEGINNER}>Beginner</option>
                   <option value={WorkshopLevel.INTERMEDIATE}>
                     Intermediate
                   </option>
-                  <option value={WorkshopLevel.ADVANCED}>
-                    Advanced
-                  </option>
-                  <option
-                    value={
-                      WorkshopLevel.INTERMEDIATE_TO_ADVANCED
-                    }
-                  >
+                  <option value={WorkshopLevel.ADVANCED}>Advanced</option>
+                  <option value={WorkshopLevel.INTERMEDIATE_TO_ADVANCED}>
                     Intermediate to Advanced
                   </option>
-                  <option value={WorkshopLevel.ALL_LEVELS}>
-                    All Levels
-                  </option>
+                  <option value={WorkshopLevel.ALL_LEVELS}>All Levels</option>
                 </select>
               </div>
+            </div>
+            <div className="grid gap-2">
+              <label
+                className="text-sm font-medium"
+                style={{ color: "#3D3935" }}
+              >
+                Capacity
+              </label>
+              <input
+                type="number"
+                min="1"
+                className="flex h-10 w-full rounded-md border px-3 py-2 text-sm"
+                style={{
+                  borderColor: "#DCD4CD",
+                  backgroundColor: "#FEFCFA",
+                }}
+                placeholder="e.g., 10"
+                value={formData.capacity}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    capacity: parseInt(e.target.value) || 1,
+                  })
+                }
+              />
             </div>
             <div className="grid gap-2">
               <label
@@ -642,8 +602,7 @@ export function AdminWorkshops() {
                 }
               />
               <p className="text-xs text-gray-500">
-                Enter one highlight per line (e.g., "Skill
-                refinement")
+                Enter one highlight per line (e.g., "Skill refinement")
               </p>
             </div>
             <div className="grid gap-2">
@@ -658,9 +617,7 @@ export function AdminWorkshops() {
                 step="0.01"
                 className="flex h-10 w-full rounded-md border px-3 py-2 text-sm"
                 style={{
-                  borderColor: !formData.price
-                    ? "#D0A096"
-                    : "#DCD4CD",
+                  borderColor: !formData.price ? "#D0A096" : "#DCD4CD",
                   backgroundColor: "#FEFCFA",
                 }}
                 placeholder="0.00"
@@ -674,10 +631,7 @@ export function AdminWorkshops() {
                 }
               />
               {!formData.price && (
-                <p
-                  className="text-xs"
-                  style={{ color: "#D0A096" }}
-                >
+                <p className="text-xs" style={{ color: "#D0A096" }}>
                   Base price is required.
                 </p>
               )}
@@ -698,9 +652,7 @@ export function AdminWorkshops() {
                   backgroundColor: "#FEFCFA",
                 }}
                 onChange={(e) =>
-                  setWorkshopImageFile(
-                    e.target.files?.[0] ?? null,
-                  )
+                  setWorkshopImageFile(e.target.files?.[0] ?? null)
                 }
               />
               <p className="text-xs text-gray-500">
@@ -763,10 +715,7 @@ export function AdminWorkshops() {
       </Dialog>
 
       {/* Edit Workshop Dialog */}
-      <Dialog
-        open={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
-      >
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Workshop</DialogTitle>
@@ -877,27 +826,22 @@ export function AdminWorkshops() {
               </div>
             </div>
             {/* Live preview */}
-            {formData.session_count &&
-              formData.session_duration_hours && (
-                <div
-                  className="text-sm px-3 py-2 rounded-md"
-                  style={{
-                    backgroundColor: "#FAF7F5",
-                    color: "#6b7280",
-                    border: "1px solid #DCD4CD",
-                  }}
-                >
-                  Total:{" "}
-                  {formatDurationLabel(
-                    parseInt(formData.session_count) || 0,
-                    Math.round(
-                      parseFloat(
-                        formData.session_duration_hours,
-                      ) || 0,
-                    ),
-                  )}
-                </div>
-              )}
+            {formData.session_count && formData.session_duration_hours && (
+              <div
+                className="text-sm px-3 py-2 rounded-md"
+                style={{
+                  backgroundColor: "#FAF7F5",
+                  color: "#6b7280",
+                  border: "1px solid #DCD4CD",
+                }}
+              >
+                Total:{" "}
+                {formatDurationLabel(
+                  parseInt(formData.session_count) || 0,
+                  Math.round(parseFloat(formData.session_duration_hours) || 0),
+                )}
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-4">
               <div></div>
               <div className="grid gap-2">
@@ -922,28 +866,19 @@ export function AdminWorkshops() {
                   }
                 >
                   <option value="">Select level</option>
-                  <option value={WorkshopLevel.BEGINNER}>
-                    Beginner
-                  </option>
+                  <option value={WorkshopLevel.BEGINNER}>Beginner</option>
                   <option value={WorkshopLevel.INTERMEDIATE}>
                     Intermediate
                   </option>
-                  <option value={WorkshopLevel.ADVANCED}>
-                    Advanced
-                  </option>
-                  <option
-                    value={
-                      WorkshopLevel.INTERMEDIATE_TO_ADVANCED
-                    }
-                  >
+                  <option value={WorkshopLevel.ADVANCED}>Advanced</option>
+                  <option value={WorkshopLevel.INTERMEDIATE_TO_ADVANCED}>
                     Intermediate to Advanced
                   </option>
-                  <option value={WorkshopLevel.ALL_LEVELS}>
-                    All Levels
-                  </option>
+                  <option value={WorkshopLevel.ALL_LEVELS}>All Levels</option>
                 </select>
               </div>
             </div>
+
             <div className="grid gap-2">
               <label
                 className="text-sm font-medium"
@@ -991,8 +926,7 @@ export function AdminWorkshops() {
                 }
               />
               <p className="text-xs text-gray-500">
-                Enter one highlight per line (e.g., "Skill
-                refinement")
+                Enter one highlight per line (e.g., "Skill refinement")
               </p>
             </div>
             <div className="grid gap-2">
@@ -1007,9 +941,7 @@ export function AdminWorkshops() {
                 step="0.01"
                 className="flex h-10 w-full rounded-md border px-3 py-2 text-sm"
                 style={{
-                  borderColor: !formData.price
-                    ? "#D0A096"
-                    : "#DCD4CD",
+                  borderColor: !formData.price ? "#D0A096" : "#DCD4CD",
                   backgroundColor: "#FEFCFA",
                 }}
                 placeholder="0.00"
@@ -1023,10 +955,7 @@ export function AdminWorkshops() {
                 }
               />
               {!formData.price && (
-                <p
-                  className="text-xs"
-                  style={{ color: "#D0A096" }}
-                >
+                <p className="text-xs" style={{ color: "#D0A096" }}>
                   Base price is required.
                 </p>
               )}
@@ -1108,14 +1037,10 @@ export function AdminWorkshops() {
                   className="px-4 pb-4 pt-3 space-y-4"
                   style={{ borderTop: "1px solid #e5e7eb" }}
                 >
-                  <p
-                    className="text-xs"
-                    style={{ color: "#9ca3af" }}
-                  >
-                    These fields control the content inside the
-                    workshop's detail card on the Workshops
-                    page. Matches the frontend section order
-                    exactly.
+                  <p className="text-xs" style={{ color: "#9ca3af" }}>
+                    These fields control the content inside the workshop's
+                    detail card on the Workshops page. Matches the frontend
+                    section order exactly.
                   </p>
 
                   {/* Badge Label */}
@@ -1164,18 +1089,13 @@ export function AdminWorkshops() {
                       onChange={(e) =>
                         setTabData({
                           ...tabData,
-                          learningPoints:
-                            e.target.value.split("\n"),
+                          learningPoints: e.target.value.split("\n"),
                         })
                       }
                     />
-                    <p
-                      className="text-xs"
-                      style={{ color: "#9ca3af" }}
-                    >
-                      One item per line. First 3 are shown
-                      collapsed; rest reveal on "View Full
-                      Curriculum".
+                    <p className="text-xs" style={{ color: "#9ca3af" }}>
+                      One item per line. First 3 are shown collapsed; rest
+                      reveal on "View Full Curriculum".
                     </p>
                   </div>
 
@@ -1203,12 +1123,8 @@ export function AdminWorkshops() {
                         })
                       }
                     />
-                    <p
-                      className="text-xs"
-                      style={{ color: "#9ca3af" }}
-                    >
-                      Shown below the Sessions / Per session /
-                      Total fact grid.
+                    <p className="text-xs" style={{ color: "#9ca3af" }}>
+                      Shown below the Sessions / Per session / Total fact grid.
                     </p>
                   </div>
 
@@ -1232,8 +1148,7 @@ export function AdminWorkshops() {
                       onChange={(e) =>
                         setTabData({
                           ...tabData,
-                          whatsIncluded:
-                            e.target.value.split("\n"),
+                          whatsIncluded: e.target.value.split("\n"),
                         })
                       }
                     />
@@ -1259,8 +1174,7 @@ export function AdminWorkshops() {
                       onChange={(e) =>
                         setTabData({
                           ...tabData,
-                          importantInfo:
-                            e.target.value.split("\n"),
+                          importantInfo: e.target.value.split("\n"),
                         })
                       }
                     />
@@ -1290,8 +1204,7 @@ export function AdminWorkshops() {
               }}
               onClick={() => {
                 if (selectedWorkshop) {
-                  const sessionCount =
-                    parseInt(formData.session_count) || 1;
+                  const sessionCount = parseInt(formData.session_count) || 1;
 
                   const updatedWorkshop = {
                     title: formData.title,
@@ -1309,15 +1222,9 @@ export function AdminWorkshops() {
                     is_active: formData.is_active,
                     display_order: formData.display_order,
                   };
-                  updateWorkshop(
-                    selectedWorkshop.id,
-                    updatedWorkshop,
-                  );
+                  updateWorkshop(selectedWorkshop.id, updatedWorkshop);
                   // Persist tab content to context (→ localStorage → live frontend)
-                  setContent(
-                    formData.title || selectedWorkshop.title,
-                    tabData,
-                  );
+                  setContent(formData.title || selectedWorkshop.title, tabData);
                 }
                 setIsEditDialogOpen(false);
               }}
@@ -1330,16 +1237,13 @@ export function AdminWorkshops() {
       </Dialog>
 
       {/* Delete Workshop Dialog */}
-      <Dialog
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-      >
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Delete Workshop</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this workshop?
-              This action cannot be undone.
+              Are you sure you want to delete this workshop? This action cannot
+              be undone.
             </DialogDescription>
           </DialogHeader>
           {selectedWorkshop && (
@@ -1350,10 +1254,7 @@ export function AdminWorkshops() {
                 backgroundColor: "#FAF7F5",
               }}
             >
-              <p
-                className="font-semibold mb-2"
-                style={{ color: "#3D3935" }}
-              >
+              <p className="font-semibold mb-2" style={{ color: "#3D3935" }}>
                 {selectedWorkshop.title}
               </p>
               <div className="flex flex-wrap gap-2 text-sm text-gray-600">

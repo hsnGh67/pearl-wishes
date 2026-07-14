@@ -16,6 +16,9 @@ import { AdminPayments } from './pages/admin/AdminPayments';
 import { AdminServices } from './pages/admin/AdminServices';
 import { AdminWorkshops } from './pages/admin/AdminWorkshops';
 import { AdminContent } from './pages/admin/AdminContent';
+import { AdminPromoCodes } from './pages/admin/AdminPromoCodes';
+import { AdminPromoCodeCreate } from './pages/admin/AdminPromoCodeCreate';
+import { AdminPromoCodeDetails } from './pages/admin/AdminPromoCodeDetails';
 import TestBookingCreation from './pages/admin/TestBookingCreation';
 import DatabaseSetup from './pages/DatabaseSetup';
 
@@ -46,6 +49,10 @@ export const router = createBrowserRouter([
       { path: 'services', element: <AdminServices /> },
       { path: 'workshops', element: <AdminWorkshops /> },
       { path: 'content', element: <AdminContent /> },
+      { path: 'promo-codes', element: <AdminPromoCodes /> },
+      { path: 'promo-codes/create', element: <AdminPromoCodeCreate /> },
+      { path: 'promo-codes/:id', element: <AdminPromoCodeDetails /> },
+      { path: 'promo-codes/:id/edit', element: <AdminPromoCodeCreate /> },
       { path: 'test-booking-creation', element: <TestBookingCreation /> },
     ],
   },

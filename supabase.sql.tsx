@@ -48,25 +48,6 @@ CREATE TABLE services (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- =============================================
--- WORKSHOPS TABLE
--- =============================================
-CREATE TABLE workshops (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  title TEXT NOT NULL,
-  description TEXT NOT NULL,
-  level TEXT NOT NULL CHECK (level IN ('beginner', 'intermediate', 'advanced', 'intermediate_to_advanced', 'all_levels')),
-  class_type TEXT NOT NULL, -- e.g., "Private or small group (max 3 students)"
-  highlights TEXT[] NOT NULL, -- Array of course highlights
-  price DECIMAL(10, 2),
-  session_duration_hours NUMERIC(10, 2) NOT NULL DEFAULT 1,
-  session_count INTEGER NOT NULL DEFAULT 1,
-  image_url TEXT,
-  is_active BOOLEAN DEFAULT true,
-  display_order INTEGER DEFAULT 0,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
 
 -- =============================================
 -- ORDERS TABLE (Bookings/Appointments)
@@ -119,6 +100,138 @@ create table orders (
     )
   )
 ) ;
+
+-- =============================================
+-- WORKSHOPS TABLE
+-- =============================================
+create table public.workshops (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  title text not null,
+  description text not null,
+  level text not null,
+  class_type text not null,
+  highlights text[] not null,
+  price numeric(10, 2) null,
+  capacity integer not null default 1,
+  session_duration_hours numeric(10, 2) not null default 1,
+  session_count integer not null default 1,
+  image_url text null,
+  is_active boolean null default true,
+  display_order integer null default 0,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  constraint workshops_pkey primary key (id),
+  constraint workshops_level_check1 check (
+    (
+      level = any (
+        array[
+          'beginner'::text,
+          'intermediate'::text,
+          'advanced'::text,
+          'intermediate_to_advanced'::text,
+          'all_levels'::text
+        ]
+      )
+    )
+  )
+) TABLESPACE pg_default;
+
+-- =============================================
+-- WORKSHOP BOOKINGS TABLE
+-- =============================================
+create table public.workshop_bookings (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  workshop_id uuid null,
+  user_id uuid null,
+  preferred_month text not null,
+  participant_name text not null,
+  participant_email text not null,
+  participant_phone text null,
+  notes text not null default ''::text,
+  payment_status text not null default 'pending'::text,
+  status text not null default 'pending'::text,
+  payment_intent_id text null,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  constraint workshop_bookings_pkey primary key (id),
+  constraint workshop_bookings_user_id_fkey foreign KEY (user_id) references users (id) on delete set null,
+  constraint workshop_bookings_workshop_id_fkey foreign KEY (workshop_id) references workshops (id) on delete CASCADE,
+  constraint workshop_bookings_payment_status_check check (
+    (
+      payment_status = any (
+        array[
+          'pending'::text,
+          'paid'::text,
+          'failed'::text,
+          'refunded'::text
+        ]
+      )
+    )
+  ),
+  constraint workshop_bookings_status_check check (
+    (
+      status = any (
+        array[
+          'pending'::text,
+          'confirmed'::text,
+          'scheduled'::text,
+          'completed'::text,
+          'cancelled'::text
+        ]
+      )
+    )
+  )
+) TABLESPACE pg_default;
+
+-- =============================================
+-- WORKSHOP SESSIONS TABLE
+-- =============================================
+create table public.workshop_sessions (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  workshop_id uuid not null,
+  starts_at time without time zone not null,
+  ends_at time without time zone not null,
+  date date not null,
+  weekdays text[] not null ,
+  status text not null default 'scheduled'::text,
+  created_at timestamp with time zone null default now(),
+  updated_at timestamp with time zone null default now(),
+  constraint workshop_sessions_pkey primary key (id),
+  constraint workshop_sessions_workshop_id_fkey foreign KEY (workshop_id) references workshops (id) on delete CASCADE,
+  constraint workshop_sessions_status_check check (
+    (
+      status = any (
+        array[
+          'scheduled'::text,
+          'completed'::text,
+          'cancelled'::text
+        ]
+      )
+    )
+  )
+) TABLESPACE pg_default;
+
+-- =============================================
+-- WORKSHOP SESSION PARTICIPANTS TABLE
+-- =============================================
+create table public.workshop_session_participants (
+  id uuid not null default extensions.uuid_generate_v4 (),
+  workshop_id uuid not null,
+  workshop_session_id uuid not null,
+  user_id uuid not null,
+  name text not null,
+  email text not null,
+  phone text not null,
+  created_at timestamp with time zone null default now(),
+  constraint workshop_session_participants_pkey primary key (id),
+  constraint workshop_session_participants_user_id_fkey foreign KEY (user_id) references users (id) on delete CASCADE,
+  constraint workshop_session_participants_workshop_id_fkey foreign KEY (workshop_id) references workshops (id) on delete CASCADE,
+  constraint workshop_session_participants_workshop_session_id_fkey foreign KEY (workshop_session_id) references workshop_sessions (id) on delete CASCADE
+) TABLESPACE pg_default;
+
+create index IF not exists idx_workshop_session_participants_workshop_session_id on public.workshop_session_participants using btree (workshop_session_id) TABLESPACE pg_default;
+
+create index IF not exists idx_workshop_session_participants_user_id on public.workshop_session_participants using btree (user_id) TABLESPACE pg_default;
 
 -- =============================================
 -- ORDER ITEMS TABLE (Services within an order)

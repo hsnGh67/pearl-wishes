@@ -98,6 +98,9 @@ export function AdminCalendar() {
     [],
   );
   const [loading, setLoading] = useState(true);
+  const [selectedWorkshopSession, setSelectedWorkshopSession] = useState<
+    WorkshopSession | undefined
+  >(undefined);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -213,10 +216,19 @@ export function AdminCalendar() {
     return workshops.find((w) => w.id === workshopId);
   };
 
-  const handleBookingClick = (booking: Booking) => {
-    console.log("booking ==> ", booking);
-    setSelectedBooking(booking);
-    setIsDetailsOpen(true);
+  const handleBookingClick = (
+    data: Booking | WorkshopSession,
+    type: "booking" | "workshop",
+  ) => {
+    console.log("booking ==> ", data);
+    if (type === "booking") {
+      setSelectedBooking(data as Booking);
+      setIsDetailsOpen(true);
+    } else {
+      console.log("data ==> ", data);
+      setSelectedWorkshopSession(data as WorkshopSession);
+      setIsScheduleDrawerOpen(true);
+    }
   };
 
   const handleWorkshopBookingClick = (workshopBooking: WorkshopBooking) => {
@@ -677,7 +689,9 @@ export function AdminCalendar() {
       />
 
       {/* Schedule Workshop Drawer */}
+
       <ScheduleWorkshopDrawer
+        selectedWorkshopSession={selectedWorkshopSession}
         open={isScheduleDrawerOpen}
         onClose={() => setIsScheduleDrawerOpen(false)}
         workshops={workshops}
@@ -1588,7 +1602,7 @@ function DayView({
   getUserName: (id: string) => string;
   getServiceName: (id: string) => string;
   getService: (id: string) => Service | undefined;
-  onBookingClick: (booking: Booking) => void;
+  onBookingClick: (booking: Booking, type: "booking" | "workshop") => void;
 }) {
   // Get business hours for this specific date
   const { startHour, endHour } = getBusinessHoursForDate(date);
@@ -1664,7 +1678,7 @@ function DayView({
                       ? "#E9CFCA"
                       : "#F1DFC0",
               }}
-              onClick={() => onBookingClick(booking)}
+              onClick={() => onBookingClick(booking, "booking")}
             >
               <div className="flex items-start justify-between h-full">
                 <div className="flex-1 overflow-hidden">
@@ -1731,7 +1745,9 @@ function DayView({
                   ...style,
                   borderColor: "#3D3935",
                   backgroundColor: "#F1DFC0",
+                  cursor: "pointer",
                 }}
+                onClick={() => onBookingClick(s, "workshop")}
               >
                 <div className="flex items-center gap-2 mb-1">
                   <GraduationCap
@@ -1795,7 +1811,10 @@ function WeekView({
   getUserName: (id: string) => string;
   getServiceName: (id: string) => string;
   getBookingsForDate: (date: Date) => WorkshopSession[];
-  onBookingClick: (session: WorkshopSession) => void;
+  onBookingClick: (
+    session: WorkshopSession,
+    type: "booking" | "workshop",
+  ) => void;
 }) {
   const getWeekStart = (d: Date) => {
     const date = new Date(d);
@@ -1907,7 +1926,7 @@ function WeekView({
                                   : "#F1DFC0",
                             borderLeft: "3px solid #3D3935",
                           }}
-                          onClick={() => onBookingClick(booking)}
+                          onClick={() => onBookingClick(booking, "booking")}
                           title={`${getUserName(booking.user_id)} - ${getServiceName(booking.service_id)}`}
                         >
                           <div
@@ -1951,8 +1970,10 @@ function WeekView({
                           style={{
                             backgroundColor: "#F1DFC0",
                             borderLeft: "3px solid #3D3935",
+                            cursor: "pointer",
                           }}
                           title={`${s.title} `}
+                          onClick={() => onBookingClick(s, "workshop")}
                         >
                           <div
                             className="font-semibold truncate"

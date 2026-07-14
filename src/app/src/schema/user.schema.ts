@@ -29,7 +29,8 @@ export const UserSchema = z.object({
       /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$|^[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+\.)?local$/,
       "Invalid email address",
     )
-    .nullable(),
+    .nullable()
+    .optional(),
   full_name: z.string().max(100),
   phone: z
     .string()
@@ -111,6 +112,7 @@ export const formatUserForDisplay = (
 ): UserDisplay => ({
   ...user,
   roleLabel: USER_ROLE_LABELS[user.role],
+  statusLabel: "Active", // Default status label
   formattedPhone: user.phone || "N/A",
 });
 

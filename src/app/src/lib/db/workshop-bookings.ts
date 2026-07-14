@@ -18,7 +18,9 @@ import { dbLogger } from "./logger";
 /**
  * Get all workshop bookings
  */
-export async function getAllWorkshopBookings(): Promise<WorkshopBooking[]> {
+export async function getAllWorkshopBookings(): Promise<
+  WorkshopBooking[]
+> {
   try {
     dbLogger.info("Fetching all workshop bookings", {
       table: "workshop_bookings",
@@ -75,16 +77,22 @@ export async function getBookedCandidatesByMonth(
       .eq("preferred_month", month);
     console.log("DATA", data);
     if (error) {
-      dbLogger.error("Failed to fetch booked candidates for month", {
-        table: "workshop_bookings",
-        error,
-      });
+      dbLogger.error(
+        "Failed to fetch booked candidates for month",
+        {
+          table: "workshop_bookings",
+          error,
+        },
+      );
       throw error;
     }
-    dbLogger.info("Successfully fetched booked candidates for month", {
-      table: "workshop_bookings",
-      data: { month, count: data?.length || 0 },
-    });
+    dbLogger.info(
+      "Successfully fetched booked candidates for month",
+      {
+        table: "workshop_bookings",
+        data: { month, count: data?.length || 0 },
+      },
+    );
     return data || [];
   } catch (error) {
     dbLogger.error("Error in getBookedCandidatesForMonth", {
@@ -153,17 +161,23 @@ export async function getWorkshopBookingsByStatus(
       .order("created_at", { ascending: false });
 
     if (error) {
-      dbLogger.error("Failed to fetch workshop bookings by status", {
-        table: "workshop_bookings",
-        error,
-      });
+      dbLogger.error(
+        "Failed to fetch workshop bookings by status",
+        {
+          table: "workshop_bookings",
+          error,
+        },
+      );
       throw error;
     }
 
-    dbLogger.info("Successfully fetched workshop bookings by status", {
-      table: "workshop_bookings",
-      data: { status, count: data?.length || 0 },
-    });
+    dbLogger.info(
+      "Successfully fetched workshop bookings by status",
+      {
+        table: "workshop_bookings",
+        data: { status, count: data?.length || 0 },
+      },
+    );
 
     return data || [];
   } catch (error) {
@@ -177,7 +191,9 @@ export async function getWorkshopBookingsByStatus(
 /**
  * Create a new workshop booking
  */
-export async function createWorkshopBooking(bookingData: any): Promise<any> {
+export async function createWorkshopBooking(
+  bookingData: any,
+): Promise<any> {
   try {
     dbLogger.info("Creating new workshop booking", {
       table: "workshop_bookings",
@@ -269,7 +285,9 @@ export async function cancelWorkshopBooking(
 /**
  * Delete a workshop booking
  */
-export async function deleteWorkshopBooking(id: string): Promise<void> {
+export async function deleteWorkshopBooking(
+  id: string,
+): Promise<void> {
   try {
     dbLogger.info("Deleting workshop booking", {
       table: "workshop_bookings",
@@ -302,7 +320,9 @@ export async function deleteWorkshopBooking(id: string): Promise<void> {
 /**
  * Create a new workshop session
  */
-export async function createWorkshopSession(sessionData: any): Promise<any> {
+export async function createWorkshopSession(
+  sessionData: any,
+): Promise<any> {
   try {
     dbLogger.info("Creating new workshop session", {
       table: "workshop_sessions",
@@ -351,17 +371,23 @@ export async function createWorkshopBookingStudent(
       .single();
 
     if (error) {
-      dbLogger.error("Failed to create workshop booking participant", {
-        table: "workshop_session_participants",
-        error,
-      });
+      dbLogger.error(
+        "Failed to create workshop booking participant",
+        {
+          table: "workshop_session_participants",
+          error,
+        },
+      );
       throw error;
     }
 
-    dbLogger.info("Successfully created workshop booking session", {
-      table: "workshop_session_participants",
-      data: { id: data.id },
-    });
+    dbLogger.info(
+      "Successfully created workshop booking session",
+      {
+        table: "workshop_session_participants",
+        data: { id: data.id },
+      },
+    );
 
     return data;
   } catch (error) {
@@ -387,17 +413,23 @@ export async function updateWorkshopBookingStatusToScheduled(
       .eq("id", bookingId);
 
     if (error) {
-      dbLogger.error("Failed to update workshop booking status", {
-        table: "workshop_bookings",
-        error,
-      });
+      dbLogger.error(
+        "Failed to update workshop booking status",
+        {
+          table: "workshop_bookings",
+          error,
+        },
+      );
       throw error;
     }
 
-    dbLogger.info("Successfully updated workshop booking status", {
-      table: "workshop_bookings",
-      data: { bookingId },
-    });
+    dbLogger.info(
+      "Successfully updated workshop booking status",
+      {
+        table: "workshop_bookings",
+        data: { bookingId },
+      },
+    );
 
     return data;
   } catch (error) {
@@ -422,7 +454,10 @@ export const getAllWorkshopSessions = async () => {
       .eq("status", "scheduled");
 
     if (error) {
-      dbLogger.error("Error fetching workshop sessions by date", { error });
+      dbLogger.error(
+        "Error fetching workshop sessions by date",
+        { error },
+      );
       throw error;
     }
 
@@ -451,7 +486,9 @@ export const getAllWorkshopSessions = async () => {
   }
 };
 
-export const getWorkshopSessionsByDate = async (date: string) => {
+export const getWorkshopSessionsByDate = async (
+  date: string,
+) => {
   try {
     dbLogger.info("Fetching workshop sessions by date", {
       table: "workshop_sessions",
@@ -472,7 +509,10 @@ export const getWorkshopSessionsByDate = async (date: string) => {
       );
 
     if (error) {
-      dbLogger.error("Error fetching workshop sessions by date", { error });
+      dbLogger.error(
+        "Error fetching workshop sessions by date",
+        { error },
+      );
       throw error;
     }
 
@@ -515,7 +555,9 @@ export const getWorkshopTimesForDate = async (date: Date) => {
       .eq("date", dateString);
 
     if (error) {
-      dbLogger.error("Error fetching booked times for date", { error });
+      dbLogger.error("Error fetching booked times for date", {
+        error,
+      });
       throw error;
     }
 
@@ -539,7 +581,9 @@ export const getWorkshopTimesForDate = async (date: Date) => {
     }));
     return slots as BookedTimeSlot[];
   } catch (error) {
-    dbLogger.error("Error in getWorkshopTimesForDate", { error });
+    dbLogger.error("Error in getWorkshopTimesForDate", {
+      error,
+    });
     throw error;
   }
 };
