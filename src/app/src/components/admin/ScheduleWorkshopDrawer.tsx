@@ -35,6 +35,7 @@ import {
   createWorkshopBookingStudent,
   createWorkshopSession,
   getBookedCandidatesByMonth,
+  getBookingCandidatesOfOtherMonths,
   updateWorkshopBookingStatusToScheduled,
 } from "../../lib/db/workshop-bookings";
 
@@ -376,7 +377,7 @@ function StudentCard({
             color: "#3D3935",
           }}
         >
-          {student.name.charAt(0).toUpperCase()}
+          {student.name?.charAt(0)?.toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -636,6 +637,20 @@ export const getAvailableMonths = (count: number = 4): AvailableMonth[] => {
   return months;
 };
 
+export const getEndOfAvailableMonth = (month: AvailableMonth): string => {
+  const monthStart = new Date(`${month.label} 1, ${month.year}`);
+  const endOfMonth = new Date(
+    monthStart.getFullYear(),
+    monthStart.getMonth() + 1,
+    0,
+  );
+  const year = endOfMonth.getFullYear();
+  const monthNum = String(endOfMonth.getMonth() + 1).padStart(2, "0");
+  const day = String(endOfMonth.getDate()).padStart(2, "0");
+
+  return `${year}-${monthNum}-${day}`;
+};
+
 const availableMonths = getAvailableMonths();
 
 export function ScheduleWorkshopDrawer({
@@ -656,6 +671,7 @@ export function ScheduleWorkshopDrawer({
   const [selectedWorkshopId, setSelectedWorkshopId] = useState<string>(
     () => selectedWorkshopSession?.workshop_id || "",
   );
+  const [selectedClassId, setSelectedClassId] = useState<string>("");
   const [firstSessionDate, setFirstSessionDate] = useState<string>("");
   const [timeRange, setTimeRange] = useState<string>("10:00 - 12:00");
   const [selectedWeekdays, setSelectedWeekdays] = useState<number[]>([2, 4]);
@@ -664,6 +680,8 @@ export function ScheduleWorkshopDrawer({
   const [editDateVal, setEditDateVal] = useState<string>("");
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [bookedCandidates, setBookedCandidates] = useState<Student[]>([]);
+  const [bookingCandidatesOfOtherMonths, setBookingCandidatesOfOtherMonths] =
+    useState<Student[]>([]);
   const [loadingBookedCandidates, setLoadingBookedCandidates] = useState(false);
   // ── step / flow state ──
   const [step, setStep] = useState<DrawerStep>("form");
@@ -719,9 +737,17 @@ export function ScheduleWorkshopDrawer({
   }, [open]);
 
   useEffect(() => {
-    if (!selectedMonth || !selectedWorkshopId) return setBookedCandidates([]);
+    if (!selectedMonth || !selectedWorkshopId) {
+      setBookedCandidates([]);
+      setBookingCandidatesOfOtherMonths([]);
+      return;
+    }
     getBookedCandidates();
   }, [selectedMonth, selectedWorkshopId]);
+
+  useEffect(() => {
+    setFirstSessionDate("");
+  }, [selectedMonth]);
 
   const isEditMode = !!selectedWorkshopSession;
 
@@ -757,12 +783,23 @@ export function ScheduleWorkshopDrawer({
       const fullMonth =
         availableMonths.find((m) => m.id === selectedMonth) ||
         availableMonths[0];
-      const bookedCandidates = await getBookedCandidatesByMonth(
-        selectedWorkshopId,
-        `${fullMonth.label}-${fullMonth.year}`,
-      );
+      const [bookedCandidates, bookingCandidatesOfOtherMonths] =
+        await Promise.all([
+          getBookedCandidatesByMonth(
+            selectedWorkshopId,
+            `${fullMonth.label}-${fullMonth.year}`,
+          ),
+          getBookingCandidatesOfOtherMonths(
+            selectedWorkshopId,
+            `${fullMonth.label}-${fullMonth.year}`,
+          ),
+        ]);
+
       setBookedCandidates(
         bookedCandidates.map((bc) => makeStudent(bc, basePrice)),
+      );
+      setBookingCandidatesOfOtherMonths(
+        bookingCandidatesOfOtherMonths.map((bc) => makeStudent(bc, basePrice)),
       );
       setLoadingBookedCandidates(false);
     } catch (e) {
@@ -794,6 +831,8 @@ export function ScheduleWorkshopDrawer({
     try {
       setIsCreatingWorkshopSessions(true);
       let newSessions: any[] = [];
+      const classId = crypto.randomUUID();
+      setSelectedClassId(classId);
       for (const session of sessions) {
         const startTime = session.time.split("-")[0]?.trim();
         const endTime = session.time.split("-")[1]?.trim();
@@ -801,6 +840,7 @@ export function ScheduleWorkshopDrawer({
 
         const newSession = await createWorkshopSession({
           workshop_id: selectedWorkshop.id,
+          class_id: classId,
           weekdays: selectedWeekdays,
           starts_at: startTime,
           ends_at: endTime,
@@ -811,10 +851,10 @@ export function ScheduleWorkshopDrawer({
         newSessions.push({ ...session, id: newSession.id });
         console.log("newSessions ===>", newSessions);
       }
+      setStep("created");
       setSessions(newSessions);
       setIsCreatingWorkshopSessions(false);
       onScheduleCreated(sessions, selectedWorkshop);
-      setStep("created");
       setIsCreatingWorkshopSessions(false);
     } catch (e) {
       alert("Error creating workshop sessions: " + e);
@@ -835,6 +875,7 @@ export function ScheduleWorkshopDrawer({
             createWorkshopBookingStudent({
               workshop_id: selectedWorkshop.id,
               workshop_session_id: session.id,
+              workshop_class_id: selectedClassId,
               user_id: student.id,
               name: student.name,
               email: student.email,
@@ -892,19 +933,22 @@ export function ScheduleWorkshopDrawer({
   const isFull =
     students.length >= (selectedWorkshop ? selectedWorkshop?.capacity || 1 : 1);
 
-  const selectedMonthName = selectedMonth
-    ? new Date(selectedMonth + "-01T00:00:00")
-        .toLocaleDateString("en-US", { month: "long" })
-        .toLowerCase()
-    : null;
+  const selectedMonthInfo = availableMonths.find((m) => m.id === selectedMonth);
+  const maxFirstSessionDate = selectedMonthInfo
+    ? getEndOfAvailableMonth(selectedMonthInfo)
+    : undefined;
+  const selectedMonthName = selectedMonthInfo?.id ?? null;
   const assignedBookingIds = new Set(
-    students.filter((s) => s.source === "booked").map((s) => s.id),
+    students
+      .filter((s) => s.source === "booked")
+      .map((s) => (s as Student & { bookingId?: string }).bookingId ?? s.id),
   );
 
   const addFromBooking = (wb: WorkshopBooking) => {
     if (isFull) return;
     const monthLabel = wb.preferred_month
-      ? wb.preferred_month.charAt(0).toUpperCase() + wb.preferred_month.slice(1)
+      ? wb.preferred_month?.charAt(0)?.toUpperCase() +
+        wb.preferred_month?.slice(1)
       : "";
     setStudents((prev) => [
       ...prev,
@@ -1171,6 +1215,9 @@ export function ScheduleWorkshopDrawer({
                       <input
                         type="date"
                         value={firstSessionDate}
+                        min={new Date().toISOString().split("T")[0]}
+                        max={maxFirstSessionDate}
+                        disabled={!selectedMonth}
                         onChange={(e) => setFirstSessionDate(e.target.value)}
                         className="w-full px-3 py-2 rounded-md border text-sm outline-none"
                         style={{
@@ -1269,10 +1316,7 @@ export function ScheduleWorkshopDrawer({
                         >
                           Session
                         </span>
-                        <span
-                          className="text-xs"
-                          style={{ color: "#3D3935" }}
-                        >
+                        <span className="text-xs" style={{ color: "#3D3935" }}>
                           {formatSessionDate(
                             new Date(
                               selectedWorkshopSession.date.includes("T")
@@ -1281,10 +1325,7 @@ export function ScheduleWorkshopDrawer({
                             ),
                           )}
                         </span>
-                        <span
-                          className="text-xs"
-                          style={{ color: "#6b7280" }}
-                        >
+                        <span className="text-xs" style={{ color: "#6b7280" }}>
                           {timeRange ||
                             `${selectedWorkshopSession.starts_at} - ${selectedWorkshopSession.ends_at}`}
                         </span>
@@ -1600,11 +1641,7 @@ export function ScheduleWorkshopDrawer({
                       style={{ borderColor: "#DCD4CD" }}
                     >
                       {bookedCandidates
-                        .filter(
-                          (wb) =>
-                            students.length === 0 ||
-                            students.some((s) => s.id !== wb.user_id),
-                        )
+                        .filter((wb) => !assignedBookingIds.has(wb.id))
                         .map((wb) => (
                           <div
                             key={wb.id}
@@ -1617,7 +1654,7 @@ export function ScheduleWorkshopDrawer({
                                 color: "#3D3935",
                               }}
                             >
-                              {wb.participant_name.charAt(0).toUpperCase()}
+                              {wb.participant_name?.charAt(0)?.toUpperCase()}
                             </div>
                             <div className="flex-1 min-w-0">
                               <p
@@ -1651,8 +1688,8 @@ export function ScheduleWorkshopDrawer({
                                   >
                                     ·{" "}
                                     {wb.preferred_month
-                                      .charAt(0)
-                                      .toUpperCase() +
+                                      ?.charAt(0)
+                                      ?.toUpperCase() +
                                       wb.preferred_month.slice(1)}
                                   </span>
                                 )}
@@ -1688,6 +1725,105 @@ export function ScheduleWorkshopDrawer({
                         ))}
                     </div>
                   </div>
+                )}
+
+                {/** Booking candidates of other months */}
+                {bookingCandidatesOfOtherMonths.length > 0 && (
+                  <>
+                    <div className="mb-4">
+                      <p
+                        className="text-xs font-medium mb-2"
+                        style={{ color: "#6b7280" }}
+                      >
+                        Booking Candidates of Other Months
+                      </p>
+                    </div>
+                    <div className="space-y-3">
+                      {bookingCandidatesOfOtherMonths
+                        .filter((wb) => !assignedBookingIds.has(wb.id))
+                        .map((wb) => (
+                          <div
+                            key={wb.id}
+                            className="flex items-center gap-3 px-3 py-2.5"
+                          >
+                            <div
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0"
+                              style={{
+                                backgroundColor: "#F1DFC0",
+                                color: "#3D3935",
+                              }}
+                            >
+                              {wb.participant_name?.charAt(0)?.toUpperCase()}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className="text-xs font-medium truncate"
+                                style={{ color: "#3D3935" }}
+                              >
+                                {wb.participant_name}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {wb.phone ? (
+                                  <span
+                                    className="flex items-center gap-1 text-xs"
+                                    style={{ color: "#9ca3af" }}
+                                  >
+                                    <Phone className="w-2.5 h-2.5" />
+                                    {wb.phone}
+                                  </span>
+                                ) : wb.email ? (
+                                  <span
+                                    className="flex items-center gap-1 text-xs"
+                                    style={{ color: "#9ca3af" }}
+                                  >
+                                    <Mail className="w-2.5 h-2.5" />
+                                    {wb.email}
+                                  </span>
+                                ) : null}
+                                {wb.preferred_month && (
+                                  <span
+                                    className="text-xs"
+                                    style={{ color: "#9ca3af" }}
+                                  >
+                                    ·{" "}
+                                    {wb.preferred_month
+                                      ?.charAt(0)
+                                      ?.toUpperCase() +
+                                      wb.preferred_month.slice(1)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <span
+                              className="text-xs px-2 py-0.5 rounded font-medium flex-shrink-0"
+                              style={{
+                                backgroundColor: "#E9CFCA",
+                                color: "#3D3935",
+                              }}
+                            >
+                              Booked
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => addFromBooking(wb)}
+                              disabled={isFull}
+                              className="flex items-center gap-1 text-xs px-2 py-1.5 rounded border font-medium transition-colors flex-shrink-0"
+                              style={{
+                                backgroundColor: isFull
+                                  ? "transparent"
+                                  : "#3D3935",
+                                borderColor: isFull ? "#DCD4CD" : "#3D3935",
+                                color: isFull ? "#9ca3af" : "#FEFCFA",
+                                cursor: isFull ? "not-allowed" : "pointer",
+                              }}
+                            >
+                              <UserPlus className="w-3 h-3" />
+                              Add
+                            </button>
+                          </div>
+                        ))}
+                    </div>
+                  </>
                 )}
 
                 {/* Assigned students */}

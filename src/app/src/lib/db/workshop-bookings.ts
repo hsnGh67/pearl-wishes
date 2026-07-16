@@ -7,9 +7,11 @@ import { supabase } from "../../config/supabase";
 import {
   WorkshopBooking,
   WorkshopBookingCreate,
-  WorkshopBookingUpdate,
   WorkshopBookingStatus,
+  WorkshopBookingWithUser,
   WorkshopPaymentStatus,
+  WorkshopSession,
+  WorkshopSessionParticipant,
 } from "../../schema/workshop-booking.schema";
 import { formatDate } from "../../utils/formatDate";
 import { BookedTimeSlot } from "./bookings";
@@ -18,9 +20,7 @@ import { dbLogger } from "./logger";
 /**
  * Get all workshop bookings
  */
-export async function getAllWorkshopBookings(): Promise<
-  WorkshopBooking[]
-> {
+export async function getAllWorkshopBookings(): Promise<WorkshopBooking[]> {
   try {
     dbLogger.info("Fetching all workshop bookings", {
       table: "workshop_bookings",
@@ -41,12 +41,50 @@ export async function getAllWorkshopBookings(): Promise<
 
     dbLogger.info("Successfully fetched workshop bookings", {
       table: "workshop_bookings",
-      count: data?.length || 0,
     });
 
     return data || [];
   } catch (error) {
     dbLogger.error("Error in getAllWorkshopBookings", {
+      error,
+    });
+    throw error;
+  }
+}
+
+export async function getAllPendingBookedCandidates(
+  workshopId: string,
+): Promise<WorkshopBookingWithUser[]> {
+  try {
+    dbLogger.info("Fetching all pending booked candidates", {
+      table: "workshop_bookings",
+    });
+    const { data, error } = await supabase
+      .from("workshop_bookings")
+      .select(
+        `*, user:users (
+        id,
+        full_name,
+        phone,
+        email
+      )`,
+      )
+      .eq("status", WorkshopBookingStatus.PENDING)
+      .eq("workshop_id", workshopId);
+    if (error) {
+      dbLogger.error("Failed to fetch all pending booked candidates", {
+        table: "workshop_bookings",
+        error,
+      });
+      throw error;
+    }
+    dbLogger.info("Successfully fetched all pending booked candidates", {
+      table: "workshop_bookings",
+      data: { count: data?.length || 0 },
+    });
+    return data || [];
+  } catch (error) {
+    dbLogger.error("Error in getAllPendingBookedCandidates", {
       error,
     });
     throw error;
@@ -77,22 +115,16 @@ export async function getBookedCandidatesByMonth(
       .eq("preferred_month", month);
     console.log("DATA", data);
     if (error) {
-      dbLogger.error(
-        "Failed to fetch booked candidates for month",
-        {
-          table: "workshop_bookings",
-          error,
-        },
-      );
+      dbLogger.error("Failed to fetch booked candidates for month", {
+        table: "workshop_bookings",
+        error,
+      });
       throw error;
     }
-    dbLogger.info(
-      "Successfully fetched booked candidates for month",
-      {
-        table: "workshop_bookings",
-        data: { month, count: data?.length || 0 },
-      },
-    );
+    dbLogger.info("Successfully fetched booked candidates for month", {
+      table: "workshop_bookings",
+      data: { month, count: data?.length || 0 },
+    });
     return data || [];
   } catch (error) {
     dbLogger.error("Error in getBookedCandidatesForMonth", {
@@ -102,6 +134,41 @@ export async function getBookedCandidatesByMonth(
   }
 }
 
+export async function getBookingCandidatesOfOtherMonths(
+  workshopId: string,
+  month: string,
+): Promise<WorkshopBooking[]> {
+  try {
+    dbLogger.info("Fetching booking candidates of other months", {
+      table: "workshop_bookings",
+      data: { workshopId, month },
+    });
+    const { data, error } = await supabase
+      .from("workshop_bookings")
+      .select("*")
+      .eq("workshop_id", workshopId)
+      .eq("status", WorkshopBookingStatus.PENDING)
+      .neq("preferred_month", month);
+
+    if (error) {
+      dbLogger.error("Failed to fetch booking candidates of other months", {
+        table: "workshop_bookings",
+        error,
+      });
+      throw error;
+    }
+    dbLogger.info("Successfully fetched booking candidates of other months", {
+      table: "workshop_bookings",
+      data: { workshopId, month, count: data?.length || 0 },
+    });
+    return data || [];
+  } catch (error) {
+    dbLogger.error("Error in getBookingCandidatesOfOtherMonths", {
+      error,
+    });
+    throw error;
+  }
+}
 /**
  * Get workshop booking by ID
  */
@@ -161,23 +228,17 @@ export async function getWorkshopBookingsByStatus(
       .order("created_at", { ascending: false });
 
     if (error) {
-      dbLogger.error(
-        "Failed to fetch workshop bookings by status",
-        {
-          table: "workshop_bookings",
-          error,
-        },
-      );
+      dbLogger.error("Failed to fetch workshop bookings by status", {
+        table: "workshop_bookings",
+        error,
+      });
       throw error;
     }
 
-    dbLogger.info(
-      "Successfully fetched workshop bookings by status",
-      {
-        table: "workshop_bookings",
-        data: { status, count: data?.length || 0 },
-      },
-    );
+    dbLogger.info("Successfully fetched workshop bookings by status", {
+      table: "workshop_bookings",
+      data: { status, count: data?.length || 0 },
+    });
 
     return data || [];
   } catch (error) {
@@ -191,9 +252,7 @@ export async function getWorkshopBookingsByStatus(
 /**
  * Create a new workshop booking
  */
-export async function createWorkshopBooking(
-  bookingData: any,
-): Promise<any> {
+export async function createWorkshopBooking(bookingData: any): Promise<any> {
   try {
     dbLogger.info("Creating new workshop booking", {
       table: "workshop_bookings",
@@ -230,7 +289,7 @@ export async function createWorkshopBooking(
  * Update an existing workshop booking
  */
 export async function updateWorkshopBooking(
-  bookingData: WorkshopBookingUpdate,
+  bookingData: WorkshopBooking,
 ): Promise<WorkshopBooking> {
   try {
     dbLogger.info("Updating workshop booking", {
@@ -285,9 +344,7 @@ export async function cancelWorkshopBooking(
 /**
  * Delete a workshop booking
  */
-export async function deleteWorkshopBooking(
-  id: string,
-): Promise<void> {
+export async function deleteWorkshopBooking(id: string): Promise<void> {
   try {
     dbLogger.info("Deleting workshop booking", {
       table: "workshop_bookings",
@@ -320,9 +377,7 @@ export async function deleteWorkshopBooking(
 /**
  * Create a new workshop session
  */
-export async function createWorkshopSession(
-  sessionData: any,
-): Promise<any> {
+export async function createWorkshopSession(sessionData: any): Promise<any> {
   try {
     dbLogger.info("Creating new workshop session", {
       table: "workshop_sessions",
@@ -371,23 +426,17 @@ export async function createWorkshopBookingStudent(
       .single();
 
     if (error) {
-      dbLogger.error(
-        "Failed to create workshop booking participant",
-        {
-          table: "workshop_session_participants",
-          error,
-        },
-      );
+      dbLogger.error("Failed to create workshop booking participant", {
+        table: "workshop_session_participants",
+        error,
+      });
       throw error;
     }
 
-    dbLogger.info(
-      "Successfully created workshop booking session",
-      {
-        table: "workshop_session_participants",
-        data: { id: data.id },
-      },
-    );
+    dbLogger.info("Successfully created workshop booking session", {
+      table: "workshop_session_participants",
+      data: { id: data.id },
+    });
 
     return data;
   } catch (error) {
@@ -413,23 +462,17 @@ export async function updateWorkshopBookingStatusToScheduled(
       .eq("id", bookingId);
 
     if (error) {
-      dbLogger.error(
-        "Failed to update workshop booking status",
-        {
-          table: "workshop_bookings",
-          error,
-        },
-      );
+      dbLogger.error("Failed to update workshop booking status", {
+        table: "workshop_bookings",
+        error,
+      });
       throw error;
     }
 
-    dbLogger.info(
-      "Successfully updated workshop booking status",
-      {
-        table: "workshop_bookings",
-        data: { bookingId },
-      },
-    );
+    dbLogger.info("Successfully updated workshop booking status", {
+      table: "workshop_bookings",
+      data: { bookingId },
+    });
 
     return data;
   } catch (error) {
@@ -454,10 +497,7 @@ export const getAllWorkshopSessions = async () => {
       .eq("status", "scheduled");
 
     if (error) {
-      dbLogger.error(
-        "Error fetching workshop sessions by date",
-        { error },
-      );
+      dbLogger.error("Error fetching getAllWorkshopSessions", { error });
       throw error;
     }
 
@@ -479,16 +519,14 @@ export const getAllWorkshopSessions = async () => {
 
     return transformedData;
   } catch (error) {
-    dbLogger.error("Error in getWorkshopSessionsByDate", {
+    dbLogger.error("Error in getAllWorkshopSessions", {
       error,
     });
     throw error;
   }
 };
 
-export const getWorkshopSessionsByDate = async (
-  date: string,
-) => {
+export const getWorkshopSessionsByDate = async (date: string) => {
   try {
     dbLogger.info("Fetching workshop sessions by date", {
       table: "workshop_sessions",
@@ -509,10 +547,7 @@ export const getWorkshopSessionsByDate = async (
       );
 
     if (error) {
-      dbLogger.error(
-        "Error fetching workshop sessions by date",
-        { error },
-      );
+      dbLogger.error("Error fetching workshop sessions by date", { error });
       throw error;
     }
 
@@ -587,3 +622,194 @@ export const getWorkshopTimesForDate = async (date: Date) => {
     throw error;
   }
 };
+
+export async function getWorkshopSessionById(
+  id: string,
+): Promise<WorkshopSession | null> {
+  try {
+    dbLogger.info("Fetching workshop session by ID", {
+      table: "workshop_sessions",
+      data: { id },
+    });
+
+    const { data, error } = await supabase
+      .from("workshop_sessions")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    if (error) {
+      dbLogger.error("Failed to fetch workshop session by ID", {
+        table: "workshop_sessions",
+        error,
+      });
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    dbLogger.error("Error in getWorkshopSessionById", { error });
+    throw error;
+  }
+}
+
+export async function getWorkshopSessionsByClassId(
+  classId: string,
+): Promise<WorkshopSession[]> {
+  try {
+    dbLogger.info("Fetching workshop sessions by class ID", {
+      table: "workshop_sessions",
+      data: { classId },
+    });
+
+    const { data, error } = await supabase
+      .from("workshop_sessions")
+      .select("*")
+      .eq("class_id", classId)
+      .order("date", { ascending: true });
+
+    if (error) {
+      dbLogger.error("Failed to fetch workshop sessions by class ID", {
+        table: "workshop_sessions",
+        error,
+      });
+      throw error;
+    }
+
+    return data || [];
+  } catch (error) {
+    dbLogger.error("Error in getWorkshopSessionsByClassId", { error });
+    throw error;
+  }
+}
+
+export async function getClassStudents(
+  classId: string,
+): Promise<WorkshopSessionParticipant[]> {
+  try {
+    dbLogger.info("Fetching class students", {
+      table: "workshop_session_participants",
+      data: { classId },
+    });
+
+    const { data, error } = await supabase
+      .from("workshop_session_participants")
+      .select("*")
+      .eq("workshop_class_id", classId);
+
+    if (error) {
+      dbLogger.error("Failed to fetch class students", {
+        table: "workshop_session_participants",
+        error,
+      });
+      throw error;
+    }
+
+    const uniqueByUser = new Map<string, WorkshopSessionParticipant>();
+    for (const participant of data || []) {
+      if (!uniqueByUser.has(participant.user_id)) {
+        uniqueByUser.set(participant.user_id, participant);
+      }
+    }
+
+    return Array.from(uniqueByUser.values());
+  } catch (error) {
+    dbLogger.error("Error in getClassStudents", { error });
+    throw error;
+  }
+}
+
+export async function updateWorkshopSession(
+  id: string,
+  updates: Pick<WorkshopSession, "date" | "starts_at" | "ends_at">,
+): Promise<WorkshopSession> {
+  try {
+    dbLogger.info("Updating workshop session", {
+      table: "workshop_sessions",
+      data: { id, updates },
+    });
+
+    const { data, error } = await supabase
+      .from("workshop_sessions")
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) {
+      dbLogger.error("Failed to update workshop session", {
+        table: "workshop_sessions",
+        error,
+      });
+      throw error;
+    }
+
+    return data;
+  } catch (error) {
+    dbLogger.error("Error in updateWorkshopSession", { error });
+    throw error;
+  }
+}
+
+export async function removeStudentFromClass(
+  classId: string,
+  userId: string,
+): Promise<void> {
+  try {
+    dbLogger.info("Removing student from class", {
+      table: "workshop_session_participants",
+      data: { classId, userId },
+    });
+
+    const { error } = await supabase
+      .from("workshop_session_participants")
+      .delete()
+      .eq("workshop_class_id", classId)
+      .eq("user_id", userId);
+
+    if (error) {
+      dbLogger.error("Failed to remove student from class", {
+        table: "workshop_session_participants",
+        error,
+      });
+      throw error;
+    }
+  } catch (error) {
+    dbLogger.error("Error in removeStudentFromClass", { error });
+    throw error;
+  }
+}
+
+export async function updateWorkshopBookingStatus(
+  bookingId: string,
+  status: WorkshopBookingStatus,
+): Promise<void> {
+  try {
+    dbLogger.info("Updating workshop booking status", {
+      table: "workshop_bookings",
+      data: { bookingId, status },
+    });
+
+    const { error } = await supabase
+      .from("workshop_bookings")
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", bookingId);
+
+    if (error) {
+      dbLogger.error("Failed to update workshop booking status", {
+        table: "workshop_bookings",
+        error,
+      });
+      throw error;
+    }
+  } catch (error) {
+    dbLogger.error("Error in updateWorkshopBookingStatus", { error });
+    throw error;
+  }
+}

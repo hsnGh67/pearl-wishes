@@ -10,6 +10,24 @@ import {
 
 // ── Read ──────────────────────────────────────────────────────────────────────
 
+export async function getActivePromoCodesForBooking(): Promise<PromoCode[]> {
+  const today = new Date().toISOString().split("T")[0];
+
+  const { data, error } = await supabase
+    .from("promo_codes")
+    .select("*")
+    .eq("is_active", true)
+    .gte("end_date", today)
+    .lte("start_date", today)
+    .eq("assign_to", "all")
+    .or(`applies_to.eq.all,applies_to.eq.treatments`)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+
+  return data ?? [];
+}
+
 export async function getAllPromoCodes(): Promise<PromoCode[]> {
   const { data, error } = await supabase
     .from("promo_codes")
@@ -29,18 +47,23 @@ export async function getPromoCodeById(id: string): Promise<PromoCode | null> {
   return data ?? null;
 }
 
-export async function getPromoCodeByCode(code: string): Promise<PromoCode | null> {
+export async function getPromoCodeByCode(
+  code: string,
+): Promise<PromoCode | null> {
   const { data } = await supabase
     .from("promo_codes")
     .select("*")
-    .ilike("code", code.trim())
+    .ilike("code", code.toUpperCase().trim())
     .maybeSingle();
+  console.log("prome data ===>", data);
   return data ?? null;
 }
 
 // ── Write ─────────────────────────────────────────────────────────────────────
 
-export async function createPromoCode(input: PromoCodeInput): Promise<PromoCode> {
+export async function createPromoCode(
+  input: PromoCodeInput,
+): Promise<PromoCode> {
   const { data, error } = await supabase
     .from("promo_codes")
     .insert({ ...input, code: input.code.toUpperCase().trim() })
@@ -81,8 +104,10 @@ export async function validatePromoCode(
   subtotal: number,
 ): Promise<PromoValidationResult> {
   const promo = await getPromoCodeByCode(code);
+  console.log("promo ===>", promo);
   if (!promo) return { valid: false, error: "Promo code not found." };
-  if (!promo.is_active) return { valid: false, error: "This promo code is disabled." };
+  if (!promo.is_active)
+    return { valid: false, error: "This promo code is disabled." };
 
   const today = new Date().toISOString().split("T")[0];
   if (promo.start_date && promo.start_date > today)
@@ -95,12 +120,18 @@ export async function validatePromoCode(
     promo.applies_to !== "specific" &&
     promo.applies_to !== serviceType
   ) {
-    return { valid: false, error: `This code only applies to ${promo.applies_to}.` };
+    return {
+      valid: false,
+      error: `This code only applies to ${promo.applies_to}.`,
+    };
   }
 
   if (promo.global_usage === "limited" && promo.global_limit != null) {
     if (promo.usage_count >= promo.global_limit)
-      return { valid: false, error: "This promo code has reached its usage limit." };
+      return {
+        valid: false,
+        error: "This promo code has reached its usage limit.",
+      };
   }
 
   if (userId) {
@@ -158,7 +189,9 @@ export async function recordPromoCodeUsage(
   await supabase.rpc("increment_promo_usage", { promo_id: promoCodeId });
 }
 
-export async function getPromoCodeUsageHistory(promoCodeId: string): Promise<PromoCodeUsage[]> {
+export async function getPromoCodeUsageHistory(
+  promoCodeId: string,
+): Promise<PromoCodeUsage[]> {
   const { data, error } = await supabase
     .from("promo_code_usage")
     .select("*")
@@ -179,10 +212,14 @@ export interface EnrichedUsage {
   final_total: number | null;
 }
 
-export async function getEnrichedUsageHistory(promoCodeId: string): Promise<EnrichedUsage[]> {
+export async function getEnrichedUsageHistory(
+  promoCodeId: string,
+): Promise<EnrichedUsage[]> {
   const { data, error } = await supabase
     .from("promo_code_usage")
-    .select("id, booking_id, discount_applied, original_total, final_total, used_at, users:user_id ( full_name, email )")
+    .select(
+      "id, booking_id, discount_applied, original_total, final_total, used_at, users:user_id ( full_name, email )",
+    )
     .eq("promo_code_id", promoCodeId)
     .order("used_at", { ascending: false });
   if (error) throw error;

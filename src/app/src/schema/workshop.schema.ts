@@ -95,7 +95,9 @@ export function formatDurationLabel(
   if (!sessionCount || !sessionDurationHours) return "–";
   const perSession = sessionDurationHours;
   const totalH = sessionCount * sessionDurationHours;
-  const total = Number.isInteger(totalH) ? `${totalH}` : totalH.toFixed(1);
+  const total = Number.isInteger(totalH)
+    ? `${totalH}`
+    : totalH.toFixed(1);
   const sessWord = sessionCount === 1 ? "session" : "sessions";
   return `${sessionCount} ${sessWord} × ${perSession} (${total} hrs total)`;
 }
@@ -111,14 +113,17 @@ export function formatDurationCompact(
   return `${sessionCount} ${sessWord} × ${perSession}`;
 }
 
-export function formatWorkshopForDisplay(workshop: Workshop): WorkshopDisplay {
+export function formatWorkshopForDisplay(
+  workshop: Workshop,
+): WorkshopDisplay {
   return {
     id: workshop.id,
     title: workshop.title,
     description: workshop.description,
     sessionCount: workshop.session_count ?? 1,
     sessionDurationHours: workshop.session_duration_hours ?? 0,
-    level: WORKSHOP_LEVEL_LABELS[workshop.level] || workshop.level,
+    level:
+      WORKSHOP_LEVEL_LABELS[workshop.level] || workshop.level,
     levelValue: workshop.level,
     capacity: workshop.capacity,
     classType: workshop.class_type,

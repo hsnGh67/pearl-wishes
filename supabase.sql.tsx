@@ -188,6 +188,7 @@ create table public.workshop_bookings (
 -- =============================================
 create table public.workshop_sessions (
   id uuid not null default extensions.uuid_generate_v4 (),
+  class_id uuid not null,
   workshop_id uuid not null,
   starts_at time without time zone not null,
   ends_at time without time zone not null,
@@ -217,6 +218,7 @@ create table public.workshop_sessions (
 create table public.workshop_session_participants (
   id uuid not null default extensions.uuid_generate_v4 (),
   workshop_id uuid not null,
+  workshop_class_id uuid not null,
   workshop_session_id uuid not null,
   user_id uuid not null,
   name text not null,

@@ -13,6 +13,7 @@ import {
   validateCreateCategory,
 } from "../../schema/service.schema";
 import { dbLogger } from "./logger";
+import { uploadImageAndGetUrl } from "../../utils/uploadImageAndGetUrl";
 
 /**
  * Get all services
@@ -309,6 +310,7 @@ export const createService = async (
  */
 export const updateService = async (
   serviceData: ServiceUpdate,
+  imageFile?: File | null,
 ): Promise<Service> => {
   try {
     // Validate input
@@ -320,6 +322,16 @@ export const updateService = async (
     });
 
     const { id, ...updateFields } = validatedData;
+
+    if (imageFile) {
+      const image_url = await uploadImageAndGetUrl(
+        imageFile,
+        "services",
+      );
+      if (image_url) {
+        updateFields.image_url = image_url;
+      }
+    }
 
     const { data, error } = await supabase
       .from("services")

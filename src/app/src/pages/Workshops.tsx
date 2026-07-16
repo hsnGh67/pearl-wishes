@@ -17,18 +17,13 @@ import {
 import WorkshopsDetails from "./WorkshopsDetails";
 
 export default function Workshops() {
-  const [isGettingWorkshops, setIsGettingWorkshops] =
-    useState(false);
-  const [activeWorkshops, setActiveWorkshops] = useState<
-    WorkshopDisplay[]
-  >([]);
+  const [isGettingWorkshops, setIsGettingWorkshops] = useState(false);
+  const [activeWorkshops, setActiveWorkshops] = useState<WorkshopDisplay[]>([]);
   const getWorkshops = async () => {
     try {
       setIsGettingWorkshops(true);
       const workshops = await getActiveWorkshops();
-      const workshopDisplay = workshops.map(
-        formatWorkshopForDisplay,
-      );
+      const workshopDisplay = workshops.map(formatWorkshopForDisplay);
       setActiveWorkshops(workshopDisplay);
     } catch (error) {
       console.error("Error getting workshops:", error);
@@ -53,12 +48,12 @@ export default function Workshops() {
       <WorkshopsNavbar />
       <WorkshopHero />
       <HowItWorks />
-      {activeWorkshops.map((workshop) => (
-        <WorkshopsDetails
-          key={workshop.id}
-          workshopDetails={workshop}
-        />
-      ))}
+      <div id="workshop-info">
+        {activeWorkshops.map((workshop) => (
+          <WorkshopsDetails key={workshop.id} workshopDetails={workshop} />
+        ))}
+      </div>
+
       {/* <CompleteNailCourse />
       <AdvancedNailCourse /> */}
       <WorkshopInfo />

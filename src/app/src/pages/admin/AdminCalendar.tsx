@@ -74,6 +74,7 @@ import {
   ScheduleWorkshopDrawer,
   GeneratedSession,
 } from "../../components/admin/ScheduleWorkshopDrawer";
+import EditScheduleWorkshopDrawer from "../../components/admin/EditScheduleWorkshopDrawer";
 
 type ViewType = "day" | "week" | "month";
 
@@ -114,6 +115,11 @@ export function AdminCalendar() {
   const [bookingToReschedule, setBookingToReschedule] =
     useState<Booking | null>(null);
   const [isScheduleDrawerOpen, setIsScheduleDrawerOpen] = useState(false);
+  const [isEditWorkshopDrawerOpen, setIsEditWorkshopDrawerOpen] =
+    useState(false);
+  const [editWorkshopSessionId, setEditWorkshopSessionId] =
+    useState<string>("");
+  const [editWorkshopId, setEditWorkshopId] = useState<string>("");
   const [scheduledRuns, setScheduledRuns] = useState<ScheduledRun[]>([]);
 
   const loadData = async () => {
@@ -225,9 +231,10 @@ export function AdminCalendar() {
       setSelectedBooking(data as Booking);
       setIsDetailsOpen(true);
     } else {
-      console.log("data ==> ", data);
-      setSelectedWorkshopSession(data as WorkshopSession);
-      setIsScheduleDrawerOpen(true);
+      const session = data as WorkshopSession;
+      setEditWorkshopSessionId(session.id);
+      setEditWorkshopId(session.workshop_id);
+      setIsEditWorkshopDrawerOpen(true);
     }
   };
 
@@ -421,7 +428,10 @@ export function AdminCalendar() {
               borderColor: "#3D3935",
               color: "#FEFCFA",
             }}
-            onClick={() => setIsScheduleDrawerOpen(true)}
+            onClick={() => {
+              setSelectedWorkshopSession(undefined);
+              setIsScheduleDrawerOpen(true);
+            }}
           >
             <GraduationCap className="w-4 h-4 mr-2" />
             Schedule Workshop
@@ -693,7 +703,10 @@ export function AdminCalendar() {
       <ScheduleWorkshopDrawer
         selectedWorkshopSession={selectedWorkshopSession}
         open={isScheduleDrawerOpen}
-        onClose={() => setIsScheduleDrawerOpen(false)}
+        onClose={() => {
+          setIsScheduleDrawerOpen(false);
+          setSelectedWorkshopSession(undefined);
+        }}
         workshops={workshops}
         workshopBookings={workshopBookings}
         onScheduleCreated={(sessions, workshop) => {
@@ -708,6 +721,18 @@ export function AdminCalendar() {
             },
           ]);
         }}
+      />
+
+      <EditScheduleWorkshopDrawer
+        open={isEditWorkshopDrawerOpen}
+        onClose={() => {
+          setIsEditWorkshopDrawerOpen(false);
+          setEditWorkshopSessionId("");
+          setEditWorkshopId("");
+        }}
+        workshopId={editWorkshopId}
+        workshopSessionId={editWorkshopSessionId}
+        onUpdated={loadData}
       />
     </div>
   );
