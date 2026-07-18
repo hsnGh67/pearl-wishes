@@ -20,12 +20,17 @@ import {
   createWorkshopBookingStudent,
   getAllPendingBookedCandidates,
   getClassStudents,
+  getOccupiedSlotsByDates,
   getWorkshopSessionById,
   getWorkshopSessionsByClassId,
   removeStudentFromClass,
   updateWorkshopBookingStatus,
   updateWorkshopSession,
 } from "../../lib/db/workshop-bookings";
+import {
+  findSessionConflicts,
+  SessionConflictCandidate,
+} from "../../utils/timeOverlap";
 
 type DrawerStep = "sessions" | "students";
 
@@ -256,6 +261,30 @@ export default function EditScheduleWorkshopDrawer({
     setStudents((prev) => prev.filter((student) => student.userId !== userId));
   };
 
+  const validateSessionOverlaps = async (): Promise<boolean> => {
+    const candidates: SessionConflictCandidate[] = sessions.map((session) => ({
+      index: session.index,
+      date: session.date,
+      startsAt: session.startsAt,
+      endsAt: session.endsAt,
+      id: session.id,
+    }));
+
+    const occupiedByDate = await getOccupiedSlotsByDates(
+      candidates.map((candidate) => candidate.date),
+      { excludeSessionIds: sessions.map((session) => session.id) },
+    );
+    const conflicts = findSessionConflicts(candidates, occupiedByDate);
+    if (conflicts.length > 0) {
+      alert(
+        "Cannot save workshop sessions due to time conflicts:\n\n" +
+          conflicts.join("\n"),
+      );
+      return false;
+    }
+    return true;
+  };
+
   const saveSessionChanges = async () => {
     const changedSessions = sessions.filter((session) => {
       const original = originalSessions.find((item) => item.id === session.id);
@@ -340,6 +369,8 @@ export default function EditScheduleWorkshopDrawer({
   const handleContinueToStudents = async () => {
     try {
       setSaving(true);
+      const isValid = await validateSessionOverlaps();
+      if (!isValid) return;
       await saveSessionChanges();
       setStep("students");
     } catch (error) {
@@ -352,6 +383,8 @@ export default function EditScheduleWorkshopDrawer({
   const handleSaveAndClose = async () => {
     try {
       setSaving(true);
+      const isValid = await validateSessionOverlaps();
+      if (!isValid) return;
       await saveSessionChanges();
       await saveStudentChanges();
       onUpdated?.();

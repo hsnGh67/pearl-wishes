@@ -36,8 +36,14 @@ import {
   createWorkshopSession,
   getBookedCandidatesByMonth,
   getBookingCandidatesOfOtherMonths,
+  getOccupiedSlotsByDates,
   updateWorkshopBookingStatusToScheduled,
 } from "../../lib/db/workshop-bookings";
+import { formatDate } from "../../utils/formatDate";
+import {
+  findSessionConflicts,
+  SessionConflictCandidate,
+} from "../../utils/timeOverlap";
 
 // ─── types ────────────────────────────────────────────────────────────────────
 
@@ -830,6 +836,35 @@ export function ScheduleWorkshopDrawer({
     if (!selectedWorkshop || !sessions.length) return;
     try {
       setIsCreatingWorkshopSessions(true);
+
+      const candidates: SessionConflictCandidate[] = sessions.map(
+        (session) => {
+          const [startsAt = "", endsAt = ""] = session.time
+            .split("-")
+            .map((part) => part.trim());
+          return {
+            index: session.index,
+            date: formatDate(session.date),
+            startsAt,
+            endsAt,
+            id: session.id,
+          };
+        },
+      );
+
+      const occupiedByDate = await getOccupiedSlotsByDates(
+        candidates.map((candidate) => candidate.date),
+      );
+      const conflicts = findSessionConflicts(candidates, occupiedByDate);
+      if (conflicts.length > 0) {
+        alert(
+          "Cannot create workshop sessions due to time conflicts:\n\n" +
+            conflicts.join("\n"),
+        );
+        setIsCreatingWorkshopSessions(false);
+        return;
+      }
+
       let newSessions: any[] = [];
       const classId = crypto.randomUUID();
       setSelectedClassId(classId);

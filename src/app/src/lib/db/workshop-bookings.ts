@@ -14,8 +14,9 @@ import {
   WorkshopSessionParticipant,
 } from "../../schema/workshop-booking.schema";
 import { formatDate } from "../../utils/formatDate";
-import { BookedTimeSlot } from "./bookings";
+import { BookedTimeSlot, getBookedTimesForDate } from "./bookings";
 import { dbLogger } from "./logger";
+import { durationMinutes } from "../../utils/timeOverlap";
 
 /**
  * Get all workshop bookings
@@ -622,6 +623,56 @@ export const getWorkshopTimesForDate = async (date: Date) => {
     throw error;
   }
 };
+
+function parseLocalDateString(dateString: string): Date {
+  const [year, month, day] = dateString.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/**
+ * Loads occupied time slots (other workshop sessions + bookings) for each date.
+ * Pass excludeSessionIds when editing so the class's own sessions are ignored.
+ */
+export async function getOccupiedSlotsByDates(
+  dates: string[],
+  options?: { excludeSessionIds?: string[] },
+): Promise<Map<string, BookedTimeSlot[]>> {
+  const uniqueDates = [...new Set(dates.filter(Boolean))];
+  const excludeIds = new Set(options?.excludeSessionIds ?? []);
+  const occupiedByDate = new Map<string, BookedTimeSlot[]>();
+
+  await Promise.all(
+    uniqueDates.map(async (dateString) => {
+      const date = parseLocalDateString(dateString);
+
+      const { data: workshopSessions, error } = await supabase
+        .from("workshop_sessions")
+        .select("id, starts_at, ends_at")
+        .eq("date", dateString);
+
+      if (error) {
+        dbLogger.error("Error fetching workshop sessions for occupied slots", {
+          error,
+          data: { date: dateString },
+        });
+        throw error;
+      }
+
+      const workshopSlots: BookedTimeSlot[] = (workshopSessions ?? [])
+        .filter((session) => !excludeIds.has(session.id))
+        .map((session) => ({
+          appointment_time: session.starts_at,
+          duration: durationMinutes(session.starts_at, session.ends_at),
+        }))
+        .filter((slot) => slot.duration > 0);
+
+      const bookingSlots = await getBookedTimesForDate(date);
+      occupiedByDate.set(dateString, [...workshopSlots, ...bookingSlots]);
+    }),
+  );
+
+  return occupiedByDate;
+}
 
 export async function getWorkshopSessionById(
   id: string,
