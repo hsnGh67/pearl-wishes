@@ -435,10 +435,9 @@ export function BookingFlow({
       );
       if (existingUser) {
         // Autofill user data
-
+        console.log("existingUser =>", existingUser);
         // Parse address like "123 Oxford Street, London, W1D 2HG"
         const addressParts = existingUser.address.split(",");
-
         if (addressParts.length >= 2) {
           const streetPart = addressParts[0].trim(); // "123 Oxford Street"
           const match = streetPart.match(/^(\d+)\s+(.+)$/);
@@ -452,6 +451,9 @@ export function BookingFlow({
           ...bookingData,
           user_id: existingUser.id,
           name: existingUser.full_name,
+          district: existingUser.district || "",
+          street: streetName,
+          houseNumber: houseNum,
           address: `${houseNum} ${streetName}`,
         });
       } else {
