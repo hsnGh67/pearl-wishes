@@ -25,7 +25,10 @@ export function doesTimeRangeOverlap(
   return startA < endB && startB < endA;
 }
 
-export function durationMinutes(startsAt: string, endsAt: string): number {
+export function durationMinutes(
+  startsAt: string,
+  endsAt: string,
+): number {
   return minutesFromTime(endsAt) - minutesFromTime(startsAt);
 }
 
@@ -34,7 +37,10 @@ function normalizeClock(time: string): string {
   return time.length >= 5 ? time.slice(0, 5) : time;
 }
 
-function rangeWithGap(startsAt: string, endsAt: string): {
+function rangeWithGap(
+  startsAt: string,
+  endsAt: string,
+): {
   start: number;
   end: number;
 } {
@@ -99,7 +105,10 @@ export function findSessionConflicts(
 
   for (const candidate of candidates) {
     const slots = occupiedByDate.get(candidate.date) ?? [];
-    const range = rangeWithGap(candidate.startsAt, candidate.endsAt);
+    const range = rangeWithGap(
+      candidate.startsAt,
+      candidate.endsAt,
+    );
 
     for (const slot of slots) {
       const occupied = occupiedRangeWithGap(slot);

@@ -60,7 +60,10 @@ interface Props {
   onUpdated?: () => void;
 }
 
-function parseCapacity(classType: string | undefined, fallback = 3): number {
+function parseCapacity(
+  classType: string | undefined,
+  fallback = 3,
+): number {
   if (!classType) return fallback;
   const match = classType.match(/(\d+)\s*student/i);
   return match ? parseInt(match[1], 10) : fallback;
@@ -103,13 +106,17 @@ function participantToStudent(
   };
 }
 
-function bookingToStudent(booking: WorkshopBookingWithUser): ClassStudent {
+function bookingToStudent(
+  booking: WorkshopBookingWithUser,
+): ClassStudent {
   return {
     id: booking.user_id || booking.id,
     userId: booking.user_id || booking.id,
     name: booking.participant_name,
-    email: booking.participant_email || booking.user?.email || "",
-    phone: booking.participant_phone || booking.user?.phone || "",
+    email:
+      booking.participant_email || booking.user?.email || "",
+    phone:
+      booking.participant_phone || booking.user?.phone || "",
     bookingId: booking.id,
     source: "booked",
   };
@@ -127,20 +134,28 @@ export default function EditScheduleWorkshopDrawer({
   const [step, setStep] = useState<DrawerStep>("sessions");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(
+    null,
+  );
 
-  const [workshop, setWorkshop] = useState<Workshop | null>(null);
+  const [workshop, setWorkshop] = useState<Workshop | null>(
+    null,
+  );
   const [classId, setClassId] = useState<string>("");
-  const [sessions, setSessions] = useState<EditableSession[]>([]);
-  const [originalSessions, setOriginalSessions] = useState<EditableSession[]>(
+  const [sessions, setSessions] = useState<EditableSession[]>(
     [],
   );
+  const [originalSessions, setOriginalSessions] = useState<
+    EditableSession[]
+  >([]);
 
   const [students, setStudents] = useState<ClassStudent[]>([]);
-  const [initialStudents, setInitialStudents] = useState<ClassStudent[]>([]);
-  const [initialStudentIds, setInitialStudentIds] = useState<Set<string>>(
-    new Set(),
-  );
+  const [initialStudents, setInitialStudents] = useState<
+    ClassStudent[]
+  >([]);
+  const [initialStudentIds, setInitialStudentIds] = useState<
+    Set<string>
+  >(new Set());
   const [pendingCandidates, setPendingCandidates] = useState<
     WorkshopBookingWithUser[]
   >([]);
@@ -154,10 +169,12 @@ export default function EditScheduleWorkshopDrawer({
         setLoadError(null);
         setStep("sessions");
 
-        const [workshopData, anchorSession] = await Promise.all([
-          getWorkshopById(workshopId),
-          getWorkshopSessionById(workshopSessionId),
-        ]);
+        const [workshopData, anchorSession] = await Promise.all(
+          [
+            getWorkshopById(workshopId),
+            getWorkshopSessionById(workshopSessionId),
+          ],
+        );
 
         if (!workshopData) {
           throw new Error("Workshop not found");
@@ -174,18 +191,17 @@ export default function EditScheduleWorkshopDrawer({
             getAllPendingBookedCandidates(workshopId),
           ]);
 
-        const editableSessions: EditableSession[] = classSessions.map(
-          (session, index) => ({
+        const editableSessions: EditableSession[] =
+          classSessions.map((session, index) => ({
             id: session.id,
             index: index + 1,
             date: session.date,
             startsAt: normalizeTime(session.starts_at),
             endsAt: normalizeTime(session.ends_at),
-          }),
-        );
+          }));
 
-        const assignedStudents = classStudents.map((participant) =>
-          participantToStudent(participant),
+        const assignedStudents = classStudents.map(
+          (participant) => participantToStudent(participant),
         );
 
         setWorkshop(workshopData);
@@ -195,11 +211,16 @@ export default function EditScheduleWorkshopDrawer({
         setStudents(assignedStudents);
         setInitialStudents(assignedStudents);
         setInitialStudentIds(
-          new Set(assignedStudents.map((student) => student.userId)),
+          new Set(
+            assignedStudents.map((student) => student.userId),
+          ),
         );
         setPendingCandidates(pendingBookings);
       } catch (error) {
-        console.error("Failed to load workshop edit data:", error);
+        console.error(
+          "Failed to load workshop edit data:",
+          error,
+        );
         setLoadError(
           error instanceof Error
             ? error.message
@@ -233,24 +254,34 @@ export default function EditScheduleWorkshopDrawer({
     : 3;
   const isFull = students.length >= capacity;
 
-  const assignedUserIds = new Set(students.map((student) => student.userId));
-  const availablePendingCandidates = pendingCandidates.filter((candidate) => {
-    const candidateUserId = candidate.user_id || candidate.id;
-    return !assignedUserIds.has(candidateUserId);
-  });
+  const assignedUserIds = new Set(
+    students.map((student) => student.userId),
+  );
+  const availablePendingCandidates = pendingCandidates.filter(
+    (candidate) => {
+      const candidateUserId = candidate.user_id || candidate.id;
+      return !assignedUserIds.has(candidateUserId);
+    },
+  );
 
   const updateSession = (
     sessionId: string,
-    patch: Partial<Pick<EditableSession, "date" | "startsAt" | "endsAt">>,
+    patch: Partial<
+      Pick<EditableSession, "date" | "startsAt" | "endsAt">
+    >,
   ) => {
     setSessions((prev) =>
       prev.map((session) =>
-        session.id === sessionId ? { ...session, ...patch } : session,
+        session.id === sessionId
+          ? { ...session, ...patch }
+          : session,
       ),
     );
   };
 
-  const addStudentFromBooking = (booking: WorkshopBookingWithUser) => {
+  const addStudentFromBooking = (
+    booking: WorkshopBookingWithUser,
+  ) => {
     if (isFull) return;
     const student = bookingToStudent(booking);
     if (assignedUserIds.has(student.userId)) return;
@@ -258,36 +289,49 @@ export default function EditScheduleWorkshopDrawer({
   };
 
   const removeStudent = (userId: string) => {
-    setStudents((prev) => prev.filter((student) => student.userId !== userId));
-  };
-
-  const validateSessionOverlaps = async (): Promise<boolean> => {
-    const candidates: SessionConflictCandidate[] = sessions.map((session) => ({
-      index: session.index,
-      date: session.date,
-      startsAt: session.startsAt,
-      endsAt: session.endsAt,
-      id: session.id,
-    }));
-
-    const occupiedByDate = await getOccupiedSlotsByDates(
-      candidates.map((candidate) => candidate.date),
-      { excludeSessionIds: sessions.map((session) => session.id) },
+    setStudents((prev) =>
+      prev.filter((student) => student.userId !== userId),
     );
-    const conflicts = findSessionConflicts(candidates, occupiedByDate);
-    if (conflicts.length > 0) {
-      alert(
-        "Cannot save workshop sessions due to time conflicts:\n\n" +
-          conflicts.join("\n"),
-      );
-      return false;
-    }
-    return true;
   };
+
+  const validateSessionOverlaps =
+    async (): Promise<boolean> => {
+      const candidates: SessionConflictCandidate[] =
+        sessions.map((session) => ({
+          index: session.index,
+          date: session.date,
+          startsAt: session.startsAt,
+          endsAt: session.endsAt,
+          id: session.id,
+        }));
+
+      const occupiedByDate = await getOccupiedSlotsByDates(
+        candidates.map((candidate) => candidate.date),
+        {
+          excludeSessionIds: sessions.map(
+            (session) => session.id,
+          ),
+        },
+      );
+      const conflicts = findSessionConflicts(
+        candidates,
+        occupiedByDate,
+      );
+      if (conflicts.length > 0) {
+        alert(
+          "Cannot save workshop sessions due to time conflicts:\n\n" +
+            conflicts.join("\n"),
+        );
+        return false;
+      }
+      return true;
+    };
 
   const saveSessionChanges = async () => {
     const changedSessions = sessions.filter((session) => {
-      const original = originalSessions.find((item) => item.id === session.id);
+      const original = originalSessions.find(
+        (item) => item.id === session.id,
+      );
       if (!original) return true;
       return (
         original.date !== session.date ||
@@ -421,9 +465,14 @@ export default function EditScheduleWorkshopDrawer({
                 className="text-base font-semibold"
                 style={{ color: "#3D3935" }}
               >
-                {step === "sessions" ? "Edit Schedule" : "Edit Students"}
+                {step === "sessions"
+                  ? "Edit Schedule"
+                  : "Edit Students"}
               </h2>
-              <p className="text-sm mt-0.5" style={{ color: "#6b7280" }}>
+              <p
+                className="text-sm mt-0.5"
+                style={{ color: "#6b7280" }}
+              >
                 {workshop?.title ?? "Workshop"} ·{" "}
                 {step === "sessions"
                   ? "Update session dates and times"
@@ -435,44 +484,61 @@ export default function EditScheduleWorkshopDrawer({
               onClick={onClose}
               className="p-1.5 rounded-md hover:bg-gray-100 transition-colors mt-0.5"
             >
-              <X className="w-4 h-4" style={{ color: "#6b7280" }} />
+              <X
+                className="w-4 h-4"
+                style={{ color: "#6b7280" }}
+              />
             </button>
           </div>
 
           <div className="flex items-center gap-2 mt-3">
-            {(["sessions", "students"] as DrawerStep[]).map((item, index) => (
-              <div key={item} className="flex items-center gap-2">
+            {(["sessions", "students"] as DrawerStep[]).map(
+              (item, index) => (
                 <div
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-semibold"
-                  style={{
-                    backgroundColor:
-                      step === item
-                        ? "#3D3935"
-                        : step === "students" && item === "sessions"
-                          ? "#E9CFCA"
-                          : "#DCD4CD",
-                    color:
-                      step === item
-                        ? "#FEFCFA"
-                        : step === "students" && item === "sessions"
-                          ? "#3D3935"
-                          : "#9ca3af",
-                  }}
+                  key={item}
+                  className="flex items-center gap-2"
                 >
-                  {step === "students" && item === "sessions" ? "✓" : index + 1}
-                </div>
-                {index < 1 && (
                   <div
-                    className="h-px w-8"
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-semibold"
                     style={{
                       backgroundColor:
-                        step === "students" ? "#E9CFCA" : "#DCD4CD",
+                        step === item
+                          ? "#3D3935"
+                          : step === "students" &&
+                              item === "sessions"
+                            ? "#E9CFCA"
+                            : "#DCD4CD",
+                      color:
+                        step === item
+                          ? "#FEFCFA"
+                          : step === "students" &&
+                              item === "sessions"
+                            ? "#3D3935"
+                            : "#9ca3af",
                     }}
-                  />
-                )}
-              </div>
-            ))}
-            <span className="ml-1 text-xs" style={{ color: "#9ca3af" }}>
+                  >
+                    {step === "students" && item === "sessions"
+                      ? "✓"
+                      : index + 1}
+                  </div>
+                  {index < 1 && (
+                    <div
+                      className="h-px w-8"
+                      style={{
+                        backgroundColor:
+                          step === "students"
+                            ? "#E9CFCA"
+                            : "#DCD4CD",
+                      }}
+                    />
+                  )}
+                </div>
+              ),
+            )}
+            <span
+              className="ml-1 text-xs"
+              style={{ color: "#9ca3af" }}
+            >
               {step === "sessions" ? "Sessions" : "Students"}
             </span>
           </div>
@@ -486,20 +552,29 @@ export default function EditScheduleWorkshopDrawer({
         <div className="flex-1 overflow-y-auto px-6 py-2">
           {loading ? (
             <div className="flex items-center justify-center h-full py-16">
-              <p className="text-sm" style={{ color: "#9ca3af" }}>
+              <p
+                className="text-sm"
+                style={{ color: "#9ca3af" }}
+              >
                 Loading workshop details...
               </p>
             </div>
           ) : loadError ? (
             <div
               className="rounded-md border px-4 py-6 text-center"
-              style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
+              style={{
+                borderColor: "#DCD4CD",
+                backgroundColor: "#FAF7F5",
+              }}
             >
               <AlertTriangle
                 className="w-6 h-6 mx-auto mb-2"
                 style={{ color: "#D0A096" }}
               />
-              <p className="text-sm" style={{ color: "#3D3935" }}>
+              <p
+                className="text-sm"
+                style={{ color: "#3D3935" }}
+              >
                 {loadError}
               </p>
             </div>
@@ -535,8 +610,9 @@ export default function EditScheduleWorkshopDrawer({
                         className="text-xs mt-0.5"
                         style={{ color: "#9ca3af" }}
                       >
-                        Capacity: {capacity} students · {sessions.length}{" "}
-                        session{sessions.length !== 1 ? "s" : ""}
+                        Capacity: {capacity} students ·{" "}
+                        {sessions.length} session
+                        {sessions.length !== 1 ? "s" : ""}
                         {workshop?.session_duration_hours
                           ? ` × ${workshop.session_duration_hours}h`
                           : ""}
@@ -561,7 +637,8 @@ export default function EditScheduleWorkshopDrawer({
                       color: "#3D3935",
                     }}
                   >
-                    {sessions.length} session{sessions.length !== 1 ? "s" : ""}
+                    {sessions.length} session
+                    {sessions.length !== 1 ? "s" : ""}
                   </span>
                 </div>
 
@@ -574,7 +651,10 @@ export default function EditScheduleWorkshopDrawer({
                     }}
                   >
                     {sessions.map((session) => (
-                      <div key={session.id} className="px-3 py-3 space-y-2">
+                      <div
+                        key={session.id}
+                        className="px-3 py-3 space-y-2"
+                      >
                         <div className="flex items-center justify-between">
                           <span
                             className="text-xs font-medium"
@@ -644,7 +724,10 @@ export default function EditScheduleWorkshopDrawer({
                     className="rounded-md border border-dashed px-4 py-6 text-center"
                     style={{ borderColor: "#DCD4CD" }}
                   >
-                    <p className="text-xs" style={{ color: "#9ca3af" }}>
+                    <p
+                      className="text-xs"
+                      style={{ color: "#9ca3af" }}
+                    >
                       No sessions found for this class.
                     </p>
                   </div>
@@ -671,9 +754,12 @@ export default function EditScheduleWorkshopDrawer({
                   >
                     {workshop?.title}
                   </p>
-                  <p className="text-xs" style={{ color: "#6b7280" }}>
-                    {sessions.length} sessions · Seats {students.length}/
-                    {capacity}
+                  <p
+                    className="text-xs"
+                    style={{ color: "#6b7280" }}
+                  >
+                    {sessions.length} sessions · Seats{" "}
+                    {students.length}/{capacity}
                   </p>
                 </div>
               </div>
@@ -689,7 +775,9 @@ export default function EditScheduleWorkshopDrawer({
                   <span
                     className="text-xs px-2.5 py-1 rounded-full font-semibold border"
                     style={{
-                      backgroundColor: isFull ? "#DCD4CD" : "#E9CFCA",
+                      backgroundColor: isFull
+                        ? "#DCD4CD"
+                        : "#E9CFCA",
                       borderColor: "#3D3935",
                       color: "#3D3935",
                     }}
@@ -715,7 +803,9 @@ export default function EditScheduleWorkshopDrawer({
                             color: "#3D3935",
                           }}
                         >
-                          {student.name?.charAt(0)?.toUpperCase()}
+                          {student.name
+                            ?.charAt(0)
+                            ?.toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
@@ -760,7 +850,9 @@ export default function EditScheduleWorkshopDrawer({
                         </div>
                         <button
                           type="button"
-                          onClick={() => removeStudent(student.userId)}
+                          onClick={() =>
+                            removeStudent(student.userId)
+                          }
                           className="p-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
                         >
                           <Trash2
@@ -780,7 +872,10 @@ export default function EditScheduleWorkshopDrawer({
                       className="w-5 h-5 mx-auto mb-1.5"
                       style={{ color: "#DCD4CD" }}
                     />
-                    <p className="text-xs" style={{ color: "#9ca3af" }}>
+                    <p
+                      className="text-xs"
+                      style={{ color: "#9ca3af" }}
+                    >
                       No students assigned to this class yet.
                     </p>
                   </div>
@@ -810,94 +905,106 @@ export default function EditScheduleWorkshopDrawer({
                       className="rounded-md border divide-y"
                       style={{ borderColor: "#DCD4CD" }}
                     >
-                      {availablePendingCandidates.map((candidate) => (
-                        <div
-                          key={candidate.id}
-                          className="flex items-center gap-3 px-3 py-2.5"
-                        >
+                      {availablePendingCandidates.map(
+                        (candidate) => (
                           <div
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0"
-                            style={{
-                              backgroundColor: "#F1DFC0",
-                              color: "#3D3935",
-                            }}
+                            key={candidate.id}
+                            className="flex items-center gap-3 px-3 py-2.5"
                           >
-                            {candidate.participant_name
-                              ?.charAt(0)
-                              ?.toUpperCase()}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className="text-xs font-medium truncate"
-                              style={{ color: "#3D3935" }}
+                            <div
+                              className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold flex-shrink-0"
+                              style={{
+                                backgroundColor: "#F1DFC0",
+                                color: "#3D3935",
+                              }}
                             >
-                              {candidate.participant_name}
-                            </p>
-                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                              {(candidate.participant_phone ||
-                                candidate.user?.phone) && (
-                                <span
-                                  className="flex items-center gap-1 text-xs"
-                                  style={{ color: "#9ca3af" }}
-                                >
-                                  <Phone className="w-2.5 h-2.5" />
-                                  {candidate.participant_phone ||
-                                    candidate.user?.phone}
-                                </span>
-                              )}
-                              {(candidate.participant_email ||
-                                candidate.user?.email) && (
-                                <span
-                                  className="flex items-center gap-1 text-xs"
-                                  style={{ color: "#9ca3af" }}
-                                >
-                                  <Mail className="w-2.5 h-2.5" />
-                                  {candidate.participant_email ||
-                                    candidate.user?.email}
-                                </span>
-                              )}
-                              {candidate.preferred_month && (
-                                <span
-                                  className="text-xs"
-                                  style={{ color: "#9ca3af" }}
-                                >
-                                  ·{" "}
-                                  {candidate.preferred_month
-                                    .charAt(0)
-                                    .toUpperCase() +
-                                    candidate.preferred_month.slice(1)}
-                                </span>
-                              )}
+                              {candidate.participant_name
+                                ?.charAt(0)
+                                ?.toUpperCase()}
                             </div>
+                            <div className="flex-1 min-w-0">
+                              <p
+                                className="text-xs font-medium truncate"
+                                style={{ color: "#3D3935" }}
+                              >
+                                {candidate.participant_name}
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                {(candidate.participant_phone ||
+                                  candidate.user?.phone) && (
+                                  <span
+                                    className="flex items-center gap-1 text-xs"
+                                    style={{ color: "#9ca3af" }}
+                                  >
+                                    <Phone className="w-2.5 h-2.5" />
+                                    {candidate.participant_phone ||
+                                      candidate.user?.phone}
+                                  </span>
+                                )}
+                                {(candidate.participant_email ||
+                                  candidate.user?.email) && (
+                                  <span
+                                    className="flex items-center gap-1 text-xs"
+                                    style={{ color: "#9ca3af" }}
+                                  >
+                                    <Mail className="w-2.5 h-2.5" />
+                                    {candidate.participant_email ||
+                                      candidate.user?.email}
+                                  </span>
+                                )}
+                                {candidate.preferred_month && (
+                                  <span
+                                    className="text-xs"
+                                    style={{ color: "#9ca3af" }}
+                                  >
+                                    ·{" "}
+                                    {candidate.preferred_month
+                                      .charAt(0)
+                                      .toUpperCase() +
+                                      candidate.preferred_month.slice(
+                                        1,
+                                      )}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <span
+                              className="text-xs px-2 py-0.5 rounded font-medium flex-shrink-0"
+                              style={{
+                                backgroundColor: "#FCEAE0",
+                                color: "#3D3935",
+                              }}
+                            >
+                              Pending
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                addStudentFromBooking(candidate)
+                              }
+                              disabled={isFull}
+                              className="flex items-center gap-1 text-xs px-2 py-1.5 rounded border font-medium transition-colors flex-shrink-0"
+                              style={{
+                                backgroundColor: isFull
+                                  ? "transparent"
+                                  : "#3D3935",
+                                borderColor: isFull
+                                  ? "#DCD4CD"
+                                  : "#3D3935",
+                                color: isFull
+                                  ? "#9ca3af"
+                                  : "#FEFCFA",
+                                cursor: isFull
+                                  ? "not-allowed"
+                                  : "pointer",
+                              }}
+                            >
+                              <UserPlus className="w-3 h-3" />
+                              Add
+                            </button>
                           </div>
-                          <span
-                            className="text-xs px-2 py-0.5 rounded font-medium flex-shrink-0"
-                            style={{
-                              backgroundColor: "#FCEAE0",
-                              color: "#3D3935",
-                            }}
-                          >
-                            Pending
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => addStudentFromBooking(candidate)}
-                            disabled={isFull}
-                            className="flex items-center gap-1 text-xs px-2 py-1.5 rounded border font-medium transition-colors flex-shrink-0"
-                            style={{
-                              backgroundColor: isFull
-                                ? "transparent"
-                                : "#3D3935",
-                              borderColor: isFull ? "#DCD4CD" : "#3D3935",
-                              color: isFull ? "#9ca3af" : "#FEFCFA",
-                              cursor: isFull ? "not-allowed" : "pointer",
-                            }}
-                          >
-                            <UserPlus className="w-3 h-3" />
-                            Add
-                          </button>
-                        </div>
-                      ))}
+                        ),
+                      )}
                     </div>
                   </div>
                 )}
@@ -934,13 +1041,19 @@ export default function EditScheduleWorkshopDrawer({
                   disabled={sessions.length === 0 || saving}
                   style={{
                     backgroundColor:
-                      sessions.length === 0 || saving ? "#DCD4CD" : "#3D3935",
+                      sessions.length === 0 || saving
+                        ? "#DCD4CD"
+                        : "#3D3935",
                     borderColor:
-                      sessions.length === 0 || saving ? "#DCD4CD" : "#3D3935",
+                      sessions.length === 0 || saving
+                        ? "#DCD4CD"
+                        : "#3D3935",
                     color: "#FEFCFA",
                   }}
                 >
-                  {saving ? "Saving..." : "Continue to Students"}
+                  {saving
+                    ? "Saving..."
+                    : "Continue to Students"}
                 </Button>
               </>
             ) : (
@@ -962,7 +1075,9 @@ export default function EditScheduleWorkshopDrawer({
                   onClick={handleSaveAndClose}
                   disabled={saving}
                   style={{
-                    backgroundColor: saving ? "#DCD4CD" : "#3D3935",
+                    backgroundColor: saving
+                      ? "#DCD4CD"
+                      : "#3D3935",
                     borderColor: saving ? "#DCD4CD" : "#3D3935",
                     color: "#FEFCFA",
                   }}

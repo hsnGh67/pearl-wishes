@@ -157,6 +157,13 @@ interface LookbookImage {
 const DRAG_TYPE = "HERO_MEDIA";
 const LOOKBOOK_DRAG_TYPE = "LOOKBOOK_IMAGE";
 
+// ── About page types ──────────────────────────────────────────────────────────
+interface AboutMainFields { title: string; description: string; }
+interface WhyCard { id: string; icon: string; imageUrl: string; title: string; description: string; }
+interface HourRow { id: string; day: string; time: string; }
+interface AwardCard { id: string; imageUrl: string; name: string; year: string; issuer: string; }
+interface ContactFields { phone: string; email: string; address: string; }
+
 interface DragItem {
   index: number;
   originalIndex?: number;
@@ -526,6 +533,54 @@ export function AdminContent() {
     useState(false);
 
   const [services, setServices] = useState<Service[]>([]);
+
+  // ── About page state ────────────────────────────────────────────────────────
+  const [editingAboutCard, setEditingAboutCard] = useState<string | null>(null);
+  const [aboutSaved, setAboutSaved] = useState<string | null>(null);
+
+  const [aboutMain, setAboutMain] = useState<AboutMainFields>({
+    title: "About Pearl Wishes Studio",
+    description: "Pearl Wishes Studio is London's premier mobile nail care service, bringing luxury treatments directly to your door. Founded with a passion for exceptional nail artistry and client convenience, we combine professional-grade products with personalised care.",
+  });
+  const [aboutMainDraft, setAboutMainDraft] = useState<AboutMainFields>({ title: "", description: "" });
+
+  const [whyItems, setWhyItems] = useState<WhyCard[]>([
+    { id: "w1", icon: "✨", imageUrl: "", title: "Mobile Convenience", description: "We come to you — at home, office, or any preferred location across London." },
+    { id: "w2", icon: "💅", imageUrl: "", title: "Premium Products", description: "Only the finest gel, BIAB, and shellac brands trusted by nail professionals." },
+    { id: "w3", icon: "🎓", imageUrl: "", title: "Certified Technicians", description: "All technicians hold industry certifications and undergo continuous training." },
+  ]);
+  const [whyDraft, setWhyDraft] = useState<WhyCard[]>([]);
+  const whyFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const [contactInfo, setContactInfo] = useState<ContactFields>({
+    phone: "+44 20 7946 0958",
+    email: "hello@pearlwishesstudio.co.uk",
+    address: "London, United Kingdom",
+  });
+  const [contactDraft, setContactDraft] = useState<ContactFields>({ phone: "", email: "", address: "" });
+
+  const [businessHoursData, setBusinessHoursData] = useState<HourRow[]>([
+    { id: "bh1", day: "Monday",    time: "9:00 AM – 7:00 PM" },
+    { id: "bh2", day: "Tuesday",   time: "9:00 AM – 7:00 PM" },
+    { id: "bh3", day: "Wednesday", time: "9:00 AM – 7:00 PM" },
+    { id: "bh4", day: "Thursday",  time: "9:00 AM – 8:00 PM" },
+    { id: "bh5", day: "Friday",    time: "9:00 AM – 8:00 PM" },
+    { id: "bh6", day: "Saturday",  time: "10:00 AM – 6:00 PM" },
+    { id: "bh7", day: "Sunday",    time: "Closed" },
+  ]);
+  const [hoursDraft, setHoursDraft] = useState<HourRow[]>([]);
+
+  const [awardItems, setAwardItems] = useState<AwardCard[]>([
+    { id: "a1", imageUrl: "", name: "Best Mobile Beauty Service", year: "2023", issuer: "London Beauty Awards" },
+    { id: "a2", imageUrl: "", name: "Five Star Excellence",       year: "2024", issuer: "UK Nail Industry Association" },
+  ]);
+  const [awardsDraft, setAwardsDraft] = useState<AwardCard[]>([]);
+  const awardFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+
+  const flashAboutSaved = (key: string) => {
+    setAboutSaved(key);
+    setTimeout(() => setAboutSaved(null), 2500);
+  };
 
   const getTestimonialSection = async () => {
     const testimonials = await getAllTestimonials();
@@ -2659,6 +2714,422 @@ export function AdminContent() {
     );
   };
 
+  // ── About page: shared card header ────────────────────────────────────────
+  const aboutCardHeader = (
+    key: string,
+    title: string,
+    onEdit: () => void,
+    onSave: () => void,
+    badge?: React.ReactNode,
+  ) => (
+    <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center gap-2">
+        <h4 className="font-medium" style={{ color: "#3D3935" }}>{title}</h4>
+        {aboutSaved === key && (
+          <span className="text-xs px-2 py-0.5 rounded-sm" style={{ backgroundColor: "#E9CFCA", color: "#3D3935" }}>Saved</span>
+        )}
+        {badge}
+      </div>
+      {editingAboutCard !== key ? (
+        <Button className="border-2 p-2" style={{ borderColor: "#DCD4CD", backgroundColor: "transparent", color: "#3D3935" }} onClick={onEdit}>
+          <Edit className="w-4 h-4" />
+        </Button>
+      ) : (
+        <div className="flex items-center gap-2">
+          <Button className="border-2 px-3 py-1.5 text-xs" style={{ borderColor: "#DCD4CD", backgroundColor: "transparent", color: "#3D3935" }}
+            onClick={() => setEditingAboutCard(null)}>
+            <X className="w-3.5 h-3.5 mr-1" />Cancel
+          </Button>
+          <Button className="px-3 py-1.5 text-xs" style={{ background: "linear-gradient(135deg, #FCEAE0, #EACAB8)", color: "#3D3935" }}
+            onClick={onSave}>
+            <Save className="w-3.5 h-3.5 mr-1" />Save
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+
+  // ── About page: 1 · Main About ─────────────────────────────────────────────
+  const renderAboutMainCard = () => {
+    const isEditing = editingAboutCard === "about-main";
+    const inputCls = "w-full px-3 py-2 border-2 rounded-md text-sm outline-none";
+    const inputStyle = { borderColor: "#DCD4CD", backgroundColor: "#FAF7F5", color: "#3D3935" };
+    return (
+      <div className="p-4 border-2 rounded-md" style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}>
+        {aboutCardHeader(
+          "about-main", "Main About",
+          () => { setEditingAboutCard("about-main"); setAboutMainDraft({ ...aboutMain }); },
+          () => { setAboutMain({ ...aboutMainDraft }); setEditingAboutCard(null); flashAboutSaved("about-main"); },
+        )}
+        <div className="space-y-3 text-sm">
+          <div>
+            <label className="font-medium block mb-1" style={{ color: "#3D3935" }}>Title</label>
+            {isEditing ? (
+              <input type="text" value={aboutMainDraft.title}
+                onChange={(e) => setAboutMainDraft((p) => ({ ...p, title: e.target.value }))}
+                className={inputCls} style={inputStyle} placeholder="e.g. About Pearl Wishes Studio" />
+            ) : (
+              <p className="text-gray-600 mt-1">{aboutMain.title || <span className="italic text-gray-400">No title set</span>}</p>
+            )}
+          </div>
+          <div>
+            <label className="font-medium block mb-1" style={{ color: "#3D3935" }}>Description</label>
+            {isEditing ? (
+              <textarea value={aboutMainDraft.description} rows={5}
+                onChange={(e) => setAboutMainDraft((p) => ({ ...p, description: e.target.value }))}
+                className={inputCls + " resize-none"} style={inputStyle}
+                placeholder="Describe your studio, values, and mission..." />
+            ) : (
+              <p className="text-gray-600 mt-1 leading-relaxed">{aboutMain.description || <span className="italic text-gray-400">No description set</span>}</p>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── About page: 2 · Why Choose Us ─────────────────────────────────────────
+  const renderWhyChooseUsCard = () => {
+    const isEditing = editingAboutCard === "about-why";
+    const items = isEditing ? whyDraft : whyItems;
+
+    const updateItem = (id: string, field: keyof WhyCard, value: string) =>
+      setWhyDraft((prev) => prev.map((i) => i.id === id ? { ...i, [field]: value } : i));
+    const removeItem = (id: string) => setWhyDraft((prev) => prev.filter((i) => i.id !== id));
+    const addItem = () =>
+      setWhyDraft((prev) => [...prev, { id: crypto.randomUUID(), icon: "⭐", imageUrl: "", title: "", description: "" }]);
+    const handleWhyImage = (id: string, file: File | null) => {
+      if (!file) return;
+      updateItem(id, "imageUrl", URL.createObjectURL(file));
+    };
+
+    return (
+      <div className="p-4 border-2 rounded-md" style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}>
+        {aboutCardHeader(
+          "about-why", "Why Choose Us",
+          () => { setEditingAboutCard("about-why"); setWhyDraft([...whyItems]); },
+          () => { setWhyItems([...whyDraft]); setEditingAboutCard(null); flashAboutSaved("about-why"); },
+          <span className="text-xs px-2 py-0.5 rounded-sm" style={{ backgroundColor: "#FAF7F5", color: "#3D3935" }}>
+            {items.length} cards
+          </span>,
+        )}
+
+        {!isEditing ? (
+          <div className="grid grid-cols-3 gap-3">
+            {items.map((item) => (
+              <div key={item.id} className="p-3 border rounded-md" style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}>
+                {item.imageUrl ? (
+                  <div className="w-10 h-10 mb-2 rounded overflow-hidden border" style={{ borderColor: "#DCD4CD" }}>
+                    <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <span className="text-2xl block mb-2">{item.icon}</span>
+                )}
+                <p className="font-medium text-sm" style={{ color: "#3D3935" }}>{item.title || "—"}</p>
+                <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{item.description}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {items.map((item) => (
+              <div key={item.id} className="p-3 border-2 rounded-md" style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}>
+                <div className="flex items-start gap-3">
+                  {/* Image / icon uploader */}
+                  <div className="flex-shrink-0 space-y-1">
+                    <input ref={(el) => { whyFileRefs.current[item.id] = el; }}
+                      type="file" accept=".png,.jpg,.jpeg,.webp" className="hidden"
+                      onChange={(e) => handleWhyImage(item.id, e.target.files?.[0] ?? null)} />
+                    <button
+                      className="w-16 h-16 border-2 border-dashed rounded-md flex flex-col items-center justify-center gap-0.5 hover:border-[#D0A096] transition-colors overflow-hidden"
+                      style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+                      onClick={() => whyFileRefs.current[item.id]?.click()}
+                    >
+                      {item.imageUrl ? (
+                        <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <>
+                          <ImagePlus className="w-4 h-4" style={{ color: "#D0A096" }} />
+                          <span className="text-xs" style={{ color: "#D0A096" }}>Image</span>
+                        </>
+                      )}
+                    </button>
+                    <input type="text" value={item.icon} maxLength={2}
+                      onChange={(e) => updateItem(item.id, "icon", e.target.value)}
+                      className="w-16 text-center px-1 py-1 border rounded text-sm outline-none"
+                      style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA", color: "#3D3935" }}
+                      placeholder="Icon" />
+                  </div>
+                  {/* Text fields */}
+                  <div className="flex-1 space-y-2">
+                    <div>
+                      <label className="text-xs font-medium block mb-0.5" style={{ color: "#3D3935" }}>Title</label>
+                      <input type="text" value={item.title}
+                        onChange={(e) => updateItem(item.id, "title", e.target.value)}
+                        className="w-full px-2 py-1.5 border rounded text-sm outline-none"
+                        style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA", color: "#3D3935" }}
+                        placeholder="Feature title" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium block mb-0.5" style={{ color: "#3D3935" }}>Short Description</label>
+                      <input type="text" value={item.description}
+                        onChange={(e) => updateItem(item.id, "description", e.target.value)}
+                        className="w-full px-2 py-1.5 border rounded text-sm outline-none"
+                        style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA", color: "#3D3935" }}
+                        placeholder="Brief description..." />
+                    </div>
+                  </div>
+                  <button className="p-1 mt-0.5 border rounded flex-shrink-0"
+                    style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+                    onClick={() => removeItem(item.id)}>
+                    <Trash2 className="w-3.5 h-3.5" style={{ color: "#D0A096" }} />
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button
+              className="w-full p-3 border-2 border-dashed rounded-md flex items-center justify-center gap-2 hover:border-[#D0A096] transition-colors"
+              style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
+              onClick={addItem}
+            >
+              <Plus className="w-4 h-4" style={{ color: "#D0A096" }} />
+              <span className="text-sm" style={{ color: "#3D3935" }}>Add Card</span>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ── About page: 3 · Contact & Business Hours ───────────────────────────────
+  const renderContactCard = () => {
+    const isEditing = editingAboutCard === "about-contact";
+    const contact = isEditing ? contactDraft : contactInfo;
+    const hours = isEditing ? hoursDraft : businessHoursData;
+    const inputCls = "w-full px-3 py-2 border-2 rounded-md text-sm outline-none";
+    const inputStyle = { borderColor: "#DCD4CD", backgroundColor: "#FAF7F5", color: "#3D3935" };
+
+    const updateHour = (id: string, field: keyof HourRow, value: string) =>
+      setHoursDraft((prev) => prev.map((h) => h.id === id ? { ...h, [field]: value } : h));
+    const removeHour = (id: string) => setHoursDraft((prev) => prev.filter((h) => h.id !== id));
+    const addHour = () =>
+      setHoursDraft((prev) => [...prev, { id: crypto.randomUUID(), day: "Monday", time: "" }]);
+
+    return (
+      <div className="p-4 border-2 rounded-md" style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}>
+        {aboutCardHeader(
+          "about-contact", "Contact & Business Hours",
+          () => { setEditingAboutCard("about-contact"); setContactDraft({ ...contactInfo }); setHoursDraft([...businessHoursData]); },
+          () => { setContactInfo({ ...contactDraft }); setBusinessHoursData([...hoursDraft]); setEditingAboutCard(null); flashAboutSaved("about-contact"); },
+        )}
+        <div className="space-y-4 text-sm">
+          {/* Phone + Email grid */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="font-medium block mb-1" style={{ color: "#3D3935" }}>Phone</label>
+              {isEditing ? (
+                <input type="text" value={contactDraft.phone}
+                  onChange={(e) => setContactDraft((p) => ({ ...p, phone: e.target.value }))}
+                  className={inputCls} style={inputStyle} placeholder="+44 20 7946 0958" />
+              ) : (
+                <p className="text-gray-600 mt-1">{contact.phone || "—"}</p>
+              )}
+            </div>
+            <div>
+              <label className="font-medium block mb-1" style={{ color: "#3D3935" }}>Email</label>
+              {isEditing ? (
+                <input type="text" value={contactDraft.email}
+                  onChange={(e) => setContactDraft((p) => ({ ...p, email: e.target.value }))}
+                  className={inputCls} style={inputStyle} placeholder="hello@studio.co.uk" />
+              ) : (
+                <p className="text-gray-600 mt-1">{contact.email || "—"}</p>
+              )}
+            </div>
+          </div>
+          {/* Address */}
+          <div>
+            <label className="font-medium block mb-1" style={{ color: "#3D3935" }}>Address</label>
+            {isEditing ? (
+              <input type="text" value={contactDraft.address}
+                onChange={(e) => setContactDraft((p) => ({ ...p, address: e.target.value }))}
+                className={inputCls} style={inputStyle} placeholder="Street, City, Postcode" />
+            ) : (
+              <p className="text-gray-600 mt-1">{contact.address || "—"}</p>
+            )}
+          </div>
+          {/* Business hours */}
+          <div className="pt-3 border-t-2" style={{ borderColor: "#DCD4CD" }}>
+            <div className="flex items-center justify-between mb-3">
+              <label className="font-medium" style={{ color: "#3D3935" }}>Business Hours</label>
+              {isEditing && (
+                <button className="text-xs px-2 py-1 border rounded flex items-center gap-1"
+                  style={{ borderColor: "#DCD4CD", color: "#3D3935" }} onClick={addHour}>
+                  <Plus className="w-3 h-3" />Add Row
+                </button>
+              )}
+            </div>
+            <div className="space-y-2">
+              {hours.map((hour) => (
+                <div key={hour.id} className="flex items-center gap-2">
+                  {isEditing ? (
+                    <>
+                      <select value={hour.day}
+                        onChange={(e) => updateHour(hour.id, "day", e.target.value)}
+                        className="border-2 px-2 py-1.5 text-sm rounded outline-none flex-shrink-0"
+                        style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5", color: "#3D3935", width: "132px" }}>
+                        {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map((d) => (
+                          <option key={d}>{d}</option>
+                        ))}
+                      </select>
+                      <input type="text" value={hour.time}
+                        onChange={(e) => updateHour(hour.id, "time", e.target.value)}
+                        className="flex-1 px-2 py-1.5 border-2 rounded text-sm outline-none"
+                        style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5", color: "#3D3935" }}
+                        placeholder="e.g. 9:00 AM – 7:00 PM" />
+                      <button className="p-1 border rounded flex-shrink-0"
+                        style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+                        onClick={() => removeHour(hour.id)}>
+                        <Trash2 className="w-3.5 h-3.5" style={{ color: "#D0A096" }} />
+                      </button>
+                    </>
+                  ) : (
+                    <div className="flex items-center gap-3 w-full px-3 py-2 rounded"
+                      style={{ backgroundColor: "#FAF7F5", border: "1px solid #DCD4CD" }}>
+                      <span className="w-24 text-xs font-medium flex-shrink-0" style={{ color: "#3D3935" }}>{hour.day}</span>
+                      <span className="text-xs text-gray-600">{hour.time}</span>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── About page: 4 · Awards & Certifications ────────────────────────────────
+  const renderAwardsCard = () => {
+    const isEditing = editingAboutCard === "about-awards";
+    const items = isEditing ? awardsDraft : awardItems;
+
+    const updateAward = (id: string, field: keyof AwardCard, value: string) =>
+      setAwardsDraft((prev) => prev.map((a) => a.id === id ? { ...a, [field]: value } : a));
+    const removeAward = (id: string) => setAwardsDraft((prev) => prev.filter((a) => a.id !== id));
+    const addAward = () =>
+      setAwardsDraft((prev) => [...prev, { id: crypto.randomUUID(), imageUrl: "", name: "", year: String(new Date().getFullYear()), issuer: "" }]);
+    const handleAwardImage = (id: string, file: File | null) => {
+      if (!file) return;
+      updateAward(id, "imageUrl", URL.createObjectURL(file));
+    };
+
+    return (
+      <div className="p-4 border-2 rounded-md" style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}>
+        {aboutCardHeader(
+          "about-awards", "Awards & Certifications",
+          () => { setEditingAboutCard("about-awards"); setAwardsDraft([...awardItems]); },
+          () => { setAwardItems([...awardsDraft]); setEditingAboutCard(null); flashAboutSaved("about-awards"); },
+          <span className="text-xs px-2 py-0.5 rounded-sm" style={{ backgroundColor: "#FAF7F5", color: "#3D3935" }}>
+            {items.length} {items.length === 1 ? "badge" : "badges"}
+          </span>,
+        )}
+
+        {!isEditing ? (
+          <div className="grid grid-cols-3 gap-3">
+            {items.map((award) => (
+              <div key={award.id} className="p-3 border rounded-md text-center" style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}>
+                {award.imageUrl ? (
+                  <div className="w-12 h-12 mx-auto mb-2 rounded overflow-hidden border" style={{ borderColor: "#DCD4CD" }}>
+                    <img src={award.imageUrl} alt={award.name} className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 mx-auto mb-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E9CFCA" }}>
+                    <Star className="w-5 h-5" style={{ color: "#3D3935" }} />
+                  </div>
+                )}
+                <p className="text-sm font-medium leading-tight" style={{ color: "#3D3935" }}>{award.name || "—"}</p>
+                <p className="text-xs text-gray-500 mt-0.5">{award.issuer}</p>
+                <p className="text-xs font-medium mt-0.5" style={{ color: "#D0A096" }}>{award.year}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-3">
+            {items.map((award) => (
+              <div key={award.id} className="p-3 border-2 rounded-md relative" style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}>
+                <button className="absolute top-2 right-2 p-1 border rounded"
+                  style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+                  onClick={() => removeAward(award.id)}>
+                  <Trash2 className="w-3.5 h-3.5" style={{ color: "#D0A096" }} />
+                </button>
+                <div className="flex items-start gap-3 pr-7">
+                  {/* Badge image uploader */}
+                  <div className="flex-shrink-0">
+                    <input ref={(el) => { awardFileRefs.current[award.id] = el; }}
+                      type="file" accept=".png,.jpg,.jpeg,.webp" className="hidden"
+                      onChange={(e) => handleAwardImage(award.id, e.target.files?.[0] ?? null)} />
+                    <button
+                      className="w-16 h-16 border-2 border-dashed rounded-md flex flex-col items-center justify-center gap-0.5 hover:border-[#D0A096] transition-colors overflow-hidden"
+                      style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+                      onClick={() => awardFileRefs.current[award.id]?.click()}
+                    >
+                      {award.imageUrl ? (
+                        <img src={award.imageUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <>
+                          <ImagePlus className="w-4 h-4" style={{ color: "#D0A096" }} />
+                          <span className="text-xs" style={{ color: "#D0A096" }}>Badge</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  {/* Award fields */}
+                  <div className="flex-1 space-y-2">
+                    <div>
+                      <label className="text-xs font-medium block mb-0.5" style={{ color: "#3D3935" }}>Award Name</label>
+                      <input type="text" value={award.name}
+                        onChange={(e) => updateAward(award.id, "name", e.target.value)}
+                        className="w-full px-2 py-1.5 border rounded text-sm outline-none"
+                        style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA", color: "#3D3935" }}
+                        placeholder="Award or certification name" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="text-xs font-medium block mb-0.5" style={{ color: "#3D3935" }}>Year</label>
+                        <input type="text" value={award.year} maxLength={4}
+                          onChange={(e) => updateAward(award.id, "year", e.target.value)}
+                          className="w-full px-2 py-1.5 border rounded text-sm outline-none"
+                          style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA", color: "#3D3935" }}
+                          placeholder="2024" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium block mb-0.5" style={{ color: "#3D3935" }}>Issuer</label>
+                        <input type="text" value={award.issuer}
+                          onChange={(e) => updateAward(award.id, "issuer", e.target.value)}
+                          className="w-full px-2 py-1.5 border rounded text-sm outline-none"
+                          style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA", color: "#3D3935" }}
+                          placeholder="Issuing body" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {/* Add badge */}
+            <button
+              className="p-3 border-2 border-dashed rounded-md flex flex-col items-center justify-center gap-2 hover:border-[#D0A096] transition-colors min-h-[100px]"
+              style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
+              onClick={addAward}
+            >
+              <Plus className="w-5 h-5" style={{ color: "#D0A096" }} />
+              <span className="text-sm" style={{ color: "#3D3935" }}>Add Badge</span>
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="p-8">
@@ -2763,9 +3234,12 @@ export function AdminContent() {
                 className="border-t-2 p-6"
                 style={{ borderColor: "#DCD4CD" }}
               >
-                <p className="text-gray-600 text-center py-8">
-                  About page content management coming soon...
-                </p>
+                <div className="space-y-6">
+                  {renderAboutMainCard()}
+                  {renderWhyChooseUsCard()}
+                  {renderContactCard()}
+                  {renderAwardsCard()}
+                </div>
               </div>
             )}
           </Card>

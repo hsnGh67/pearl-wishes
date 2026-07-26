@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { WorkshopDisplay } from "../schema/workshop.schema";
 import { WorkshopBookingFlow } from "../../components/WorkshopBookingFlow";
 import { ChevronDown } from "lucide-react";
@@ -6,15 +6,27 @@ import { ChevronDown } from "lucide-react";
 type Props = {
   workshopDetails: WorkshopDisplay;
 };
-export default function WorkshopsDetails({
-  workshopDetails,
-}: Props) {
+export default function WorkshopsDetails({ workshopDetails }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
   const learningPoints = workshopDetails.highlights;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const selectedWorkshopId = params.get("workshopId");
+    if (selectedWorkshopId && selectedWorkshopId === workshopDetails.id) {
+      window.scrollTo({
+        top:
+          document.getElementById(`workshop-${workshopDetails.id}`)
+            ?.offsetTop || 0,
+        behavior: "smooth",
+      });
+    }
+  }, []);
+
   return (
     <section
-      id="complete-nail-course"
+      id={`workshop-${workshopDetails.id}`}
       className="py-16 px-5 lg:px-20"
       style={{ backgroundColor: "#FCEAE0" }}
     >
@@ -46,41 +58,32 @@ export default function WorkshopsDetails({
             >
               {workshopDetails.title}
             </h2>
-            <p
-              className="text-lg"
-              style={{ color: "#3D3935", opacity: 0.8 }}
-            >
+            <p className="text-lg" style={{ color: "#3D3935", opacity: 0.8 }}>
               {workshopDetails.description}
             </p>
           </div>
 
           {/* What You'll Learn */}
           <div className="mb-10">
-            <h3
-              className="text-xl mb-6"
-              style={{ color: "#3D3935" }}
-            >
+            <h3 className="text-xl mb-6" style={{ color: "#3D3935" }}>
               What You'll Learn
             </h3>
             <div className="relative">
               <ol className="space-y-3">
-                {(isExpanded
-                  ? learningPoints
-                  : learningPoints.slice(0, 3)
-                ).map((point, index) => (
-                  <li
-                    key={index}
-                    className="flex items-start gap-3"
-                    style={{ color: "#3D3935" }}
-                  >
-                    <span className="font-medium flex-shrink-0">
-                      {index + 1}.
-                    </span>
-                    <span style={{ opacity: 0.85 }}>
-                      {point}
-                    </span>
-                  </li>
-                ))}
+                {(isExpanded ? learningPoints : learningPoints.slice(0, 3)).map(
+                  (point, index) => (
+                    <li
+                      key={index}
+                      className="flex items-start gap-3"
+                      style={{ color: "#3D3935" }}
+                    >
+                      <span className="font-medium flex-shrink-0">
+                        {index + 1}.
+                      </span>
+                      <span style={{ opacity: 0.85 }}>{point}</span>
+                    </li>
+                  ),
+                )}
               </ol>
               {!isExpanded && learningPoints.length > 3 && (
                 <div
@@ -99,9 +102,7 @@ export default function WorkshopsDetails({
                 style={{
                   borderColor: "#DCD4CD",
                   color: "#3D3935",
-                  background: isExpanded
-                    ? "transparent"
-                    : "#E9CFCA",
+                  background: isExpanded ? "transparent" : "#E9CFCA",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = isExpanded
@@ -130,10 +131,7 @@ export default function WorkshopsDetails({
           {/* Duration + What's Included */}
           <div className="grid lg:grid-cols-2 gap-8 mb-10">
             <div>
-              <h3
-                className="text-xl mb-4"
-                style={{ color: "#3D3935" }}
-              >
+              <h3 className="text-xl mb-4" style={{ color: "#3D3935" }}>
                 Course Duration
               </h3>
               <div className="grid grid-cols-3 gap-3 mb-3">
@@ -159,10 +157,7 @@ export default function WorkshopsDetails({
                       border: "1px solid #DCD4CD",
                     }}
                   >
-                    <p
-                      className="text-xs mb-0.5"
-                      style={{ color: "#9ca3af" }}
-                    >
+                    <p className="text-xs mb-0.5" style={{ color: "#9ca3af" }}>
                       {fact.label}
                     </p>
                     <p
@@ -244,13 +239,11 @@ export default function WorkshopsDetails({
                   color: "#FEFCFA",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "#1F1F1F";
+                  e.currentTarget.style.backgroundColor = "#1F1F1F";
                   e.currentTarget.style.borderColor = "#1F1F1F";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "#3D3935";
+                  e.currentTarget.style.backgroundColor = "#3D3935";
                   e.currentTarget.style.borderColor = "#3D3935";
                 }}
               >
@@ -264,12 +257,10 @@ export default function WorkshopsDetails({
                   color: "#3D3935",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "#E9CFCA";
+                  e.currentTarget.style.backgroundColor = "#E9CFCA";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "transparent";
+                  e.currentTarget.style.backgroundColor = "transparent";
                 }}
               >
                 Contact Us

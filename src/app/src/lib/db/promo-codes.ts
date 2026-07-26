@@ -10,7 +10,9 @@ import {
 
 // ── Read ──────────────────────────────────────────────────────────────────────
 
-export async function getActivePromoCodesForBooking(): Promise<PromoCode[]> {
+export async function getActivePromoCodesForBooking(): Promise<
+  PromoCode[]
+> {
   const today = new Date().toISOString().split("T")[0];
 
   const { data, error } = await supabase
@@ -37,7 +39,9 @@ export async function getAllPromoCodes(): Promise<PromoCode[]> {
   return data ?? [];
 }
 
-export async function getPromoCodeById(id: string): Promise<PromoCode | null> {
+export async function getPromoCodeById(
+  id: string,
+): Promise<PromoCode | null> {
   const { data, error } = await supabase
     .from("promo_codes")
     .select("*")
@@ -87,10 +91,15 @@ export async function updatePromoCode(
   return data;
 }
 
-export async function disablePromoCode(id: string): Promise<void> {
+export async function disablePromoCode(
+  id: string,
+): Promise<void> {
   const { error } = await supabase
     .from("promo_codes")
-    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .update({
+      is_active: false,
+      updated_at: new Date().toISOString(),
+    })
     .eq("id", id);
   if (error) throw error;
 }
@@ -105,15 +114,25 @@ export async function validatePromoCode(
 ): Promise<PromoValidationResult> {
   const promo = await getPromoCodeByCode(code);
   console.log("promo ===>", promo);
-  if (!promo) return { valid: false, error: "Promo code not found." };
+  if (!promo)
+    return { valid: false, error: "Promo code not found." };
   if (!promo.is_active)
-    return { valid: false, error: "This promo code is disabled." };
+    return {
+      valid: false,
+      error: "This promo code is disabled.",
+    };
 
   const today = new Date().toISOString().split("T")[0];
   if (promo.start_date && promo.start_date > today)
-    return { valid: false, error: "This promo code is not yet active." };
+    return {
+      valid: false,
+      error: "This promo code is not yet active.",
+    };
   if (promo.end_date && promo.end_date < today)
-    return { valid: false, error: "This promo code has expired." };
+    return {
+      valid: false,
+      error: "This promo code has expired.",
+    };
 
   if (
     promo.applies_to !== "all" &&
@@ -126,7 +145,10 @@ export async function validatePromoCode(
     };
   }
 
-  if (promo.global_usage === "limited" && promo.global_limit != null) {
+  if (
+    promo.global_usage === "limited" &&
+    promo.global_limit != null
+  ) {
     if (promo.usage_count >= promo.global_limit)
       return {
         valid: false,
@@ -143,7 +165,10 @@ export async function validatePromoCode(
 
     const used = count ?? 0;
     if (promo.per_user_usage === "once" && used >= 1)
-      return { valid: false, error: "You have already used this promo code." };
+      return {
+        valid: false,
+        error: "You have already used this promo code.",
+      };
     if (
       promo.per_user_usage === "multiple" &&
       promo.per_user_limit != null &&
@@ -175,18 +200,22 @@ export async function recordPromoCodeUsage(
   originalTotal: number,
   finalTotal: number,
 ): Promise<void> {
-  const { error } = await supabase.from("promo_code_usage").insert({
-    promo_code_id: promoCodeId,
-    booking_id: bookingId,
-    user_id: userId,
-    discount_applied: discountApplied,
-    original_total: originalTotal,
-    final_total: finalTotal,
-  });
+  const { error } = await supabase
+    .from("promo_code_usage")
+    .insert({
+      promo_code_id: promoCodeId,
+      booking_id: bookingId,
+      user_id: userId,
+      discount_applied: discountApplied,
+      original_total: originalTotal,
+      final_total: finalTotal,
+    });
   if (error) throw error;
 
   // Atomic increment — function created in migration 004
-  await supabase.rpc("increment_promo_usage", { promo_id: promoCodeId });
+  await supabase.rpc("increment_promo_usage", {
+    promo_id: promoCodeId,
+  });
 }
 
 export async function getPromoCodeUsageHistory(

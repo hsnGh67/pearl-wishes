@@ -20,50 +20,6 @@ import {
 import { Service } from "../../schema/service.schema";
 import { getAllServices } from "../../lib/db/services";
 
-const services = [
-  {
-    title: "Classic Manicure",
-    description:
-      "Shaping, detailed cuticle care and hydration, finished with a smooth, glossy polish.",
-    image: image_679687b58ce05fc7f2594b8bf72d2d451028e99d,
-    alt: "Classic Manicure",
-  },
-  {
-    title: "Biab Fresh Set",
-    description: "Builder gel strengthens and protects nails before colour.",
-    image: image_a83f5cb32c2f19e665063ce30e70b3476e2a64e4,
-    alt: "Biab Fresh Set",
-  },
-  {
-    title: "Luxury Manicure-gel",
-    description:
-      "Shaping, cuticle care, massage and hot cream, finished with long-lasting gel.",
-    image: image_de5bc49c6ee121f60355e8d9046ef67bcdce7701,
-    alt: "Luxury Manicure-gel",
-  },
-  {
-    title: "Full Set Gel Extensions",
-    description:
-      "Premium gel extensions add natural length and strength, finished with your chosen polish or gel.",
-    image: image_a14b4868f53816194a358f878ac7a1017021ad62,
-    alt: "Full Set Gel Extensions",
-  },
-  {
-    title: "Biab Infill",
-    description:
-      "Builder gel is rebalanced and refreshed to maintain strength and growth.",
-    image: image_75f40d3e12b6b5243875aa4fead0faded7f4d2a9,
-    alt: "Biab Infill",
-  },
-  {
-    title: "Gel Manicure",
-    description:
-      "Shaping, cuticle care and hydration, finished with long-lasting gel.",
-    image: image_f2463330abf9ff6645b724d843fdd129e7582d73,
-    alt: "Gel Manicure",
-  },
-];
-
 export function Features() {
   const [isLoading, setIsLoading] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
@@ -118,7 +74,7 @@ export function Features() {
               <span className="text-sm text-gray-500">Loading...</span>
             </div>
           ) : (
-            services.map((service, index) => (
+            services.slice(0, 6).map((service, index) => (
               <Card
                 key={index}
                 className="overflow-hidden flex flex-col shrink-0 w-[calc(100vw-5rem)] md:w-auto shadow-sm snap-start"

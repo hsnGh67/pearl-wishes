@@ -1,5 +1,11 @@
 import { Card, CardContent } from "./ui/card";
-import { GraduationCap, Users, Clock, Award, UserCheck } from "lucide-react";
+import {
+  GraduationCap,
+  Users,
+  Clock,
+  Award,
+  UserCheck,
+} from "lucide-react";
 import { Button } from "./ui/button";
 
 const workshops = [
@@ -44,7 +50,9 @@ export function Training() {
           <h2 className="font-semibold text-gray-800 mb-4">
             Pearl Wishes Studio Training
           </h2>
-          <h3 className="text-gray-700 mb-4">Master the Art of Luxury Nails</h3>
+          <h3 className="text-gray-700 mb-4">
+            Master the Art of Luxury Nails
+          </h3>
           <p className="text-gray-600 max-w-2xl mx-auto mb-6">
             From foundation to advanced bridal & VIP skills
           </p>
@@ -71,7 +79,8 @@ export function Training() {
           >
             <span
               style={{
-                background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                background:
+                  "linear-gradient(to right, #FCEAE0, #EACAB8)",
                 WebkitBackgroundClip: "text",
                 backgroundClip: "text",
                 WebkitTextFillColor: "transparent",
@@ -101,43 +110,59 @@ export function Training() {
                 <div className="flex flex-wrap gap-4 mb-4">
                   <div className="flex items-center gap-2 text-gray-600">
                     <Clock className="w-4 h-4" />
-                    <span className="text-sm">{workshop.duration}</span>
+                    <span className="text-sm">
+                      {workshop.duration}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-gray-600">
                     <Award className="w-4 h-4" />
-                    <span className="text-sm">{workshop.level}</span>
+                    <span className="text-sm">
+                      {workshop.level}
+                    </span>
                   </div>
                   {workshop.classType && (
                     <div className="flex items-center gap-2 text-gray-600">
                       <UserCheck className="w-4 h-4" />
-                      <span className="text-sm">{workshop.classType}</span>
+                      <span className="text-sm">
+                        {workshop.classType}
+                      </span>
                     </div>
                   )}
                 </div>
 
-                <p className="text-gray-600 mb-4">{workshop.description}</p>
+                <p className="text-gray-600 mb-4">
+                  {workshop.description}
+                </p>
 
                 <div className="mb-4">
-                  <div className="text-sm mb-2" style={{ color: "#3D3935" }}>
+                  <div
+                    className="text-sm mb-2"
+                    style={{ color: "#3D3935" }}
+                  >
                     Course Highlights:
                   </div>
                   <ul className="grid grid-cols-2 gap-2">
-                    {workshop.highlights.map((highlight, idx) => (
-                      <li
-                        key={idx}
-                        className="text-sm text-gray-600 flex items-start gap-2"
-                      >
-                        <span className="text-gray-400 mt-1">•</span>
-                        <span>{highlight}</span>
-                      </li>
-                    ))}
+                    {workshop.highlights.map(
+                      (highlight, idx) => (
+                        <li
+                          key={idx}
+                          className="text-sm text-gray-600 flex items-start gap-2"
+                        >
+                          <span className="text-gray-400 mt-1">
+                            •
+                          </span>
+                          <span>{highlight}</span>
+                        </li>
+                      ),
+                    )}
                   </ul>
                 </div>
 
                 <Button
                   className="w-full transition-colors"
                   style={{
-                    background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                    background:
+                      "linear-gradient(to right, #FCEAE0, #EACAB8)",
                     color: "#3D3935",
                   }}
                   onMouseEnter={(e) => {

@@ -19,11 +19,14 @@ export function Training() {
   };
 
   const handleNavigateToWorkshop = (sectionId: string) => {
-    navigate("/workshops");
+    navigate(`/workshops?workshopId=${sectionId}`);
     setTimeout(() => {
       const element = document.getElementById(sectionId);
       if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "start" });
+        element.scrollIntoView({
+          behavior: "smooth",
+          block: "start",
+        });
       }
     }, 100);
   };
@@ -157,7 +160,7 @@ export function Training() {
                       e.currentTarget.style.background =
                         "linear-gradient(to right, #FCEAE0, #EACAB8)";
                     }}
-                    onClick={() => handleNavigateToWorkshop(workshop.sectionId)}
+                    onClick={() => handleNavigateToWorkshop(workshop.id)}
                   >
                     Learn More
                   </Button>

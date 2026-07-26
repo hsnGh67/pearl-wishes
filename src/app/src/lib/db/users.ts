@@ -408,7 +408,7 @@ export const getUserByPhone = async (
     }
 
     if (!data) {
-      dbLogger.warn("User not found", {
+      dbLogger.info("User not found by phone", {
         table: "users",
         data: { phone },
       });

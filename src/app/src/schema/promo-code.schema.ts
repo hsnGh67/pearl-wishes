@@ -1,9 +1,17 @@
 export type DiscountType = "percentage" | "fixed";
-export type AppliesToType = "all" | "treatments" | "workshops" | "specific";
+export type AppliesToType =
+  | "all"
+  | "treatments"
+  | "workshops"
+  | "specific";
 export type AssignType = "all" | "specific" | "filter";
 export type UsagePerUser = "once" | "multiple";
 export type GlobalUsage = "unlimited" | "limited";
-export type PromoCodeStatus = "Active" | "Scheduled" | "Expired" | "Disabled";
+export type PromoCodeStatus =
+  | "Active"
+  | "Scheduled"
+  | "Expired"
+  | "Disabled";
 
 export interface PromoCode {
   id: string;
@@ -55,33 +63,51 @@ export interface PromoCodeUsage {
 }
 
 export type PromoValidationResult =
-  | { valid: true; promoCodeId: string; code: string; discountAmount: number; finalTotal: number }
+  | {
+      valid: true;
+      promoCodeId: string;
+      code: string;
+      discountAmount: number;
+      finalTotal: number;
+    }
   | { valid: false; error: string };
 
-export function getPromoStatus(promo: PromoCode): PromoCodeStatus {
+export function getPromoStatus(
+  promo: PromoCode,
+): PromoCodeStatus {
   if (!promo.is_active) return "Disabled";
   const today = new Date().toISOString().split("T")[0];
-  if (promo.start_date && promo.start_date > today) return "Scheduled";
-  if (promo.end_date && promo.end_date < today) return "Expired";
+  if (promo.start_date && promo.start_date > today)
+    return "Scheduled";
+  if (promo.end_date && promo.end_date < today)
+    return "Expired";
   return "Active";
 }
 
 export function formatUsage(promo: PromoCode): string {
-  if (promo.global_usage === "limited" && promo.global_limit != null)
+  if (
+    promo.global_usage === "limited" &&
+    promo.global_limit != null
+  )
     return `${promo.usage_count}/${promo.global_limit}`;
   return `${promo.usage_count} used`;
 }
 
 export function formatDiscount(promo: PromoCode): string {
-  if (promo.discount_type === "percentage") return `${promo.discount_value}% off`;
+  if (promo.discount_type === "percentage")
+    return `${promo.discount_value}% off`;
   return `£${Number(promo.discount_value).toFixed(2)} off`;
 }
 
-export function calculateDiscount(promo: PromoCode, subtotal: number): number {
+export function calculateDiscount(
+  promo: PromoCode,
+  subtotal: number,
+): number {
   let discount =
     promo.discount_type === "percentage"
       ? (subtotal * promo.discount_value) / 100
       : promo.discount_value;
-  if (promo.max_cap != null) discount = Math.min(discount, promo.max_cap);
+  if (promo.max_cap != null)
+    discount = Math.min(discount, promo.max_cap);
   return Math.min(discount, subtotal);
 }

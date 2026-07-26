@@ -25,18 +25,25 @@ import {
 import { subscribeToServices } from "../../lib/db/realtime";
 
 export function AdminServices() {
-  const [isUpdatingService, setIsUpdatingService] = useState(false);
-  const [isCategoryAddDialogOpen, setIsCategoryAddDialogOpen] = useState(false);
-  const [isServiceAddDialogOpen, setIsServiceAddDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState<ServiceDisplay | null>(
-    null,
+  const [isUpdatingService, setIsUpdatingService] =
+    useState(false);
+  const [isCategoryAddDialogOpen, setIsCategoryAddDialogOpen] =
+    useState(false);
+  const [isServiceAddDialogOpen, setIsServiceAddDialogOpen] =
+    useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] =
+    useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] =
+    useState(false);
+  const [selectedService, setSelectedService] =
+    useState<ServiceDisplay | null>(null);
+  const [services, setServices] = useState<ServiceDisplay[]>(
+    [],
   );
-  const [services, setServices] = useState<ServiceDisplay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [categories, setCategories] = useState<any[]>([]);
-  const [isCategoriesLoading, setIsCategoriesLoading] = useState(false);
+  const [isCategoriesLoading, setIsCategoriesLoading] =
+    useState(false);
   const [categoryFormData, setCategoryFormData] = useState({
     name: "",
     is_active: true,
@@ -53,10 +60,14 @@ export function AdminServices() {
     image_url: "",
     display_order: 0,
   });
-  const [categoryImageFile, setCategoryImageFile] = useState<File | null>(null);
-  const [serviceImageFile, setServiceImageFile] = useState<File | null>(null);
-  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
-  const [isCreatingService, setIsCreatingService] = useState(false);
+  const [categoryImageFile, setCategoryImageFile] =
+    useState<File | null>(null);
+  const [serviceImageFile, setServiceImageFile] =
+    useState<File | null>(null);
+  const [isCreatingCategory, setIsCreatingCategory] =
+    useState(false);
+  const [isCreatingService, setIsCreatingService] =
+    useState(false);
 
   // Load services from database
   useEffect(() => {
@@ -85,12 +96,18 @@ export function AdminServices() {
     }
   };
 
-  const uploadImageAndGetUrl = async (file: File | null, folder: string) => {
+  const uploadImageAndGetUrl = async (
+    file: File | null,
+    folder: string,
+  ) => {
     if (!file) {
       return "";
     }
 
-    const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9_.-]/g, "-");
+    const sanitizedFilename = file.name.replace(
+      /[^a-zA-Z0-9_.-]/g,
+      "-",
+    );
     const filePath = `${folder}/${Date.now()}-${sanitizedFilename}`;
 
     const { error: uploadError } = await supabase.storage
@@ -102,12 +119,14 @@ export function AdminServices() {
       throw uploadError;
     }
 
-    const { data: publicUrlData, error: publicUrlError } = supabase.storage
-      .from("images")
-      .getPublicUrl(filePath);
+    const { data: publicUrlData, error: publicUrlError } =
+      supabase.storage.from("images").getPublicUrl(filePath);
 
     if (publicUrlError) {
-      console.error("Generating image public URL failed:", publicUrlError);
+      console.error(
+        "Generating image public URL failed:",
+        publicUrlError,
+      );
       throw publicUrlError;
     }
 
@@ -170,7 +189,11 @@ export function AdminServices() {
       setServiceImageFile(null);
       setServiceFormData({
         name: "",
-        category: "" as "manicure" | "extensions" | "add_on" | "",
+        category: "" as
+          | "manicure"
+          | "extensions"
+          | "add_on"
+          | "",
         duration: "",
         price: "",
         is_active: true,
@@ -295,7 +318,9 @@ export function AdminServices() {
     },
     {
       label: "Active Services",
-      value: services.filter((s) => s.is_active).length.toString(),
+      value: services
+        .filter((s) => s.is_active)
+        .length.toString(),
     },
     {
       label: "Avg. Price",
@@ -306,7 +331,9 @@ export function AdminServices() {
     },
     {
       label: "Categories",
-      value: new Set(services.map((s) => s.category)).size.toString(),
+      value: new Set(
+        services.map((s) => s.category),
+      ).size.toString(),
     },
   ];
 
@@ -316,7 +343,9 @@ export function AdminServices() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-gray-800 mb-2">Services</h1>
-          <p className="text-gray-600">Manage your service offerings</p>
+          <p className="text-gray-600">
+            Manage your service offerings
+          </p>
         </div>
         <Button
           className="flex items-center gap-2 border-2"
@@ -352,8 +381,13 @@ export function AdminServices() {
             className="p-6 border-2"
             style={{ borderColor: "#DCD4CD" }}
           >
-            <p className="text-gray-600 text-sm mb-1">{stat.label}</p>
-            <p className="text-2xl font-semibold" style={{ color: "#3D3935" }}>
+            <p className="text-gray-600 text-sm mb-1">
+              {stat.label}
+            </p>
+            <p
+              className="text-2xl font-semibold"
+              style={{ color: "#3D3935" }}
+            >
               {stat.value}
             </p>
           </Card>
@@ -365,32 +399,59 @@ export function AdminServices() {
         className="border-2 overflow-hidden"
         style={{ borderColor: "#DCD4CD" }}
       >
-        <div className="p-6 border-b-2" style={{ borderColor: "#DCD4CD" }}>
+        <div
+          className="p-6 border-b-2"
+          style={{ borderColor: "#DCD4CD" }}
+        >
           <h3 style={{ color: "#3D3935" }}>All Services</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead style={{ backgroundColor: "#FAF7F5" }}>
-              <tr className="border-b-2" style={{ borderColor: "#DCD4CD" }}>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+              <tr
+                className="border-b-2"
+                style={{ borderColor: "#DCD4CD" }}
+              >
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   #
                 </th>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Service Name
                 </th>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Category
                 </th>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Duration
                 </th>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Price
                 </th>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Status
                 </th>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Actions
                 </th>
               </tr>
@@ -402,7 +463,9 @@ export function AdminServices() {
                   className="border-b hover:bg-gray-50"
                   style={{ borderColor: "#DCD4CD" }}
                 >
-                  <td className="p-4 text-gray-600">{index + 1}</td>
+                  <td className="p-4 text-gray-600">
+                    {index + 1}
+                  </td>
                   <td className="p-4">
                     <span
                       className="font-semibold"
@@ -411,8 +474,12 @@ export function AdminServices() {
                       {service.name}
                     </span>
                   </td>
-                  <td className="p-4 text-gray-600">{service.category}</td>
-                  <td className="p-4 text-gray-600">{service.duration}</td>
+                  <td className="p-4 text-gray-600">
+                    {service.category}
+                  </td>
+                  <td className="p-4 text-gray-600">
+                    {service.duration}
+                  </td>
                   <td className="p-4">
                     <span
                       className="font-semibold"
@@ -431,7 +498,9 @@ export function AdminServices() {
                         color: "#3D3935",
                       }}
                     >
-                      {service.is_active ? "Active" : "Inactive"}
+                      {service.is_active
+                        ? "Active"
+                        : "Inactive"}
                     </span>
                   </td>
                   <td className="p-4">
@@ -546,7 +615,9 @@ export function AdminServices() {
                   backgroundColor: "#FEFCFA",
                 }}
                 onChange={(e) =>
-                  setCategoryImageFile(e.target.files?.[0] ?? null)
+                  setCategoryImageFile(
+                    e.target.files?.[0] ?? null,
+                  )
                 }
               />
               <p className="text-xs text-gray-500">
@@ -601,7 +672,9 @@ export function AdminServices() {
               onClick={handleCreateCategory}
               disabled={isCreatingCategory}
             >
-              {isCreatingCategory ? "Adding..." : "Add Category"}
+              {isCreatingCategory
+                ? "Adding..."
+                : "Add Category"}
             </Button>
           </div>
         </DialogContent>
@@ -686,7 +759,9 @@ export function AdminServices() {
                       </option>
                     ))
                   ) : (
-                    <option disabled>No categories available</option>
+                    <option disabled>
+                      No categories available
+                    </option>
                   )}
                 </select>
               )}
@@ -782,7 +857,9 @@ export function AdminServices() {
                   backgroundColor: "#FEFCFA",
                 }}
                 onChange={(e) =>
-                  setServiceImageFile(e.target.files?.[0] ?? null)
+                  setServiceImageFile(
+                    e.target.files?.[0] ?? null,
+                  )
                 }
               />
               <p className="text-xs text-gray-500">
@@ -850,7 +927,10 @@ export function AdminServices() {
       </Dialog>
 
       {/* Edit Service Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+      >
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Service</DialogTitle>
@@ -928,7 +1008,9 @@ export function AdminServices() {
                       </option>
                     ))
                   ) : (
-                    <option disabled>No categories available</option>
+                    <option disabled>
+                      No categories available
+                    </option>
                   )}
                 </select>
               )}
@@ -1024,7 +1106,9 @@ export function AdminServices() {
                   backgroundColor: "#FEFCFA",
                 }}
                 onChange={(e) =>
-                  setServiceImageFile(e.target.files?.[0] ?? null)
+                  setServiceImageFile(
+                    e.target.files?.[0] ?? null,
+                  )
                 }
               />
               <p className="text-xs text-gray-500">
@@ -1078,20 +1162,25 @@ export function AdminServices() {
               onClick={handleUpdateService}
               disabled={isUpdatingService}
             >
-              {isUpdatingService ? "Updating..." : "Update Service"}
+              {isUpdatingService
+                ? "Updating..."
+                : "Update Service"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Delete Service Dialog */}
-      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+      <Dialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Delete Service</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this service? This action cannot
-              be undone.
+              Are you sure you want to delete this service? This
+              action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           {selectedService && (
@@ -1102,7 +1191,10 @@ export function AdminServices() {
                 backgroundColor: "#FAF7F5",
               }}
             >
-              <p className="font-semibold mb-2" style={{ color: "#3D3935" }}>
+              <p
+                className="font-semibold mb-2"
+                style={{ color: "#3D3935" }}
+              >
                 {selectedService.name}
               </p>
               <div className="flex gap-4 text-sm text-gray-600">
