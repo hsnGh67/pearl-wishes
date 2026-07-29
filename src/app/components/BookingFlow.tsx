@@ -24,19 +24,9 @@ import {
   DropdownContent,
   DropdownItem,
 } from "./ui/dropdown";
-import {
-  Check,
-  CreditCard,
-  Users,
-  User,
-  ChevronDown,
-} from "lucide-react";
+import { Check, CreditCard, Users, User, ChevronDown } from "lucide-react";
 import { Separator } from "./ui/separator";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from "./ui/input-otp";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "./ui/input-otp";
 import { VisuallyHidden } from "./ui/visually-hidden";
 import {
   getBookedTimesForDate,
@@ -48,11 +38,7 @@ import {
   PaymentStatus,
 } from "../src/schema/booking.schema";
 import { createBookingWithTreatments } from "../src/lib/db/booking-with-treatments";
-import {
-  createUser,
-  getUserByPhone,
-  updateUser,
-} from "../src/lib/db/users";
+import { createUser, getUserByPhone, updateUser } from "../src/lib/db/users";
 import { getActiveServices } from "../src/lib/db/services";
 import { getAllDistricts } from "../src/lib/db/districts";
 import { formatDate } from "../src/utils/formatDate";
@@ -65,10 +51,11 @@ import {
   getActivePromoCodesForBooking,
   validatePromoCode,
 } from "../src/lib/db/promo-codes";
+import { calculateDiscount, PromoCode } from "../src/schema/promo-code.schema";
 import {
-  calculateDiscount,
-  PromoCode,
-} from "../src/schema/promo-code.schema";
+  GAP_MINUTES_PER_PEOPLE,
+  GAP_MINUTES_PER_SERVICE,
+} from "../src/components/admin/AdminBookingForm";
 
 interface BookingFlowProps {
   open: boolean;
@@ -143,10 +130,8 @@ const generateTimeSlots = (
 
   // Get business hours for the selected date
   const date = selectedDate || new Date();
-  const {
-    startHour: businessOpenHour,
-    endHour: businessCloseHour,
-  } = getBusinessHoursForDate(date);
+  const { startHour: businessOpenHour, endHour: businessCloseHour } =
+    getBusinessHoursForDate(date);
 
   const gapMinutes = 30; // 30 minutes gap after appointment
 
@@ -155,8 +140,7 @@ const generateTimeSlots = (
 
   // Calculate latest possible start time in minutes from midnight
   const businessCloseMinutes = businessCloseHour * 60;
-  const latestStartMinutes =
-    businessCloseMinutes - totalTimeNeeded;
+  const latestStartMinutes = businessCloseMinutes - totalTimeNeeded;
 
   // Generate slots in 30-minute increments
   const businessOpenMinutes = businessOpenHour * 60;
@@ -185,11 +169,8 @@ export function BookingFlow({
     isLoading: false,
     hasError: false,
   });
-  const [isLoadingPromoCodes, setIsLoadingPromoCodes] =
-    useState(false);
-  const [activePromoCodes, setActivePromoCodes] = useState<
-    PromoCode[]
-  >([]);
+  const [isLoadingPromoCodes, setIsLoadingPromoCodes] = useState(false);
+  const [activePromoCodes, setActivePromoCodes] = useState<PromoCode[]>([]);
   const [step, setStep] = useState<BookingStep>("phone");
   const [bookingData, setBookingData] = useState<BookingData>({
     user_id: "",
@@ -211,24 +192,17 @@ export function BookingFlow({
     finalPrice: 0,
   });
   const [districts, setDistricts] = useState([]);
-  const [isLoadingDistricts, setIsLoadingDistricts] =
-    useState(false);
+  const [isLoadingDistricts, setIsLoadingDistricts] = useState(false);
   const [isAddingNewUser, setIsAddingNewUser] = useState(false);
 
   const [tempUser, setTempUser] = useState(null);
-  const [existingUserAddress, setExistingUserAddress] =
-    useState("");
+  const [existingUserAddress, setExistingUserAddress] = useState("");
   const [receiptNumber, setReceiptNumber] = useState("");
   const [voucherError, setVoucherError] = useState("");
   const [voucherSuccess, setVoucherSuccess] = useState("");
-  const [appliedVoucherCode, setAppliedVoucherCode] =
-    useState("");
-  const [currentPersonIndex, setCurrentPersonIndex] =
-    useState(0);
-  const [
-    selectedServiceForAddOns,
-    setSelectedServiceForAddOns,
-  ] = useState<{
+  const [appliedVoucherCode, setAppliedVoucherCode] = useState("");
+  const [currentPersonIndex, setCurrentPersonIndex] = useState(0);
+  const [selectedServiceForAddOns, setSelectedServiceForAddOns] = useState<{
     id: string;
     name: string;
     price: number;
@@ -238,17 +212,12 @@ export function BookingFlow({
   const [tempAddOns, setTempAddOns] = useState<
     Array<{ name: string; price: number; duration: number }>
   >([]);
-  const [bookedTimeSlots, setBookedTimeSlots] = useState<
-    BookedTimeSlot[]
-  >([]);
-  const [availableServices, setAvailableServices] = useState<
-    ServiceBooking[]
-  >([]);
-  const [availableAddons, setAvailableAddons] = useState<
-    ServiceBooking[]
-  >([]);
-  const [isServicesLoading, setIsServicesLoading] =
-    useState(false);
+  const [bookedTimeSlots, setBookedTimeSlots] = useState<BookedTimeSlot[]>([]);
+  const [availableServices, setAvailableServices] = useState<ServiceBooking[]>(
+    [],
+  );
+  const [availableAddons, setAvailableAddons] = useState<ServiceBooking[]>([]);
+  const [isServicesLoading, setIsServicesLoading] = useState(false);
 
   // Payment & Booking Saving State
   const [paymentState, setPaymentState] = useState({
@@ -277,26 +246,13 @@ export function BookingFlow({
 
   const isSlotBlocked = (slot: string) => {
     const slotStart = minutesFromTime(slot);
-    const slotEnd =
-      slotStart +
-      (bookingData.totalDuration || 60) +
-      GAP_MINUTES;
+    const slotEnd = slotStart + (bookingData.totalDuration || 60) + GAP_MINUTES;
 
-    return bookedTimeSlots.some(
-      (bookedSlot: BookedTimeSlot) => {
-        const bookedStart = minutesFromTime(
-          bookedSlot.appointment_time,
-        );
-        const bookedEnd =
-          bookedStart + bookedSlot.duration + GAP_MINUTES;
-        return doesTimeRangeOverlap(
-          slotStart,
-          slotEnd,
-          bookedStart,
-          bookedEnd,
-        );
-      },
-    );
+    return bookedTimeSlots.some((bookedSlot: BookedTimeSlot) => {
+      const bookedStart = minutesFromTime(bookedSlot.appointment_time);
+      const bookedEnd = bookedStart + bookedSlot.duration + GAP_MINUTES;
+      return doesTimeRangeOverlap(slotStart, slotEnd, bookedStart, bookedEnd);
+    });
   };
 
   const availableTimeSlots = bookingData.date
@@ -340,10 +296,7 @@ export function BookingFlow({
       setActivePromoCodes(promoCodes);
       setIsLoadingPromoCodes(false);
     } catch (error) {
-      console.error(
-        "Failed to load active promo codes for booking",
-        error,
-      );
+      console.error("Failed to load active promo codes for booking", error);
       setIsLoadingPromoCodes(false);
     }
   };
@@ -445,39 +398,20 @@ export function BookingFlow({
       return sum + servicePrice + addOnsPrice;
     }, 0);
 
-    const totalServiceDuration = servicesArray.reduce(
-      (sum, service) => {
+    const totalServiceDuration =
+      servicesArray.reduce((sum, service) => {
         const serviceDuration = Number(service.duration);
         const addOnsDuration =
           service.addOns?.reduce(
-            (addOnSum, addOn) =>
-              addOnSum + Number(addOn.duration),
+            (addOnSum, addOn) => addOnSum + Number(addOn.duration),
             0,
           ) || 0;
         return sum + serviceDuration + addOnsDuration;
-      },
-      0,
-    );
+      }, 0) +
+      ((servicesArray.length - 1) * GAP_MINUTES_PER_SERVICE +
+        GAP_MINUTES_PER_PEOPLE * (peopleCount - 1)); // Add 10 min breaks between services
 
-    // Add 10 min breaks between services for each person
-    let serviceLevelBreaks = 0;
-    for (let i = 1; i <= peopleCount; i++) {
-      const personServices = servicesArray.filter(
-        (s) => s.personNumber === i,
-      );
-      if (personServices.length > 1) {
-        serviceLevelBreaks += (personServices.length - 1) * 10;
-      }
-    }
-
-    // Add 10 min gaps between people if more than one person
-    const peopleLevelGaps =
-      peopleCount > 1 ? (peopleCount - 1) * 10 : 0;
-
-    const totalDuration =
-      totalServiceDuration +
-      serviceLevelBreaks +
-      peopleLevelGaps;
+    const totalDuration = totalServiceDuration;
 
     return { totalPrice, totalDuration };
   };
@@ -486,14 +420,9 @@ export function BookingFlow({
     e.preventDefault();
     let houseNum = "";
     let streetName = "";
-    if (
-      bookingData.phoneNumber &&
-      bookingData.otpCode.length === 6
-    ) {
+    if (bookingData.phoneNumber && bookingData.otpCode.length === 6) {
       const zipCode =
-        countryCodes.find(
-          (c) => c.id === bookingData.countryCode,
-        )?.code || "";
+        countryCodes.find((c) => c.id === bookingData.countryCode)?.code || "";
       // Check if user exists in database
       let existingUser = await getUserByPhone(
         `${zipCode}${bookingData.phoneNumber.replaceAll(" ", "")}`,
@@ -505,10 +434,7 @@ export function BookingFlow({
         const addressParts = existingUser.address.split(",");
         console.log("addressParts =>", addressParts);
         if (addressParts.length >= 2) {
-          console.log(
-            "addressParts.length >= 2 =>",
-            addressParts.length >= 2,
-          );
+          console.log("addressParts.length >= 2 =>", addressParts.length >= 2);
           const streetPart = addressParts[0].trim(); // "123 Oxford Street"
           const match = streetPart.match(/^(\d+)\s+(.+)$/);
           console.log("match =>", match);
@@ -618,13 +544,9 @@ export function BookingFlow({
     addOnPrice: number,
     addOnDuration: number,
   ) => {
-    const isSelected = tempAddOns.some(
-      (a) => a.name === addOnName,
-    );
+    const isSelected = tempAddOns.some((a) => a.name === addOnName);
     if (isSelected) {
-      setTempAddOns(
-        tempAddOns.filter((a) => a.name !== addOnName),
-      );
+      setTempAddOns(tempAddOns.filter((a) => a.name !== addOnName));
     } else {
       setTempAddOns([
         ...tempAddOns,
@@ -649,10 +571,7 @@ export function BookingFlow({
       addOns: tempAddOns.length > 0 ? tempAddOns : [],
     };
 
-    const updatedServices = [
-      ...bookingData.services,
-      newService,
-    ];
+    const updatedServices = [...bookingData.services, newService];
     const { totalPrice, totalDuration } = calculateTotals(
       updatedServices,
       bookingData.numberOfPeople,
@@ -683,10 +602,7 @@ export function BookingFlow({
       addOns: undefined, // Explicitly no add-ons
     };
 
-    const updatedServices = [
-      ...bookingData.services,
-      newService,
-    ];
+    const updatedServices = [...bookingData.services, newService];
     const { totalPrice, totalDuration } = calculateTotals(
       updatedServices,
       bookingData.numberOfPeople,
@@ -729,9 +645,7 @@ export function BookingFlow({
   };
 
   const handleRemoveService = (index: number) => {
-    const updatedServices = bookingData.services.filter(
-      (_, i) => i !== index,
-    );
+    const updatedServices = bookingData.services.filter((_, i) => i !== index);
     const { totalPrice, totalDuration } = calculateTotals(
       updatedServices,
       bookingData.numberOfPeople,
@@ -763,9 +677,7 @@ export function BookingFlow({
   };
 
   const handleApplyVoucher = async () => {
-    const voucher = bookingData.voucherCode
-      .toUpperCase()
-      .trim();
+    const voucher = bookingData.voucherCode.toUpperCase().trim();
     const subtotal = bookingData.services.reduce(
       (sum, service) =>
         sum +
@@ -783,15 +695,9 @@ export function BookingFlow({
       "treatments",
       subtotal,
     );
-    console.log(
-      "promoCodeValidationData ===>",
-      promoCodeValidationData,
-    );
+    console.log("promoCodeValidationData ===>", promoCodeValidationData);
     if (promoCodeValidationData.valid) {
-      if (
-        appliedVoucherCode &&
-        appliedVoucherCode !== voucher
-      ) {
+      if (appliedVoucherCode && appliedVoucherCode !== voucher) {
         setVoucherSuccess(
           `Voucher ${voucher} applied! Previous voucher ${appliedVoucherCode} has been replaced.`,
         );
@@ -852,19 +758,17 @@ export function BookingFlow({
       // In a production app, you might use a "booking" service type or handle this differently
 
       // Prepare treatments for each service in the booking
-      const treatments = bookingData.services.map(
-        (service, index) => ({
-          service_id: service.id, // All treatments reference the default ID (ideally should map to actual service IDs)
-          person_name:
-            bookingData.numberOfPeople > 1
-              ? `Person ${service.personNumber}`
-              : bookingData.name,
-          service_name: service.name,
-          price: service.price,
-          duration: service.duration,
-          addOns: service?.addOns || [],
-        }),
-      );
+      const treatments = bookingData.services.map((service, index) => ({
+        service_id: service.id, // All treatments reference the default ID (ideally should map to actual service IDs)
+        person_name:
+          bookingData.numberOfPeople > 1
+            ? `Person ${service.personNumber}`
+            : bookingData.name,
+        service_name: service.name,
+        price: service.price,
+        duration: service.duration,
+        addOns: service?.addOns || [],
+      }));
 
       console.log("📝 Creating booking with treatments:", {
         userId: bookingData.user_id,
@@ -876,28 +780,26 @@ export function BookingFlow({
       });
 
       // Step 2: Create booking with treatments
-      const { booking, treatmentsCreated } =
-        await createBookingWithTreatments({
-          booking: {
-            user_id: bookingData.user_id,
-            appointment_date: appointmentDate,
-            appointment_time: bookingData.timeSlot,
-            address: `${bookingData.houseNumber} ${bookingData.street}`,
-            district: bookingData.district,
-            status: BookingStatus.CONFIRMED,
-            payment_status: PaymentStatus.PAID,
-            discount_amount: bookingData.discount,
-            people_numbers: bookingData.numberOfPeople,
-            balance_amount: 0,
-            tax_amount: 0,
-            currency: "£",
-            subtotal_amount: bookingData.servicePrice,
-            total_amount:
-              bookingData.servicePrice - bookingData.discount,
-            notes: `${bookingData.numberOfPeople} person(s). Services: ${bookingData.services.map((s) => s.name).join(", ")}. ${bookingData.voucherCode ? `Voucher: ${bookingData.voucherCode}` : ""}`,
-          },
-          treatments,
-        });
+      const { booking, treatmentsCreated } = await createBookingWithTreatments({
+        booking: {
+          user_id: bookingData.user_id,
+          appointment_date: appointmentDate,
+          appointment_time: bookingData.timeSlot,
+          address: `${bookingData.houseNumber} ${bookingData.street}`,
+          district: bookingData.district,
+          status: BookingStatus.CONFIRMED,
+          payment_status: PaymentStatus.PAID,
+          discount_amount: bookingData.discount,
+          people_numbers: bookingData.numberOfPeople,
+          balance_amount: 0,
+          tax_amount: 0,
+          currency: "£",
+          subtotal_amount: bookingData.servicePrice,
+          total_amount: bookingData.servicePrice - bookingData.discount,
+          notes: `${bookingData.numberOfPeople} person(s). Services: ${bookingData.services.map((s) => s.name).join(", ")}. ${bookingData.voucherCode ? `Voucher: ${bookingData.voucherCode}` : ""}`,
+        },
+        treatments,
+      });
 
       await updateUser({
         id: bookingData.user_id,
@@ -918,9 +820,7 @@ export function BookingFlow({
       setStep("receipt");
     } catch (error) {
       const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Failed to save booking";
+        error instanceof Error ? error.message : "Failed to save booking";
       console.error("❌ Payment error:", error);
       setPaymentState({
         isSaving: false,
@@ -981,10 +881,7 @@ export function BookingFlow({
                 Enter your phone number to get started
               </DialogDescription>
             </DialogHeader>
-            <form
-              onSubmit={handlePhoneSubmit}
-              className="space-y-6 py-4"
-            >
+            <form onSubmit={handlePhoneSubmit} className="space-y-6 py-4">
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
                 <div className="flex gap-2">
@@ -1003,10 +900,7 @@ export function BookingFlow({
                     </SelectTrigger>
                     <SelectContent>
                       {countryCodes.map((item) => (
-                        <SelectItem
-                          key={item.id}
-                          value={item.id}
-                        >
+                        <SelectItem key={item.id} value={item.id}>
                           {item.code} {item.country}
                         </SelectItem>
                       ))}
@@ -1020,7 +914,10 @@ export function BookingFlow({
                     onChange={(e) =>
                       setBookingData({
                         ...bookingData,
-                        phoneNumber: e.target.value.replace(/[^0-9\s\-()]/g, ""),
+                        phoneNumber: e.target.value.replace(
+                          /[^0-9\s\-()]/g,
+                          "",
+                        ),
                       })
                     }
                     className="flex-1"
@@ -1028,8 +925,7 @@ export function BookingFlow({
                   />
                 </div>
                 <p className="text-sm text-gray-500">
-                  We'll send you a verification code to confirm
-                  your booking
+                  We'll send you a verification code to confirm your booking
                 </p>
               </div>
 
@@ -1067,13 +963,9 @@ export function BookingFlow({
                 className="w-full transition-all"
                 style={{
                   backgroundColor:
-                    bookingData.otpCode.length === 6
-                      ? "#3D3935"
-                      : "#DCD4CD",
+                    bookingData.otpCode.length === 6 ? "#3D3935" : "#DCD4CD",
                   background:
-                    bookingData.otpCode.length === 6
-                      ? "#3D3935"
-                      : "#DCD4CD",
+                    bookingData.otpCode.length === 6 ? "#3D3935" : "#DCD4CD",
                   color:
                     bookingData.otpCode.length === 6
                       ? "transparent"
@@ -1085,18 +977,14 @@ export function BookingFlow({
                 }}
                 onMouseEnter={(e) => {
                   if (bookingData.otpCode.length === 6) {
-                    e.currentTarget.style.backgroundColor =
-                      "#1F1F1F";
-                    e.currentTarget.style.background =
-                      "#1F1F1F";
+                    e.currentTarget.style.backgroundColor = "#1F1F1F";
+                    e.currentTarget.style.background = "#1F1F1F";
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (bookingData.otpCode.length === 6) {
-                    e.currentTarget.style.backgroundColor =
-                      "#3D3935";
-                    e.currentTarget.style.background =
-                      "#3D3935";
+                    e.currentTarget.style.backgroundColor = "#3D3935";
+                    e.currentTarget.style.background = "#3D3935";
                   }
                 }}
                 disabled={bookingData.otpCode.length !== 6}
@@ -1104,8 +992,7 @@ export function BookingFlow({
                 {bookingData.otpCode.length === 6 ? (
                   <span
                     style={{
-                      background:
-                        "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                      background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
                       WebkitBackgroundClip: "text",
                       backgroundClip: "text",
                       WebkitTextFillColor: "transparent",
@@ -1159,9 +1046,7 @@ export function BookingFlow({
               <Separator />
 
               <div className="space-y-2">
-                <Label className="mb-3 block">
-                  Select District
-                </Label>
+                <Label className="mb-3 block">Select District</Label>
                 {isLoadingDistricts ? (
                   <div className="flex justify-center py-8">
                     <span className="text-sm text-gray-500">
@@ -1182,8 +1067,7 @@ export function BookingFlow({
                         }}
                       >
                         <span>
-                          {bookingData.district ||
-                            "Choose a district"}
+                          {bookingData.district || "Choose a district"}
                         </span>
                         <ChevronDown className="size-4" />
                       </Button>
@@ -1198,15 +1082,13 @@ export function BookingFlow({
                             handleDistrictSelect(district.name)
                           }
                           className={`flex items-center justify-between gap-2 rounded-sm px-3 py-2 text-sm transition-all ${
-                            bookingData.district ===
-                            district.name
+                            bookingData.district === district.name
                               ? "bg-[#EADDD5] text-[#3D3935]"
                               : "text-[#3D3935] hover:bg-[#F4E8E1]"
                           } ${!district.is_coming_soon ? "" : "opacity-50 cursor-not-allowed"}`}
                           style={{
                             backgroundColor:
-                              bookingData.district ===
-                              district.name
+                              bookingData.district === district.name
                                 ? "#EADDD5"
                                 : undefined,
                           }}
@@ -1224,15 +1106,11 @@ export function BookingFlow({
                 )}
 
                 <p className="text-xs text-gray-500 mb-4">
-                  Service available in central London districts
-                  only
+                  Service available in central London districts only
                 </p>
               </div>
 
-              <form
-                onSubmit={handleAddressSubmit}
-                className="space-y-4"
-              >
+              <form onSubmit={handleAddressSubmit} className="space-y-4">
                 <div className="grid grid-cols-3 gap-3">
                   <div className="col-span-1 space-y-2">
                     <Label htmlFor="houseNumber">Number</Label>
@@ -1251,9 +1129,7 @@ export function BookingFlow({
                     />
                   </div>
                   <div className="col-span-2 space-y-2">
-                    <Label htmlFor="street">
-                      Street Address
-                    </Label>
+                    <Label htmlFor="street">Street Address</Label>
                     <Input
                       id="street"
                       type="text"
@@ -1278,10 +1154,7 @@ export function BookingFlow({
                       borderColor: "#DCD4CD",
                     }}
                   >
-                    <p
-                      className="text-sm"
-                      style={{ color: "#3D3935" }}
-                    >
+                    <p className="text-sm" style={{ color: "#3D3935" }}>
                       <span
                         style={{
                           color: "#3D3935",
@@ -1291,8 +1164,7 @@ export function BookingFlow({
                         Selected address:
                       </span>{" "}
                       {bookingData.houseNumber || "___"}{" "}
-                      {bookingData.street || "___"},{" "}
-                      {bookingData.district}
+                      {bookingData.street || "___"}, {bookingData.district}
                     </p>
                   </div>
                 )}
@@ -1346,10 +1218,8 @@ export function BookingFlow({
                         bookingData.street &&
                         bookingData.houseNumber
                       ) {
-                        e.currentTarget.style.backgroundColor =
-                          "#1F1F1F";
-                        e.currentTarget.style.background =
-                          "#1F1F1F";
+                        e.currentTarget.style.backgroundColor = "#1F1F1F";
+                        e.currentTarget.style.background = "#1F1F1F";
                       }
                     }}
                     onMouseLeave={(e) => {
@@ -1359,10 +1229,8 @@ export function BookingFlow({
                         bookingData.street &&
                         bookingData.houseNumber
                       ) {
-                        e.currentTarget.style.backgroundColor =
-                          "#3D3935";
-                        e.currentTarget.style.background =
-                          "#3D3935";
+                        e.currentTarget.style.backgroundColor = "#3D3935";
+                        e.currentTarget.style.background = "#3D3935";
                       }
                     }}
                     disabled={
@@ -1387,9 +1255,7 @@ export function BookingFlow({
                           color: "transparent",
                         }}
                       >
-                        {isAddingNewUser
-                          ? "Laoding..."
-                          : "Continue"}
+                        {isAddingNewUser ? "Laoding..." : "Continue"}
                       </span>
                     ) : (
                       "Continue"
@@ -1416,9 +1282,7 @@ export function BookingFlow({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="numberOfPeople">
-                  Number of People
-                </Label>
+                <Label htmlFor="numberOfPeople">Number of People</Label>
                 <Input
                   id="numberOfPeople"
                   type="number"
@@ -1428,8 +1292,7 @@ export function BookingFlow({
                   onChange={(e) =>
                     setBookingData({
                       ...bookingData,
-                      numberOfPeople:
-                        parseInt(e.target.value) || 1,
+                      numberOfPeople: parseInt(e.target.value) || 1,
                     })
                   }
                   className="w-full text-center text-lg"
@@ -1447,14 +1310,10 @@ export function BookingFlow({
                   borderColor: "#E9CFCA",
                 }}
               >
-                <p
-                  className="text-sm"
-                  style={{ color: "#3D3935" }}
-                >
-                  <span className="font-medium">Note:</span> For
-                  multiple people, a 5-minute gap will be added
-                  between each service to ensure smooth
-                  scheduling.
+                <p className="text-sm" style={{ color: "#3D3935" }}>
+                  <span className="font-medium">Note:</span> For multiple
+                  people, a 5-minute gap will be added between each service to
+                  ensure smooth scheduling.
                 </p>
               </div>
 
@@ -1471,13 +1330,9 @@ export function BookingFlow({
                   className="flex-1 transition-all"
                   style={{
                     backgroundColor:
-                      bookingData.numberOfPeople >= 1
-                        ? "#3D3935"
-                        : "#DCD4CD",
+                      bookingData.numberOfPeople >= 1 ? "#3D3935" : "#DCD4CD",
                     background:
-                      bookingData.numberOfPeople >= 1
-                        ? "#3D3935"
-                        : "#DCD4CD",
+                      bookingData.numberOfPeople >= 1 ? "#3D3935" : "#DCD4CD",
                     color:
                       bookingData.numberOfPeople >= 1
                         ? "transparent"
@@ -1489,18 +1344,14 @@ export function BookingFlow({
                   }}
                   onMouseEnter={(e) => {
                     if (bookingData.numberOfPeople >= 1) {
-                      e.currentTarget.style.backgroundColor =
-                        "#1F1F1F";
-                      e.currentTarget.style.background =
-                        "#1F1F1F";
+                      e.currentTarget.style.backgroundColor = "#1F1F1F";
+                      e.currentTarget.style.background = "#1F1F1F";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (bookingData.numberOfPeople >= 1) {
-                      e.currentTarget.style.backgroundColor =
-                        "#3D3935";
-                      e.currentTarget.style.background =
-                        "#3D3935";
+                      e.currentTarget.style.backgroundColor = "#3D3935";
+                      e.currentTarget.style.background = "#3D3935";
                     }
                   }}
                   disabled={bookingData.numberOfPeople < 1}
@@ -1532,8 +1383,7 @@ export function BookingFlow({
           <>
             <DialogHeader>
               <DialogTitle>
-                Choose Services for Person{" "}
-                {currentPersonIndex + 1} of{" "}
+                Choose Services for Person {currentPersonIndex + 1} of{" "}
                 {bookingData.numberOfPeople}
               </DialogTitle>
               <DialogDescription>
@@ -1547,8 +1397,7 @@ export function BookingFlow({
             <div className="space-y-3 py-0 max-h-[60vh] overflow-y-auto">
               {/* Current Person's Services */}
               {bookingData.services.filter(
-                (s) =>
-                  s.personNumber === currentPersonIndex + 1,
+                (s) => s.personNumber === currentPersonIndex + 1,
               ).length > 0 && (
                 <Card
                   style={{
@@ -1561,10 +1410,7 @@ export function BookingFlow({
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center gap-2 mb-3">
-                      <Check
-                        style={{ color: "#3D3935" }}
-                        size={18}
-                      />
+                      <Check style={{ color: "#3D3935" }} size={18} />
                       <p
                         className="text-sm"
                         style={{
@@ -1572,8 +1418,7 @@ export function BookingFlow({
                           fontWeight: "bold",
                         }}
                       >
-                        Selected for Person{" "}
-                        {currentPersonIndex + 1}:
+                        Selected for Person {currentPersonIndex + 1}:
                       </p>
                     </div>
                     <div className="space-y-2">
@@ -1584,8 +1429,7 @@ export function BookingFlow({
                         }))
                         .filter(
                           ({ service }) =>
-                            service.personNumber ===
-                            currentPersonIndex + 1,
+                            service.personNumber === currentPersonIndex + 1,
                         )
                         .map(({ service, originalIndex }) => {
                           const serviceTotal =
@@ -1619,24 +1463,20 @@ export function BookingFlow({
                                     {serviceDuration} min
                                   </p>
                                   {service.addOns &&
-                                    service.addOns.length >
-                                      0 && (
+                                    service.addOns.length > 0 && (
                                       <div className="mt-1.5 space-y-0.5">
-                                        {service.addOns.map(
-                                          (addOn, i) => (
-                                            <p
-                                              key={i}
-                                              className="text-xs"
-                                              style={{
-                                                color:
-                                                  "#3D3935",
-                                              }}
-                                            >
-                                              + {addOn.name} (£
-                                              {addOn.price})
-                                            </p>
-                                          ),
-                                        )}
+                                        {service.addOns.map((addOn, i) => (
+                                          <p
+                                            key={i}
+                                            className="text-xs"
+                                            style={{
+                                              color: "#3D3935",
+                                            }}
+                                          >
+                                            + {addOn.name} (£
+                                            {addOn.price})
+                                          </p>
+                                        ))}
                                       </div>
                                     )}
                                 </div>
@@ -1648,21 +1488,17 @@ export function BookingFlow({
                                     variant="ghost"
                                     size="sm"
                                     onClick={() =>
-                                      handleRemoveService(
-                                        originalIndex,
-                                      )
+                                      handleRemoveService(originalIndex)
                                     }
                                     className="h-8 px-2"
                                     style={{ color: "#3D3935" }}
                                     onMouseEnter={(e) => {
-                                      e.currentTarget.style.color =
-                                        "#D0A096";
+                                      e.currentTarget.style.color = "#D0A096";
                                       e.currentTarget.style.backgroundColor =
                                         "#FAF7F5";
                                     }}
                                     onMouseLeave={(e) => {
-                                      e.currentTarget.style.color =
-                                        "#3D3935";
+                                      e.currentTarget.style.color = "#3D3935";
                                       e.currentTarget.style.backgroundColor =
                                         "transparent";
                                     }}
@@ -1707,14 +1543,11 @@ export function BookingFlow({
                       availableServices.map((service) => {
                         const currentPersonServices =
                           bookingData.services.filter(
-                            (s) =>
-                              s.personNumber ===
-                              currentPersonIndex + 1,
+                            (s) => s.personNumber === currentPersonIndex + 1,
                           );
-                        const isAlreadySelected =
-                          currentPersonServices.some(
-                            (s) => s.name === service.name,
-                          );
+                        const isAlreadySelected = currentPersonServices.some(
+                          (s) => s.name === service.name,
+                        );
 
                         return (
                           <div
@@ -1743,8 +1576,7 @@ export function BookingFlow({
                                 !isAlreadySelected &&
                                 !selectedServiceForAddOns
                               ) {
-                                e.currentTarget.style.backgroundColor =
-                                  "";
+                                e.currentTarget.style.backgroundColor = "";
                               }
                             }}
                             onClick={() => {
@@ -1774,8 +1606,7 @@ export function BookingFlow({
                                     <span
                                       className="text-xs px-1.5 py-0.5 rounded"
                                       style={{
-                                        backgroundColor:
-                                          "#E9CFCA",
+                                        backgroundColor: "#E9CFCA",
                                         color: "#3D3935",
                                       }}
                                     >
@@ -1803,135 +1634,128 @@ export function BookingFlow({
               )}
 
               {/* Add-Ons Selection for Selected Service */}
-              {selectedServiceForAddOns &&
-                availableAddons.length > 0 && (
-                  <div className="pt-3 border-t">
-                    <Card
-                      style={{
-                        backgroundColor: "#EADDD5",
-                        borderColor: "#E9CFCA",
-                      }}
-                    >
-                      <CardContent className="p-4">
-                        <div className="mb-3">
-                          <p className="text-sm text-gray-900">
-                            Adding:{" "}
-                            <span className="font-medium">
-                              {selectedServiceForAddOns.name}
-                            </span>
-                          </p>
-                          <p className="text-xs text-gray-600 mt-0.5">
-                            Select optional add-ons for this
-                            service:
-                          </p>
-                        </div>
+              {selectedServiceForAddOns && availableAddons.length > 0 && (
+                <div className="pt-3 border-t">
+                  <Card
+                    style={{
+                      backgroundColor: "#EADDD5",
+                      borderColor: "#E9CFCA",
+                    }}
+                  >
+                    <CardContent className="p-4">
+                      <div className="mb-3">
+                        <p className="text-sm text-gray-900">
+                          Adding:{" "}
+                          <span className="font-medium">
+                            {selectedServiceForAddOns.name}
+                          </span>
+                        </p>
+                        <p className="text-xs text-gray-600 mt-0.5">
+                          Select optional add-ons for this service:
+                        </p>
+                      </div>
 
-                        <Separator className="my-3" />
+                      <Separator className="my-3" />
 
-                        <div className="space-y-2 mb-3">
-                          {availableAddons.map((addOn) => {
-                            const isSelected = tempAddOns.some(
-                              (a) => a.name === addOn.name,
-                            );
+                      <div className="space-y-2 mb-3">
+                        {availableAddons.map((addOn) => {
+                          const isSelected = tempAddOns.some(
+                            (a) => a.name === addOn.name,
+                          );
 
-                            return (
-                              <div
-                                key={addOn.name}
-                                className={`border rounded p-3 cursor-pointer transition-all ${
-                                  isSelected
-                                    ? "border-[#E9CFCA]"
-                                    : "hover:border-[#E9CFCA] border-[#DCD4CD]"
-                                }`}
-                                style={
-                                  isSelected
-                                    ? {
-                                        backgroundColor:
-                                          "#FAF7F5",
-                                        boxShadow:
-                                          "0 2px 4px rgba(0, 0, 0, 0.1)",
-                                      }
-                                    : {
-                                        backgroundColor:
-                                          "#FEFCFA",
-                                      }
-                                }
-                                onClick={() =>
-                                  handleAddOnToggle(
-                                    addOn.id,
-                                    addOn.name,
-                                    addOn.price,
-                                    addOn.duration,
-                                  )
-                                }
-                              >
-                                <div className="flex justify-between items-center gap-4">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className="text-sm"
+                          return (
+                            <div
+                              key={addOn.name}
+                              className={`border rounded p-3 cursor-pointer transition-all ${
+                                isSelected
+                                  ? "border-[#E9CFCA]"
+                                  : "hover:border-[#E9CFCA] border-[#DCD4CD]"
+                              }`}
+                              style={
+                                isSelected
+                                  ? {
+                                      backgroundColor: "#FAF7F5",
+                                      boxShadow: "0 2px 4px rgba(0, 0, 0, 0.1)",
+                                    }
+                                  : {
+                                      backgroundColor: "#FEFCFA",
+                                    }
+                              }
+                              onClick={() =>
+                                handleAddOnToggle(
+                                  addOn.id,
+                                  addOn.name,
+                                  addOn.price,
+                                  addOn.duration,
+                                )
+                              }
+                            >
+                              <div className="flex justify-between items-center gap-4">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="text-sm"
+                                      style={{
+                                        color: "#3D3935",
+                                      }}
+                                    >
+                                      {addOn.name}
+                                    </span>
+                                    {isSelected && (
+                                      <Check
+                                        className="h-4 w-4"
                                         style={{
                                           color: "#3D3935",
                                         }}
-                                      >
-                                        {addOn.name}
-                                      </span>
-                                      {isSelected && (
-                                        <Check
-                                          className="h-4 w-4"
-                                          style={{
-                                            color: "#3D3935",
-                                          }}
-                                        />
-                                      )}
-                                    </div>
-                                    <p className="text-xs text-gray-500 mt-0.5">
-                                      {addOn.duration} min
-                                    </p>
+                                      />
+                                    )}
                                   </div>
-                                  <div
-                                    className="text-sm flex-shrink-0"
-                                    style={{ color: "#3D3935" }}
-                                  >
-                                    £{addOn.price}
-                                  </div>
+                                  <p className="text-xs text-gray-500 mt-0.5">
+                                    {addOn.duration} min
+                                  </p>
+                                </div>
+                                <div
+                                  className="text-sm flex-shrink-0"
+                                  style={{ color: "#3D3935" }}
+                                >
+                                  £{addOn.price}
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
+                            </div>
+                          );
+                        })}
+                      </div>
 
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={handleAddServiceWithAddOns}
-                            className="flex-1 transition-all"
-                            style={{
-                              backgroundColor: "#3D3935",
-                              color: "#E9CFCA",
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.color =
-                                "#D0A096";
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.color =
-                                "#E9CFCA";
-                            }}
-                          >
-                            Add Service
-                          </Button>
-                          <Button
-                            variant="outline"
-                            onClick={handleCancelAddOns}
-                            className="flex-1 hover:bg-[#DCD4CD]"
-                            disabled={tempAddOns.length > 0}
-                          >
-                            Without add-ons
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </div>
-                )}
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleAddServiceWithAddOns}
+                          className="flex-1 transition-all"
+                          style={{
+                            backgroundColor: "#3D3935",
+                            color: "#E9CFCA",
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = "#D0A096";
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = "#E9CFCA";
+                          }}
+                        >
+                          Add Service
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={handleCancelAddOns}
+                          className="flex-1 hover:bg-[#DCD4CD]"
+                          disabled={tempAddOns.length > 0}
+                        >
+                          Without add-ons
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}
@@ -1941,9 +1765,7 @@ export function BookingFlow({
                   variant="outline"
                   onClick={() => {
                     if (currentPersonIndex > 0) {
-                      setCurrentPersonIndex(
-                        currentPersonIndex - 1,
-                      );
+                      setCurrentPersonIndex(currentPersonIndex - 1);
                     } else {
                       setStep("people");
                     }
@@ -1958,33 +1780,25 @@ export function BookingFlow({
                   style={{
                     backgroundColor:
                       bookingData.services.filter(
-                        (s) =>
-                          s.personNumber ===
-                          currentPersonIndex + 1,
+                        (s) => s.personNumber === currentPersonIndex + 1,
                       ).length > 0
                         ? "#3D3935"
                         : "#DCD4CD",
                     background:
                       bookingData.services.filter(
-                        (s) =>
-                          s.personNumber ===
-                          currentPersonIndex + 1,
+                        (s) => s.personNumber === currentPersonIndex + 1,
                       ).length > 0
                         ? "#3D3935"
                         : "#DCD4CD",
                     color:
                       bookingData.services.filter(
-                        (s) =>
-                          s.personNumber ===
-                          currentPersonIndex + 1,
+                        (s) => s.personNumber === currentPersonIndex + 1,
                       ).length > 0
                         ? "transparent"
                         : "#3D3935",
                     cursor:
                       bookingData.services.filter(
-                        (s) =>
-                          s.personNumber ===
-                          currentPersonIndex + 1,
+                        (s) => s.personNumber === currentPersonIndex + 1,
                       ).length > 0
                         ? "pointer"
                         : "not-allowed",
@@ -1992,42 +1806,31 @@ export function BookingFlow({
                   onMouseEnter={(e) => {
                     if (
                       bookingData.services.filter(
-                        (s) =>
-                          s.personNumber ===
-                          currentPersonIndex + 1,
+                        (s) => s.personNumber === currentPersonIndex + 1,
                       ).length > 0
                     ) {
-                      e.currentTarget.style.backgroundColor =
-                        "#1F1F1F";
-                      e.currentTarget.style.background =
-                        "#1F1F1F";
+                      e.currentTarget.style.backgroundColor = "#1F1F1F";
+                      e.currentTarget.style.background = "#1F1F1F";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (
                       bookingData.services.filter(
-                        (s) =>
-                          s.personNumber ===
-                          currentPersonIndex + 1,
+                        (s) => s.personNumber === currentPersonIndex + 1,
                       ).length > 0
                     ) {
-                      e.currentTarget.style.backgroundColor =
-                        "#3D3935";
-                      e.currentTarget.style.background =
-                        "#3D3935";
+                      e.currentTarget.style.backgroundColor = "#3D3935";
+                      e.currentTarget.style.background = "#3D3935";
                     }
                   }}
                   disabled={
                     bookingData.services.filter(
-                      (s) =>
-                        s.personNumber ===
-                        currentPersonIndex + 1,
+                      (s) => s.personNumber === currentPersonIndex + 1,
                     ).length === 0
                   }
                 >
                   {bookingData.services.filter(
-                    (s) =>
-                      s.personNumber === currentPersonIndex + 1,
+                    (s) => s.personNumber === currentPersonIndex + 1,
                   ).length > 0 ? (
                     <span
                       style={{
@@ -2039,13 +1842,11 @@ export function BookingFlow({
                         color: "transparent",
                       }}
                     >
-                      {currentPersonIndex + 1 <
-                      bookingData.numberOfPeople
+                      {currentPersonIndex + 1 < bookingData.numberOfPeople
                         ? `Continue to Person ${currentPersonIndex + 2}`
                         : "Continue to Date Selection"}
                     </span>
-                  ) : currentPersonIndex + 1 <
-                    bookingData.numberOfPeople ? (
+                  ) : currentPersonIndex + 1 < bookingData.numberOfPeople ? (
                     `Continue to Person ${currentPersonIndex + 2}`
                   ) : (
                     "Continue to Date Selection"
@@ -2078,10 +1879,9 @@ export function BookingFlow({
                   {Array.from(
                     { length: bookingData.numberOfPeople },
                     (_, i) => {
-                      const personServices =
-                        bookingData.services.filter(
-                          (s) => s.personNumber === i + 1,
-                        );
+                      const personServices = bookingData.services.filter(
+                        (s) => s.personNumber === i + 1,
+                      );
                       return (
                         <div
                           key={i}
@@ -2090,13 +1890,9 @@ export function BookingFlow({
                           <User className="w-3 h-3 mt-0.5 flex-shrink-0 text-gray-500" />
                           <span>
                             {bookingData.numberOfPeople > 1 && (
-                              <span className="text-gray-900">
-                                P{i + 1}:{" "}
-                              </span>
+                              <span className="text-gray-900">P{i + 1}: </span>
                             )}
-                            {personServices
-                              .map((s) => s.name)
-                              .join(", ")}
+                            {personServices.map((s) => s.name).join(", ")}
                           </span>
                         </div>
                       );
@@ -2116,10 +1912,8 @@ export function BookingFlow({
                 <div className="text-xs flex justify-between items-center">
                   <span>
                     {bookingData.services.length} service
-                    {bookingData.services.length > 1
-                      ? "s"
-                      : ""}{" "}
-                    · {bookingData.totalDuration} min
+                    {bookingData.services.length > 1 ? "s" : ""} ·{" "}
+                    {bookingData.totalDuration} min
                   </span>
                   <span>£{bookingData.servicePrice}</span>
                 </div>
@@ -2139,9 +1933,7 @@ export function BookingFlow({
             <Button
               variant="outline"
               onClick={() => {
-                setCurrentPersonIndex(
-                  bookingData.numberOfPeople - 1,
-                );
+                setCurrentPersonIndex(bookingData.numberOfPeople - 1);
                 setStep("service");
               }}
               className="w-full hover:bg-[#DCD4CD]"
@@ -2168,10 +1960,7 @@ export function BookingFlow({
                   borderColor: "#DCD4CD",
                 }}
               >
-                <p
-                  className="text-sm"
-                  style={{ color: "#3D3935" }}
-                >
+                <p className="text-sm" style={{ color: "#3D3935" }}>
                   {bookingData.numberOfPeople > 1 ? (
                     <>
                       <span className="font-medium block mb-2">
@@ -2183,36 +1972,25 @@ export function BookingFlow({
                             length: bookingData.numberOfPeople,
                           },
                           (_, index) => {
-                            const personServices =
-                              bookingData.services.filter(
-                                (s) =>
-                                  s.personNumber === index + 1,
-                              );
-                            const personDuration =
-                              personServices.reduce(
-                                (total, service) => {
-                                  return (
-                                    total + service.duration
-                                  );
-                                },
-                                0,
-                              );
+                            const personServices = bookingData.services.filter(
+                              (s) => s.personNumber === index + 1,
+                            );
+                            const personDuration = personServices.reduce(
+                              (total, service) => {
+                                return total + service.duration;
+                              },
+                              0,
+                            );
 
                             // Calculate start time for this person (including 5-min gaps)
                             const GAP_MINUTES = 5;
-                            const previousDuration =
-                              bookingData.services
-                                .filter(
-                                  (s) =>
-                                    s.personNumber < index + 1,
-                                )
-                                .reduce(
-                                  (total, service) =>
-                                    total + service.duration,
-                                  0,
-                                );
-                            const previousGaps =
-                              index * GAP_MINUTES;
+                            const previousDuration = bookingData.services
+                              .filter((s) => s.personNumber < index + 1)
+                              .reduce(
+                                (total, service) => total + service.duration,
+                                0,
+                              );
+                            const previousGaps = index * GAP_MINUTES;
 
                             const [hours, minutes] =
                               bookingData.timeSlot.split(":");
@@ -2224,43 +2002,37 @@ export function BookingFlow({
                                 previousGaps,
                               0,
                             );
-                            const startTime =
-                              startDate.toLocaleTimeString(
-                                "en-GB",
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                  hour12: false,
-                                },
-                              );
+                            const startTime = startDate.toLocaleTimeString(
+                              "en-GB",
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: false,
+                              },
+                            );
 
                             // Calculate end time
                             const endDate = new Date(startDate);
                             endDate.setMinutes(
-                              endDate.getMinutes() +
-                                personDuration,
+                              endDate.getMinutes() + personDuration,
                             );
-                            const endTime =
-                              endDate.toLocaleTimeString(
-                                "en-GB",
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                  hour12: false,
-                                },
-                              );
+                            const endTime = endDate.toLocaleTimeString(
+                              "en-GB",
+                              {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: false,
+                              },
+                            );
 
                             return (
                               <span
                                 key={index}
                                 className="block flex items-center gap-1"
                               >
-                                <User
-                                  size={16}
-                                  style={{ color: "#3D3935" }}
-                                />
-                                {index + 1}: {startTime} -{" "}
-                                {endTime} ({personDuration} min)
+                                <User size={16} style={{ color: "#3D3935" }} />
+                                {index + 1}: {startTime} - {endTime} (
+                                {personDuration} min)
                               </span>
                             );
                           },
@@ -2271,12 +2043,9 @@ export function BookingFlow({
                         </span>
                       )}
                       <span className="block mt-2 font-medium">
-                        Total Duration:{" "}
-                        {bookingData.totalDuration} minutes (
-                        {Math.floor(
-                          bookingData.totalDuration / 60,
-                        )}
-                        h {bookingData.totalDuration % 60}m)
+                        Total Duration: {bookingData.totalDuration} minutes (
+                        {Math.floor(bookingData.totalDuration / 60)}h{" "}
+                        {bookingData.totalDuration % 60}m)
                       </span>
                     </>
                   ) : (
@@ -2295,34 +2064,26 @@ export function BookingFlow({
                               const endDate = new Date();
                               endDate.setHours(
                                 parseInt(hours),
-                                parseInt(minutes) +
-                                  bookingData.totalDuration,
+                                parseInt(minutes) + bookingData.totalDuration,
                                 0,
                               );
-                              return endDate.toLocaleTimeString(
-                                "en-GB",
-                                {
-                                  hour: "2-digit",
-                                  minute: "2-digit",
-                                  hour12: false,
-                                },
-                              );
+                              return endDate.toLocaleTimeString("en-GB", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                                hour12: false,
+                              });
                             })()}
                           </span>{" "}
                           ({bookingData.totalDuration} min)
                         </>
                       ) : (
                         <>
-                          Your appointment will take
-                          approximately{" "}
+                          Your appointment will take approximately{" "}
                           <span className="font-medium">
                             {bookingData.totalDuration} minutes
                           </span>{" "}
-                          (
-                          {Math.floor(
-                            bookingData.totalDuration / 60,
-                          )}
-                          h {bookingData.totalDuration % 60}m)
+                          ({Math.floor(bookingData.totalDuration / 60)}h{" "}
+                          {bookingData.totalDuration % 60}m)
                         </>
                       )}
                     </>
@@ -2368,14 +2129,11 @@ export function BookingFlow({
                             : {}
                         }
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.backgroundColor =
-                            "#E9CFCA";
+                          e.currentTarget.style.backgroundColor = "#E9CFCA";
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.backgroundColor =
-                            bookingData.timeSlot === time
-                              ? "#E9CFCA"
-                              : "";
+                            bookingData.timeSlot === time ? "#E9CFCA" : "";
                         }}
                       >
                         {time}
@@ -2408,30 +2166,20 @@ export function BookingFlow({
                     backgroundColor: bookingData.timeSlot
                       ? "#3D3935"
                       : "#DCD4CD",
-                    background: bookingData.timeSlot
-                      ? "#3D3935"
-                      : "#DCD4CD",
-                    color: bookingData.timeSlot
-                      ? "transparent"
-                      : "#3D3935",
-                    cursor: bookingData.timeSlot
-                      ? "pointer"
-                      : "not-allowed",
+                    background: bookingData.timeSlot ? "#3D3935" : "#DCD4CD",
+                    color: bookingData.timeSlot ? "transparent" : "#3D3935",
+                    cursor: bookingData.timeSlot ? "pointer" : "not-allowed",
                   }}
                   onMouseEnter={(e) => {
                     if (bookingData.timeSlot) {
-                      e.currentTarget.style.backgroundColor =
-                        "#1F1F1F";
-                      e.currentTarget.style.background =
-                        "#1F1F1F";
+                      e.currentTarget.style.backgroundColor = "#1F1F1F";
+                      e.currentTarget.style.background = "#1F1F1F";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (bookingData.timeSlot) {
-                      e.currentTarget.style.backgroundColor =
-                        "#3D3935";
-                      e.currentTarget.style.background =
-                        "#3D3935";
+                      e.currentTarget.style.backgroundColor = "#3D3935";
+                      e.currentTarget.style.background = "#3D3935";
                     }
                   }}
                 >
@@ -2463,17 +2211,14 @@ export function BookingFlow({
             <DialogHeader>
               <DialogTitle>Apply Gift Voucher</DialogTitle>
               <DialogDescription>
-                Have a gift voucher? Enter the code below to get
-                a discount
+                Have a gift voucher? Enter the code below to get a discount
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-6">
               <Card style={{ backgroundColor: "#FAF7F5" }}>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-gray-600">
-                      Service Price
-                    </span>
+                    <span className="text-gray-600">Service Price</span>
                     <span className="text-gray-800">
                       £{bookingData.servicePrice}
                     </span>
@@ -2485,15 +2230,11 @@ export function BookingFlow({
                         style={{ color: "#3D3935" }}
                       >
                         <span>Discount Applied</span>
-                        <span>
-                          -£{bookingData.discount.toFixed(2)}
-                        </span>
+                        <span>-£{bookingData.discount.toFixed(2)}</span>
                       </div>
                       <div className="border-t pt-2 mt-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-gray-800">
-                            Final Price
-                          </span>
+                          <span className="text-gray-800">Final Price</span>
                           <span className="text-gray-800">
                             £{bookingData.finalPrice.toFixed(2)}
                           </span>
@@ -2506,9 +2247,7 @@ export function BookingFlow({
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="voucherCode">
-                    Voucher Code
-                  </Label>
+                  <Label htmlFor="voucherCode">Voucher Code</Label>
                   <div className="flex gap-2">
                     <Input
                       id="voucherCode"
@@ -2542,10 +2281,7 @@ export function BookingFlow({
                         borderColor: "#D0A096",
                       }}
                     >
-                      <p
-                        className="text-sm"
-                        style={{ color: "#D0A096" }}
-                      >
+                      <p className="text-sm" style={{ color: "#D0A096" }}>
                         {voucherError}
                       </p>
                     </div>
@@ -2558,21 +2294,13 @@ export function BookingFlow({
                         borderColor: "#DCD4CD",
                       }}
                     >
-                      <Check
-                        style={{ color: "#3D3935" }}
-                        size={20}
-                      />
-                      <p
-                        className="text-sm"
-                        style={{ color: "#3D3935" }}
-                      >
+                      <Check style={{ color: "#3D3935" }} size={20} />
+                      <p className="text-sm" style={{ color: "#3D3935" }}>
                         {voucherSuccess}
                       </p>
                     </div>
                   )}
                 </div>
-
-                
               </div>
 
               <div className="flex gap-3">
@@ -2583,7 +2311,7 @@ export function BookingFlow({
                 >
                   Back
                 </Button>
-                
+
                 <Button
                   onClick={handleContinueWithVoucher}
                   className="flex-1 transition-all"
@@ -2599,17 +2327,13 @@ export function BookingFlow({
                         bookingData.discount === 0
                       )
                     ) {
-                      e.currentTarget.style.backgroundColor =
-                        "#1F1F1F";
-                      e.currentTarget.style.background =
-                        "#1F1F1F";
+                      e.currentTarget.style.backgroundColor = "#1F1F1F";
+                      e.currentTarget.style.background = "#1F1F1F";
                     }
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      "#3D3935";
-                    e.currentTarget.style.background =
-                      "#3D3935";
+                    e.currentTarget.style.backgroundColor = "#3D3935";
+                    e.currentTarget.style.background = "#3D3935";
                   }}
                   disabled={
                     bookingData.voucherCode.trim() !== "" &&
@@ -2618,8 +2342,7 @@ export function BookingFlow({
                 >
                   <span
                     style={{
-                      background:
-                        "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                      background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
                       WebkitBackgroundClip: "text",
                       backgroundClip: "text",
                       WebkitTextFillColor: "transparent",
@@ -2640,8 +2363,7 @@ export function BookingFlow({
             <DialogHeader>
               <DialogTitle>Confirm Your Booking</DialogTitle>
               <DialogDescription>
-                Review your appointment details before
-                proceeding to payment
+                Review your appointment details before proceeding to payment
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-6">
@@ -2672,9 +2394,7 @@ export function BookingFlow({
                         {bookingData.name}
                       </span>
                     </div>
-                    <Separator
-                      style={{ backgroundColor: "#DCD4CD" }}
-                    />
+                    <Separator style={{ backgroundColor: "#DCD4CD" }} />
                     <div className="flex justify-between items-center">
                       <span
                         className="text-sm"
@@ -2691,16 +2411,13 @@ export function BookingFlow({
                       >
                         {
                           countryCodes.find(
-                            (c) =>
-                              c.id === bookingData.countryCode,
+                            (c) => c.id === bookingData.countryCode,
                           )?.code
                         }{" "}
                         {bookingData.phoneNumber}
                       </span>
                     </div>
-                    <Separator
-                      style={{ backgroundColor: "#DCD4CD" }}
-                    />
+                    <Separator style={{ backgroundColor: "#DCD4CD" }} />
                     <div className="flex justify-between items-start">
                       <span
                         className="text-sm"
@@ -2715,8 +2432,7 @@ export function BookingFlow({
                         className="font-medium text-right max-w-[200px]"
                         style={{ color: "#3D3935" }}
                       >
-                        {bookingData.houseNumber}{" "}
-                        {bookingData.street},{" "}
+                        {bookingData.houseNumber} {bookingData.street},{" "}
                         {bookingData.district}
                       </span>
                     </div>
@@ -2748,20 +2464,15 @@ export function BookingFlow({
                         className="font-medium"
                         style={{ color: "#3D3935" }}
                       >
-                        {bookingData.date?.toLocaleDateString(
-                          "en-GB",
-                          {
-                            weekday: "short",
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          },
-                        )}
+                        {bookingData.date?.toLocaleDateString("en-GB", {
+                          weekday: "short",
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
                       </span>
                     </div>
-                    <Separator
-                      style={{ backgroundColor: "#DCD4CD" }}
-                    />
+                    <Separator style={{ backgroundColor: "#DCD4CD" }} />
                     <div className="flex justify-between items-center">
                       <span
                         className="text-sm"
@@ -2779,9 +2490,7 @@ export function BookingFlow({
                         {bookingData.timeSlot}
                       </span>
                     </div>
-                    <Separator
-                      style={{ backgroundColor: "#DCD4CD" }}
-                    />
+                    <Separator style={{ backgroundColor: "#DCD4CD" }} />
                     <div className="flex justify-between items-center">
                       <span
                         className="text-sm"
@@ -2796,15 +2505,11 @@ export function BookingFlow({
                         className="font-medium"
                         style={{ color: "#3D3935" }}
                       >
-                        {Math.floor(
-                          bookingData.totalDuration / 60,
-                        )}
-                        h {bookingData.totalDuration % 60}m
+                        {Math.floor(bookingData.totalDuration / 60)}h{" "}
+                        {bookingData.totalDuration % 60}m
                       </span>
                     </div>
-                    <Separator
-                      style={{ backgroundColor: "#DCD4CD" }}
-                    />
+                    <Separator style={{ backgroundColor: "#DCD4CD" }} />
                     <div className="flex justify-between items-center">
                       <span
                         className="text-sm"
@@ -2836,90 +2541,76 @@ export function BookingFlow({
                 </h3>
                 <Card style={{ backgroundColor: "#FAF7F5" }}>
                   <CardContent className="p-5 space-y-3">
-                    {bookingData.services.map(
-                      (service, index) => (
-                        <div key={index}>
-                          <div className="flex justify-between items-start py-2">
-                            <div className="flex-1">
-                              <p
-                                className="font-medium mb-1"
-                                style={{ color: "#3D3935" }}
-                              >
-                                {bookingData.numberOfPeople >
-                                  1 && (
-                                  <span
-                                    className="text-xs px-2 py-0.5 rounded mr-2"
-                                    style={{
-                                      backgroundColor:
-                                        "#E9CFCA",
-                                      color: "#3D3935",
-                                    }}
-                                  >
-                                    Person{" "}
-                                    {service.personNumber}
-                                  </span>
-                                )}
-                                {service.name}
-                              </p>
-                              {service.addOns &&
-                                service.addOns.length > 0 && (
-                                  <div className="ml-4 mt-2 space-y-1">
-                                    {service.addOns.map(
-                                      (addOn, addOnIndex) => (
-                                        <div
-                                          key={addOnIndex}
-                                          className="text-sm"
-                                        >
-                                          <span
-                                            style={{
-                                              color: "#3D3935",
-                                              opacity: 0.6,
-                                            }}
-                                          >
-                                            + {addOn.name}
-                                          </span>
-                                        </div>
-                                      ),
-                                    )}
-                                  </div>
-                                )}
-                            </div>
-                            <div className="ml-4 flex flex-col items-end">
-                              <span
-                                className="font-medium"
-                                style={{ color: "#3D3935" }}
-                              >
-                                £{service.price}
-                              </span>
-                              {service.addOns &&
-                                service.addOns.length > 0 &&
-                                service.addOns.map(
-                                  (addOn, addOnIndex) => (
+                    {bookingData.services.map((service, index) => (
+                      <div key={index}>
+                        <div className="flex justify-between items-start py-2">
+                          <div className="flex-1">
+                            <p
+                              className="font-medium mb-1"
+                              style={{ color: "#3D3935" }}
+                            >
+                              {bookingData.numberOfPeople > 1 && (
+                                <span
+                                  className="text-xs px-2 py-0.5 rounded mr-2"
+                                  style={{
+                                    backgroundColor: "#E9CFCA",
+                                    color: "#3D3935",
+                                  }}
+                                >
+                                  Person {service.personNumber}
+                                </span>
+                              )}
+                              {service.name}
+                            </p>
+                            {service.addOns && service.addOns.length > 0 && (
+                              <div className="ml-4 mt-2 space-y-1">
+                                {service.addOns.map((addOn, addOnIndex) => (
+                                  <div key={addOnIndex} className="text-sm">
                                     <span
-                                      key={addOnIndex}
-                                      className="text-sm"
                                       style={{
                                         color: "#3D3935",
                                         opacity: 0.6,
                                       }}
                                     >
-                                      £{addOn.price}
+                                      + {addOn.name}
                                     </span>
-                                  ),
-                                )}
-                            </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          {index <
-                            bookingData.services.length - 1 && (
-                            <Separator
-                              style={{
-                                backgroundColor: "#DCD4CD",
-                              }}
-                            />
-                          )}
+                          <div className="ml-4 flex flex-col items-end">
+                            <span
+                              className="font-medium"
+                              style={{ color: "#3D3935" }}
+                            >
+                              £{service.price}
+                            </span>
+                            {service.addOns &&
+                              service.addOns.length > 0 &&
+                              service.addOns.map((addOn, addOnIndex) => (
+                                <span
+                                  key={addOnIndex}
+                                  className="text-sm"
+                                  style={{
+                                    color: "#3D3935",
+                                    opacity: 0.6,
+                                  }}
+                                >
+                                  £{addOn.price}
+                                </span>
+                              ))}
+                          </div>
                         </div>
-                      ),
-                    )}
+                        {index < bookingData.services.length - 1 && (
+                          <Separator
+                            style={{
+                              backgroundColor: "#DCD4CD",
+                            }}
+                          />
+                        )}
+                      </div>
+                    ))}
                   </CardContent>
                 </Card>
               </div>
@@ -2953,9 +2644,7 @@ export function BookingFlow({
                     </div>
                     {bookingData.discount > 0 && (
                       <>
-                        <Separator
-                          style={{ backgroundColor: "#DCD4CD" }}
-                        />
+                        <Separator style={{ backgroundColor: "#DCD4CD" }} />
                         <div className="flex justify-between items-center">
                           <span
                             className="text-sm"
@@ -3030,17 +2719,14 @@ export function BookingFlow({
             <DialogHeader>
               <DialogTitle>Payment</DialogTitle>
               <DialogDescription>
-                Enter your payment details to complete the
-                booking
+                Enter your payment details to complete the booking
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-6">
               <Card className="bg-gray-50">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-800">
-                      Amount to Pay
-                    </span>
+                    <span className="text-gray-800">Amount to Pay</span>
                     <span className="text-gray-800">
                       £
                       {bookingData.discount > 0
@@ -3053,9 +2739,7 @@ export function BookingFlow({
 
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="cardNumber">
-                    Card Number
-                  </Label>
+                  <Label htmlFor="cardNumber">Card Number</Label>
                   <Input
                     id="cardNumber"
                     type="text"
@@ -3086,21 +2770,15 @@ export function BookingFlow({
               </div>
 
               <div className="flex items-center gap-2 p-4 bg-blue-50 rounded-md border border-blue-200">
-                <CreditCard
-                  className="text-blue-600"
-                  size={20}
-                />
+                <CreditCard className="text-blue-600" size={20} />
                 <p className="text-sm text-blue-800">
-                  This is a demo. No real payment will be
-                  processed.
+                  This is a demo. No real payment will be processed.
                 </p>
               </div>
 
               {paymentState.error && (
                 <div className="flex items-center gap-2 p-4 bg-red-50 rounded-md border border-red-200">
-                  <p className="text-sm text-red-700">
-                    {paymentState.error}
-                  </p>
+                  <p className="text-sm text-red-700">{paymentState.error}</p>
                 </div>
               )}
 
@@ -3123,21 +2801,17 @@ export function BookingFlow({
                   }}
                   onMouseEnter={(e) => {
                     if (!paymentState.isSaving) {
-                      e.currentTarget.style.backgroundColor =
-                        "#D0A096";
+                      e.currentTarget.style.backgroundColor = "#D0A096";
                     }
                   }}
                   onMouseLeave={(e) => {
                     if (!paymentState.isSaving) {
-                      e.currentTarget.style.backgroundColor =
-                        "#3D3935";
+                      e.currentTarget.style.backgroundColor = "#3D3935";
                     }
                   }}
                   disabled={paymentState.isSaving}
                 >
-                  {paymentState.isSaving
-                    ? "Processing..."
-                    : "Complete Payment"}
+                  {paymentState.isSaving ? "Processing..." : "Complete Payment"}
                 </Button>
               </div>
             </div>
@@ -3159,34 +2833,23 @@ export function BookingFlow({
                   className="w-16 h-16 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: "#FAF7F5" }}
                 >
-                  <Check
-                    style={{ color: "#3D3935" }}
-                    size={32}
-                  />
+                  <Check style={{ color: "#3D3935" }} size={32} />
                 </div>
               </div>
 
               <Card>
                 <CardContent className="p-6 space-y-3">
                   <div className="text-center pb-3 border-b">
-                    <h3 className="text-gray-800 mb-1">
-                      Receipt
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      #{receiptNumber}
-                    </p>
+                    <h3 className="text-gray-800 mb-1">Receipt</h3>
+                    <p className="text-sm text-gray-600">#{receiptNumber}</p>
                   </div>
 
                   <div className="flex justify-between">
                     <span className="text-gray-600">Name</span>
-                    <span className="text-gray-800">
-                      {bookingData.name}
-                    </span>
+                    <span className="text-gray-800">{bookingData.name}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">
-                      People
-                    </span>
+                    <span className="text-gray-600">People</span>
                     <span className="text-gray-800">
                       {bookingData.numberOfPeople}
                     </span>
@@ -3195,67 +2858,47 @@ export function BookingFlow({
                   <Separator />
 
                   <div className="space-y-2">
-                    <p className="text-sm text-gray-600">
-                      Services:
-                    </p>
-                    {bookingData.services.map(
-                      (service, index) => {
-                        return (
-                          <div
-                            key={index}
-                            className="space-y-1"
-                          >
-                            <div className="flex justify-between text-sm">
-                              <span className="text-gray-700">
-                                {service.name}
-                              </span>
-                              <span className="text-gray-800">
-                                £{service.price}
-                              </span>
-                            </div>
-                            {service.addOns &&
-                              service.addOns.length > 0 && (
-                                <div className="ml-3 space-y-1">
-                                  {service.addOns.map(
-                                    (addOn, addOnIndex) => (
-                                      <div
-                                        key={addOnIndex}
-                                        className="flex justify-between text-xs text-gray-600"
-                                      >
-                                        <span>
-                                          + {addOn.name}
-                                        </span>
-                                        <span>
-                                          £{addOn.price}
-                                        </span>
-                                      </div>
-                                    ),
-                                  )}
-                                </div>
-                              )}
+                    <p className="text-sm text-gray-600">Services:</p>
+                    {bookingData.services.map((service, index) => {
+                      return (
+                        <div key={index} className="space-y-1">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-700">
+                              {service.name}
+                            </span>
+                            <span className="text-gray-800">
+                              £{service.price}
+                            </span>
                           </div>
-                        );
-                      },
-                    )}
+                          {service.addOns && service.addOns.length > 0 && (
+                            <div className="ml-3 space-y-1">
+                              {service.addOns.map((addOn, addOnIndex) => (
+                                <div
+                                  key={addOnIndex}
+                                  className="flex justify-between text-xs text-gray-600"
+                                >
+                                  <span>+ {addOn.name}</span>
+                                  <span>£{addOn.price}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <Separator />
 
                   <div className="flex justify-between">
-                    <span className="text-gray-600">
-                      Date & Time
-                    </span>
+                    <span className="text-gray-600">Date & Time</span>
                     <span className="text-gray-800">
-                      {bookingData.date?.toLocaleDateString(
-                        "en-GB",
-                      )}{" "}
-                      at {bookingData.timeSlot}
+                      {bookingData.date?.toLocaleDateString("en-GB")} at{" "}
+                      {bookingData.timeSlot}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">
-                      Duration
-                    </span>
+                    <span className="text-gray-600">Duration</span>
                     <span className="text-gray-800">
                       {bookingData.totalDuration} min
                     </span>
@@ -3265,20 +2908,16 @@ export function BookingFlow({
                     <span className="text-gray-800">
                       {
                         countryCodes.find(
-                          (c) =>
-                            c.id === bookingData.countryCode,
+                          (c) => c.id === bookingData.countryCode,
                         )?.code
                       }{" "}
                       {bookingData.phoneNumber}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">
-                      Location
-                    </span>
+                    <span className="text-gray-600">Location</span>
                     <span className="text-gray-800 text-right">
-                      {bookingData.houseNumber}{" "}
-                      {bookingData.street},{" "}
+                      {bookingData.houseNumber} {bookingData.street},{" "}
                       {bookingData.district}
                     </span>
                   </div>
@@ -3286,9 +2925,7 @@ export function BookingFlow({
                   {bookingData.discount > 0 && (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">
-                          Voucher
-                        </span>
+                        <span className="text-gray-600">Voucher</span>
                         <span className="text-gray-800">
                           {bookingData.voucherCode}
                         </span>
@@ -3298,18 +2935,14 @@ export function BookingFlow({
                         style={{ color: "#3D3935" }}
                       >
                         <span>Discount</span>
-                        <span>
-                          -£{bookingData.discount.toFixed(2)}
-                        </span>
+                        <span>-£{bookingData.discount.toFixed(2)}</span>
                       </div>
                     </>
                   )}
 
                   <div className="border-t pt-3 mt-3">
                     <div className="flex justify-between">
-                      <span className="text-gray-800">
-                        Amount Paid
-                      </span>
+                      <span className="text-gray-800">Amount Paid</span>
                       <span className="text-gray-800">
                         £
                         {bookingData.discount > 0
@@ -3323,19 +2956,15 @@ export function BookingFlow({
 
               <div className="bg-gray-50 p-4 rounded-md">
                 <p className="text-sm text-gray-700">
-                  Thank you, {bookingData.name}! A confirmation
-                  has been sent to{" "}
+                  Thank you, {bookingData.name}! A confirmation has been sent to{" "}
                   {
-                    countryCodes.find(
-                      (c) => c.id === bookingData.countryCode,
-                    )?.code
+                    countryCodes.find((c) => c.id === bookingData.countryCode)
+                      ?.code
                   }{" "}
-                  {bookingData.phoneNumber}. We'll send you a
-                  reminder 24 hours before your appointment. Our
-                  mobile nail technician will arrive at{" "}
-                  {bookingData.houseNumber} {bookingData.street}
-                  , {bookingData.district} at the scheduled
-                  time.
+                  {bookingData.phoneNumber}. We'll send you a reminder 24 hours
+                  before your appointment. Our mobile nail technician will
+                  arrive at {bookingData.houseNumber} {bookingData.street},{" "}
+                  {bookingData.district} at the scheduled time.
                   {bookingData.numberOfPeople > 1 &&
                     ` The appointment is scheduled for ${bookingData.numberOfPeople} people with a total duration of ${bookingData.totalDuration} minutes.`}
                 </p>
@@ -3349,12 +2978,10 @@ export function BookingFlow({
                   color: "#E9CFCA",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "#D0A096";
+                  e.currentTarget.style.backgroundColor = "#D0A096";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "#3D3935";
+                  e.currentTarget.style.backgroundColor = "#3D3935";
                 }}
               >
                 Close

@@ -69,7 +69,11 @@ import {
   DialogFooter,
   DialogDescription,
 } from "../../components/ui/dialog";
-import { AdminBookingForm } from "../../components/admin/AdminBookingForm";
+import {
+  AdminBookingForm,
+  GAP_MINUTES_PER_PEOPLE,
+  GAP_MINUTES_PER_SERVICE,
+} from "../../components/admin/AdminBookingForm";
 import {
   ScheduleWorkshopDrawer,
   GeneratedSession,
@@ -336,24 +340,23 @@ export function AdminCalendar() {
   };
 
   const getBookingsForDate = (date: Date) => {
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     return filterBookings(bookings)
       .filter((booking) => {
-        const bookingDate = new Date(booking.appointment_date)
-          .toISOString()
-          .split("T")[0];
+        const d = new Date(booking.appointment_date);
+        const bookingDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         return bookingDate === dateStr;
       })
       .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
   };
 
   const getWorkshopSessionssForDate = (date: Date) => {
-    const dateStr = date.toISOString().split("T")[0];
-    console.log("AAAAAAAAAAAAAa", dateStr, "====>", workshopBookings);
+    const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     return workshopSessions
       .filter((session) => {
         if (!session.date) return false;
-        const sessionDate = new Date(session.date).toISOString().split("T")[0];
+        const d = new Date(session.date);
+        const sessionDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         return sessionDate === dateStr;
       })
       .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
@@ -374,7 +377,7 @@ export function AdminCalendar() {
   };
 
   const getBookingsCount = (date: Date) => {
-    return getBookingsForDate(date).length;
+    return getBookingsForDate(date).length + getWorkshopSessionssForDate(date).length;
   };
 
   if (loading) {
@@ -965,6 +968,17 @@ function BookingDetailsDialog({
     booking.status !== BookingStatus.CANCELLED &&
     booking.status !== BookingStatus.COMPLETED;
 
+  const numberOfServices = treatments.length;
+  const numberOfPeople = booking.people_numbers || 1; // Assuming each treatment is for one person
+
+  const totalDuration =
+    treatments.reduce(
+      (total, treatment) => total + (treatment.duration || 0),
+      0,
+    ) +
+    (numberOfServices - 1) * GAP_MINUTES_PER_SERVICE +
+    (numberOfPeople - 1) * GAP_MINUTES_PER_PEOPLE; // Adding 10 minutes for each additional person
+
   console.log("admin Calendar selected booking ===>", booking);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1125,12 +1139,18 @@ function BookingDetailsDialog({
                       <div className="text-sm" style={{ color: "#3D3935" }}>
                         {treatment.service_name}{" "}
                         {treatment.addOns.length > 0 ? "(" : ""}
-                        {treatment.addOns.map((a) => `${a.addon_name} `)}
+                        {treatment.addOns.map((a) => `${a.name} `)}
                         {treatment.addOns.length > 0 ? ")" : ""}
                       </div>
                       <div className="text-xs text-gray-600 mt-1">
                         {treatment.duration} minutes • £
-                        {treatment.price.toFixed(2)}
+                        {(
+                          Number(treatment.price) +
+                          treatment.addOns.reduce(
+                            (sum, a) => sum + Number(a.price),
+                            0,
+                          )
+                        ).toFixed(2)}
                       </div>
                     </div>
                   ))}
@@ -1193,7 +1213,7 @@ function BookingDetailsDialog({
               <div>
                 <div className="text-sm text-gray-600 mb-1">Duration</div>
                 <div className="font-medium" style={{ color: "#3D3935" }}>
-                  {service?.duration || 60} minutes
+                  {totalDuration || 60} minutes
                 </div>
               </div>
               <div>
@@ -1928,22 +1948,26 @@ function WeekView({
             return (
               <div
                 key={idx}
-                className="flex-1 text-center p-2 border-2"
+                className="flex-1 text-center p-2 border-2 h-16 overflow-hidden"
                 style={{
                   borderColor: "#DCD4CD",
                   backgroundColor: isToday ? "#E9CFCA" : "transparent",
                 }}
               >
-                <div className="text-xs text-gray-600">
+                <div className="text-xs text-gray-600 truncate">
                   {day.toLocaleDateString("en-GB", {
                     weekday: "short",
                   })}
                 </div>
-                <div className="font-semibold" style={{ color: "#3D3935" }}>
+                <div className="font-semibold truncate" style={{ color: "#3D3935" }}>
                   {day.getDate()}
                 </div>
-                <div className="text-xs text-gray-600">
-                  {getBookingsForDate(day).length} appts
+                <div className="text-xs text-gray-600 truncate">
+                  {(() => {
+                    const dayDateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
+                    const wsCount = workshopBookings.filter((s) => s.date === dayDateStr).length;
+                    return getBookingsForDate(day).length + wsCount;
+                  })()} appts
                 </div>
               </div>
             );
@@ -1981,7 +2005,7 @@ function WeekView({
                 return (
                   <div
                     key={idx}
-                    className="flex-1 min-h-[50px] border p-1"
+                    className="flex-1 min-h-[50px] max-h-[60px] border p-1 overflow-hidden"
                     style={{
                       borderColor: "#DCD4CD",
                       backgroundColor: isOutsideHours
@@ -1997,7 +2021,7 @@ function WeekView({
                       .map((booking) => (
                         <div
                           key={booking.id}
-                          className="text-xs p-1 mb-1 cursor-pointer hover:opacity-80 transition-opacity"
+                          className="text-xs p-1 mb-1 cursor-pointer hover:opacity-80 transition-opacity overflow-hidden"
                           style={{
                             backgroundColor:
                               booking.status === "cancelled"
@@ -2057,7 +2081,7 @@ function WeekView({
                       .map((s, si) => (
                         <div
                           key={`ws-${si}`}
-                          className="text-xs p-1 mb-1"
+                          className="text-xs p-1 mb-1 overflow-hidden"
                           style={{
                             backgroundColor: "#F1DFC0",
                             borderLeft: "3px solid #3D3935",
@@ -2195,7 +2219,7 @@ function MonthView({
           return (
             <div
               key={idx}
-              className="aspect-square border-2 p-2 cursor-pointer hover:shadow-md transition-shadow"
+              className="h-24 border-2 p-2 cursor-pointer hover:shadow-md transition-shadow overflow-hidden"
               style={{
                 borderColor: "#DCD4CD",
                 backgroundColor: isToday
@@ -2217,7 +2241,7 @@ function MonthView({
               {bookingsCount > 0 && (
                 <div className="mt-1">
                   <div
-                    className="text-xs px-2 py-1 text-center"
+                    className="text-xs px-2 py-1 text-center truncate"
                     style={{
                       backgroundColor: "#3D3935",
                       color: "white",

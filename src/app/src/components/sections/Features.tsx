@@ -21,6 +21,7 @@ import { Service } from "../../schema/service.schema";
 import { getAllServices } from "../../lib/db/services";
 
 export function Features() {
+  const [showAll, setShowAll] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const [open, setOpen] = useState(false);
@@ -46,6 +47,7 @@ export function Features() {
     loadServices();
   }, []);
 
+  const servicesToShow = showAll ? services : services.slice(0, 6);
   return (
     <section
       id="features"
@@ -74,7 +76,7 @@ export function Features() {
               <span className="text-sm text-gray-500">Loading...</span>
             </div>
           ) : (
-            services.slice(0, 6).map((service, index) => (
+            servicesToShow.map((service, index) => (
               <Card
                 key={index}
                 className="overflow-hidden flex flex-col shrink-0 w-[calc(100vw-5rem)] md:w-auto shadow-sm snap-start"
@@ -134,6 +136,21 @@ export function Features() {
             ))
           )}
         </div>
+        {services.length > 6 && (
+          <div className="flex justify-center items-center w-full mt-4">
+            <Button
+              onClick={() => setShowAll(!showAll)}
+              className="w-full max-w-sm transition-colors min-h-[48px] md:min-h-[44px] text-base md:text-sm"
+              style={{
+                background: "transparent",
+                color: "#3D3935",
+                cursor: "pointer",
+              }}
+            >
+              {showAll ? "Show Less" : "View All"}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Booking Dialog */}

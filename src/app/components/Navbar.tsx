@@ -14,8 +14,7 @@ import {
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
-  const [whatsappModalOpen, setWhatsappModalOpen] =
-    useState(false);
+  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
   // Placeholder logo
@@ -32,8 +31,7 @@ export function Navbar() {
     };
 
     window.addEventListener("scroll", handleScroll);
-    return () =>
-      window.removeEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   console.log("NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN");
@@ -68,12 +66,8 @@ export function Navbar() {
               href="#about"
               className="transition-colors"
               style={{ color: "#3D3935" }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.color = "#1F1F1F")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = "#3D3935")
-              }
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#1F1F1F")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#3D3935")}
             >
               About
             </a>
@@ -81,12 +75,8 @@ export function Navbar() {
               href="#services"
               className="transition-colors"
               style={{ color: "#3D3935" }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.color = "#1F1F1F")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = "#3D3935")
-              }
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#1F1F1F")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#3D3935")}
             >
               Services
             </a>
@@ -94,12 +84,8 @@ export function Navbar() {
               href="#training"
               className="transition-colors"
               style={{ color: "#3D3935" }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.color = "#1F1F1F")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.color = "#3D3935")
-              }
+              onMouseEnter={(e) => (e.currentTarget.style.color = "#1F1F1F")}
+              onMouseLeave={(e) => (e.currentTarget.style.color = "#3D3935")}
             >
               Workshops
             </a>
@@ -113,12 +99,10 @@ export function Navbar() {
               style={{ backgroundColor: "#E9CFCA" }}
               className="border-2 border-gray-800 text-gray-800 transition-all"
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "#D0A096";
+                e.currentTarget.style.backgroundColor = "#D0A096";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "#E9CFCA";
+                e.currentTarget.style.backgroundColor = "#E9CFCA";
               }}
               onClick={() => setWhatsappModalOpen(true)}
             >
@@ -128,13 +112,11 @@ export function Navbar() {
               className="bg-gray-800 transition-all"
               style={{ color: "#E9CFCA" }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "#1F1F1F";
+                e.currentTarget.style.backgroundColor = "#1F1F1F";
                 e.currentTarget.style.color = "#D0A096";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "#1F1F1F";
+                e.currentTarget.style.backgroundColor = "#1F1F1F";
                 e.currentTarget.style.color = "#E9CFCA";
               }}
               onClick={() => setBookingOpen(true)}
@@ -188,13 +170,11 @@ export function Navbar() {
                 className="w-full bg-gray-800 transition-all"
                 style={{ color: "#E9CFCA" }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "#1F1F1F";
+                  e.currentTarget.style.backgroundColor = "#1F1F1F";
                   e.currentTarget.style.color = "#D0A096";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor =
-                    "#1F1F1F";
+                  e.currentTarget.style.backgroundColor = "#1F1F1F";
                   e.currentTarget.style.color = "#E9CFCA";
                 }}
                 onClick={() => {
@@ -210,24 +190,17 @@ export function Navbar() {
       )}
 
       {bookingOpen && (
-        <BookingFlow
-          open={bookingOpen}
-          onOpenChange={setBookingOpen}
-        />
+        <BookingFlow open={bookingOpen} onOpenChange={setBookingOpen} />
       )}
-      <Dialog
-        open={whatsappModalOpen}
-        onOpenChange={setWhatsappModalOpen}
-      >
+      <Dialog open={whatsappModalOpen} onOpenChange={setWhatsappModalOpen}>
         <DialogContent className="sm:max-w-[425px] border-2 border-gray-900 rounded-none p-8">
           <DialogHeader className="space-y-4">
             <DialogTitle className="text-gray-900">
               Contact Us on WhatsApp
             </DialogTitle>
             <DialogDescription className="text-gray-600">
-              This will take you to WhatsApp where you can
-              message us directly for any questions or
-              enquiries.
+              This will take you to WhatsApp where you can message us directly
+              for any questions or enquiries.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-8 gap-4 sm:justify-center">
@@ -242,21 +215,16 @@ export function Navbar() {
               className="bg-gray-800 rounded-none px-6 transition-all"
               style={{ color: "#E9CFCA" }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "#1F1F1F";
+                e.currentTarget.style.backgroundColor = "#1F1F1F";
                 e.currentTarget.style.color = "#D0A096";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor =
-                  "#1F1F1F";
+                e.currentTarget.style.backgroundColor = "#1F1F1F";
                 e.currentTarget.style.color = "#E9CFCA";
               }}
               onClick={() => {
                 setWhatsappModalOpen(false);
-                window.open(
-                  "https://wa.me/447123456789",
-                  "_blank",
-                );
+                window.open("https://wa.me/+447930515131", "_blank");
               }}
             >
               <Phone className="mr-2 h-4 w-4" />

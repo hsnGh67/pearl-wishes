@@ -1,6 +1,20 @@
 import { z } from "zod";
 
 /**
+ * Note Schema (user_notes table)
+ */
+export const NoteSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  content: z.string(),
+  author: z.string().default("Admin"),
+  created_at: z.string().or(z.date()).optional(),
+  updated_at: z.string().or(z.date()).optional(),
+});
+
+export type Note = z.infer<typeof NoteSchema>;
+
+/**
  * User Role Enum
  */
 export enum UserRole {
@@ -57,6 +71,7 @@ export const UserSchema = z.object({
     .transform((val) => val || ""),
   created_at: z.string().or(z.date()).optional(),
   updated_at: z.string().or(z.date()).optional(),
+  notes: z.array(NoteSchema).optional().default([]),
 });
 
 /**

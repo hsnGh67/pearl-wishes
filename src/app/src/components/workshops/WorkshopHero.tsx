@@ -18,10 +18,9 @@ export function WorkshopHero() {
           Nail Training workshops
         </h1>
         <p className="text-xl text-gray-600 mb-10 leading-relaxed max-w-3xl mx-auto">
-          Professional hands-on nail training for beginners and
-          experienced nail technicians. Our workshops are held
-          monthly and designed to build confidence, precision,
-          and real-world skills.
+          Professional hands-on nail training for beginners and experienced nail
+          technicians. Our workshops are held monthly and designed to build
+          confidence, precision, and real-world skills.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button
@@ -41,8 +40,7 @@ export function WorkshopHero() {
             }}
             onClick={() =>
               window.scrollTo({
-                top: document.getElementById("workshop-info")
-                  ?.offsetTop,
+                top: document.getElementById("workshop-info")?.offsetTop,
                 behavior: "smooth",
               })
             }
@@ -63,6 +61,9 @@ export function WorkshopHero() {
             onMouseLeave={(e) => {
               e.currentTarget.style.backgroundColor = "#E9CFCA";
               e.currentTarget.style.color = "#3D3935";
+            }}
+            onClick={() => {
+              window.open("https://wa.me/+447930515131", "_blank");
             }}
           >
             Contact Us

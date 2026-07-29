@@ -262,6 +262,12 @@ export default function WorkshopsDetails({ workshopDetails }: Props) {
                 onMouseLeave={(e) => {
                   e.currentTarget.style.backgroundColor = "transparent";
                 }}
+                onClick={() => {
+                  window.open(
+                    `https://wa.me/+447930515131?text=${workshopDetails.title}`,
+                    "_blank",
+                  );
+                }}
               >
                 Contact Us
               </button>

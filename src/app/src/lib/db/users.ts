@@ -3,6 +3,8 @@ import {
   User,
   UserCreate,
   UserUpdate,
+  Note,
+  NoteSchema,
   validateUser,
   validateUserCreate,
   validateUserUpdate,
@@ -19,7 +21,7 @@ export const getAllUsers = async (): Promise<User[]> => {
 
     const { data, error } = await supabase
       .from("users")
-      .select("*")
+      .select("*, user_notes(*)")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -37,13 +39,15 @@ export const getAllUsers = async (): Promise<User[]> => {
 
     const validatedUsers =
       data?.map((user) => {
-        const validated = validateUser(user);
+        const { user_notes, ...rest } = user as any;
+        const validated = validateUser({ ...rest, notes: user_notes ?? [] });
         console.log("✅ Validated user:", {
           name: validated.full_name,
           hasAddress: !!validated.address,
           address: validated.address,
           postcode: validated.postcode,
           district: validated.district,
+          notesCount: validated.notes?.length ?? 0,
         });
         return validated;
       }) || [];
@@ -426,5 +430,122 @@ export const getUserByPhone = async (
   } catch (error) {
     dbLogger.error("Error in getUserByPhone", { error });
     return null; // Return null instead of throwing to allow fallback to user creation
+  }
+};
+
+/**
+ * Add a note to a user
+ */
+export const addUserNote = async (
+  userId: string,
+  content: string,
+  author = "Admin",
+): Promise<Note> => {
+  try {
+    dbLogger.info("Adding note to user", {
+      table: "user_notes",
+      data: { userId },
+    });
+
+    const { data, error } = await supabase
+      .from("user_notes")
+      .insert([{ user_id: userId, content, author }])
+      .select()
+      .single();
+
+    if (error) {
+      dbLogger.error("Failed to add user note", {
+        table: "user_notes",
+        error,
+      });
+      throw error;
+    }
+
+    const validatedNote = NoteSchema.parse(data);
+
+    dbLogger.info("Successfully added user note", {
+      table: "user_notes",
+      data: { id: validatedNote.id },
+    });
+
+    return validatedNote;
+  } catch (error) {
+    dbLogger.error("Error in addUserNote", { error });
+    throw error;
+  }
+};
+
+/**
+ * Update a user note's content
+ */
+export const updateUserNote = async (
+  noteId: string,
+  content: string,
+): Promise<Note> => {
+  try {
+    dbLogger.info("Updating user note", {
+      table: "user_notes",
+      data: { noteId },
+    });
+
+    const { data, error } = await supabase
+      .from("user_notes")
+      .update({ content, updated_at: new Date().toISOString() })
+      .eq("id", noteId)
+      .select()
+      .single();
+
+    if (error) {
+      dbLogger.error("Failed to update user note", {
+        table: "user_notes",
+        error,
+      });
+      throw error;
+    }
+
+    const validatedNote = NoteSchema.parse(data);
+
+    dbLogger.info("Successfully updated user note", {
+      table: "user_notes",
+      data: { id: validatedNote.id },
+    });
+
+    return validatedNote;
+  } catch (error) {
+    dbLogger.error("Error in updateUserNote", { error });
+    throw error;
+  }
+};
+
+/**
+ * Delete a user note
+ */
+export const deleteUserNote = async (noteId: string): Promise<void> => {
+  try {
+    dbLogger.info("Deleting user note", {
+      table: "user_notes",
+      data: { noteId },
+    });
+
+    const { error } = await supabase
+      .from("user_notes")
+      .delete()
+      .eq("id", noteId);
+
+    if (error) {
+      dbLogger.error("Failed to delete user note", {
+        table: "user_notes",
+        error,
+      });
+      throw error;
+    }
+
+    dbLogger.info("Successfully deleted user note", {
+      table: "user_notes",
+      data: { noteId },
+    });
+  } catch (error) {
+    dbLogger.error("Error in deleteUserNote", { error });
+    throw error;
   }
 };
