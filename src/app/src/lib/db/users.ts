@@ -21,7 +21,7 @@ export const getAllUsers = async (): Promise<User[]> => {
 
     const { data, error } = await supabase
       .from("users")
-      .select("*, user_notes(*)")
+      .select("*, user_notes(*), bookings!bookings_user_id_fkey(*)")
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -32,15 +32,17 @@ export const getAllUsers = async (): Promise<User[]> => {
       throw error;
     }
 
-    console.log(
-      "📦 Raw users from Supabase:",
-      data?.slice(0, 2),
-    ); // Show first 2 users
+    console.log("📦 Raw users from Supabase:", data?.slice(0, 2)); // Show first 2 users
 
     const validatedUsers =
       data?.map((user) => {
         const { user_notes, ...rest } = user as any;
-        const validated = validateUser({ ...rest, notes: user_notes ?? [] });
+        const validated = validateUser({
+          ...rest,
+          notes: user_notes ?? [],
+          bookings: user.bookings ?? [],
+          workshops: user.workshops ?? [],
+        });
         console.log("✅ Validated user:", {
           name: validated.full_name,
           hasAddress: !!validated.address,
@@ -90,10 +92,7 @@ export const findUserByNameOrEmailOrPhone = async (
       throw error;
     }
 
-    console.log(
-      "📦 Raw users from Supabase:",
-      data?.slice(0, 2),
-    ); // Show first 2 users
+    console.log("📦 Raw users from Supabase:", data?.slice(0, 2)); // Show first 2 users
 
     const validatedUsers =
       data?.map((user) => {
@@ -122,9 +121,7 @@ export const findUserByNameOrEmailOrPhone = async (
 /**
  * Get users by role
  */
-export const getUsersByRole = async (
-  role: UserRole,
-): Promise<User[]> => {
+export const getUsersByRole = async (role: UserRole): Promise<User[]> => {
   try {
     dbLogger.info("Fetching users by role", {
       table: "users",
@@ -145,8 +142,7 @@ export const getUsersByRole = async (
       throw error;
     }
 
-    const validatedUsers =
-      data?.map((user) => validateUser(user)) || [];
+    const validatedUsers = data?.map((user) => validateUser(user)) || [];
 
     dbLogger.info("Successfully fetched users by role", {
       table: "users",
@@ -163,9 +159,7 @@ export const getUsersByRole = async (
 /**
  * Get user by ID
  */
-export const getUserById = async (
-  id: string,
-): Promise<User | null> => {
+export const getUserById = async (id: string): Promise<User | null> => {
   try {
     dbLogger.info("Fetching user by ID", {
       table: "users",
@@ -211,9 +205,7 @@ export const getUserById = async (
 /**
  * Get user by email
  */
-export const getUserByEmail = async (
-  email: string,
-): Promise<User | null> => {
+export const getUserByEmail = async (email: string): Promise<User | null> => {
   try {
     dbLogger.info("Fetching user by email", {
       table: "users",
@@ -259,9 +251,7 @@ export const getUserByEmail = async (
 /**
  * Create a new user
  */
-export const createUser = async (
-  userData: UserCreate,
-): Promise<User> => {
+export const createUser = async (userData: UserCreate): Promise<User> => {
   try {
     const validatedData = validateUserCreate(userData);
 
@@ -302,9 +292,7 @@ export const createUser = async (
 /**
  * Update an existing user
  */
-export const updateUser = async (
-  userData: UserUpdate,
-): Promise<User> => {
+export const updateUser = async (userData: UserUpdate): Promise<User> => {
   try {
     const validatedData = validateUserUpdate(userData);
 
@@ -354,10 +342,7 @@ export const deleteUser = async (id: string): Promise<void> => {
       data: { id },
     });
 
-    const { error } = await supabase
-      .from("users")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.from("users").delete().eq("id", id);
 
     if (error) {
       dbLogger.error("Failed to delete user", {
@@ -380,9 +365,7 @@ export const deleteUser = async (id: string): Promise<void> => {
 /**
  * Get user by phone number
  */
-export const getUserByPhone = async (
-  phone: string,
-): Promise<User | null> => {
+export const getUserByPhone = async (phone: string): Promise<User | null> => {
   try {
     dbLogger.info("Fetching user by phone", {
       table: "users",

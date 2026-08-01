@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BookingSchema } from "./booking.schema";
 
 /**
  * Note Schema (user_notes table)
@@ -46,6 +47,8 @@ export const UserSchema = z.object({
     .nullable()
     .optional(),
   full_name: z.string().max(100),
+  bookings: z.array(BookingSchema).optional().default([]),
+  workshops: z.array(z.any()).optional().default([]),
   phone: z
     .string()
     .regex(/^\+?[0-9\s\-()]+$/, "Invalid phone number")
@@ -122,9 +125,7 @@ export const USER_BUSINESS_RULES = {
 /**
  * Helper Functions
  */
-export const formatUserForDisplay = (
-  user: User,
-): UserDisplay => ({
+export const formatUserForDisplay = (user: User): UserDisplay => ({
   ...user,
   roleLabel: USER_ROLE_LABELS[user.role],
   statusLabel: "Active", // Default status label
@@ -145,14 +146,10 @@ export const validateUser = (data: unknown): User => {
   }
 };
 
-export const validateUserCreate = (
-  data: unknown,
-): UserCreate => {
+export const validateUserCreate = (data: unknown): UserCreate => {
   return UserCreateSchema.parse(data);
 };
 
-export const validateUserUpdate = (
-  data: unknown,
-): UserUpdate => {
+export const validateUserUpdate = (data: unknown): UserUpdate => {
   return UserUpdateSchema.parse(data);
 };

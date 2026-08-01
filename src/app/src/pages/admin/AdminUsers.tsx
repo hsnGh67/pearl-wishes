@@ -68,6 +68,7 @@ export function AdminUsers() {
         setIsLoading(true);
         setDbError(null);
         const fetchedUsers = await getAllUsers();
+        console.log("fetchedUsers", fetchedUsers);
         setUsers(fetchedUsers);
       } catch (error) {
         // Silently handle - error already logged by dbLogger
@@ -458,7 +459,9 @@ export function AdminUsers() {
                     </div>
                   </td>
                   <td className="p-4">
-                    <span className="text-gray-500 text-sm">-</span>
+                    <span className="text-gray-500 text-sm">
+                      {user?.address || "-"}
+                    </span>
                   </td>
                   <td className="p-4">
                     <span className="text-gray-500 text-sm">-</span>
