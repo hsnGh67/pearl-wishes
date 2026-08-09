@@ -23,22 +23,91 @@ import {
   deleteUserNote,
 } from "../../lib/db/users";
 import { User, UserRole, Note } from "../../schema/user.schema";
+import {
+  Booking,
+  BookingStatus,
+  BOOKING_STATUS_LABELS,
+  PaymentStatus,
+} from "../../schema/booking.schema";
+import {
+  WORKSHOP_BOOKING_STATUS_LABELS,
+  WORKSHOP_PAYMENT_STATUS_LABELS,
+  WorkshopBookingStatus,
+  WorkshopPaymentStatus,
+} from "../../schema/workshop-booking.schema";
 
-interface Appointment {
-  id: number;
-  date: string;
-  time: string;
-  service: string;
-  price: number;
-  people: number;
-  promoCode?: string;
-  type: "training" | "session";
-}
+type UserWorkshop = {
+  id?: string;
+  workshop_id?: string;
+  preferred_month?: string;
+  participant_name?: string;
+  participant_phone?: string;
+  participant_email?: string;
+  status?: string;
+  payment_status?: string;
+  notes?: string;
+  scheduled_date?: string | null;
+  created_at?: string;
+  workshops?: { title?: string; price?: number } | null;
+};
+
+const PAYMENT_STATUS_LABELS: Record<string, string> = {
+  [PaymentStatus.UNPAID]: "Unpaid",
+  [PaymentStatus.PARTIALL_PAID]: "Partially Paid",
+  [PaymentStatus.PARTIALL_REFUNDED]: "Partially Refunded",
+  [PaymentStatus.PAID]: "Paid",
+  [PaymentStatus.REFUNDED]: "Refunded",
+};
+
+const getBookingStatusStyle = (status: string) => {
+  if (status === BookingStatus.CANCELLED || status === BookingStatus.NO_SHOW) {
+    return { backgroundColor: "#DCD4CD", color: "#3D3935" };
+  }
+  if (
+    status === BookingStatus.CONFIRMED ||
+    status === BookingStatus.COMPLETED
+  ) {
+    return { backgroundColor: "#E9CFCA", color: "#3D3935" };
+  }
+  return { backgroundColor: "#F1DFC0", color: "#3D3935" };
+};
+
+const getPaymentStatusStyle = (status: string) => {
+  if (status === PaymentStatus.PAID || status === WorkshopPaymentStatus.PAID) {
+    return { backgroundColor: "#E9CFCA", color: "#3D3935" };
+  }
+  if (
+    status === PaymentStatus.UNPAID ||
+    status === WorkshopPaymentStatus.PENDING
+  ) {
+    return { backgroundColor: "#F1DFC0", color: "#3D3935" };
+  }
+  if (
+    status === PaymentStatus.REFUNDED ||
+    status === WorkshopPaymentStatus.REFUNDED
+  ) {
+    return { backgroundColor: "#EADDD5", color: "#3D3935" };
+  }
+  return { backgroundColor: "#DCD4CD", color: "#3D3935" };
+};
+
+const formatMoney = (amount?: number | null) =>
+  `£${Number(amount ?? 0).toFixed(2)}`;
+
+const formatDateLabel = (dateValue?: string | Date | null) => {
+  if (!dateValue) return "-";
+  return new Date(dateValue).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+};
 
 export function AdminUsers() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [bookingsUser, setBookingsUser] = useState<User | null>(null);
+  const [workshopsUser, setWorkshopsUser] = useState<User | null>(null);
   const [notesUser, setNotesUser] = useState<User | null>(null);
   const [newNoteContent, setNewNoteContent] = useState("");
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -463,11 +532,43 @@ export function AdminUsers() {
                       {user?.address || "-"}
                     </span>
                   </td>
-                  <td className="p-4">
-                    <span className="text-gray-500 text-sm">-</span>
+                  <td
+                    className="p-0 cursor-pointer"
+                    onClick={() => setBookingsUser(user)}
+                  >
+                    <div className="w-full h-full p-4">
+                      {(user.bookings?.length ?? 0) > 0 ? (
+                        <span
+                          className="text-sm font-semibold underline transition-colors hover:opacity-70"
+                          style={{ color: "#3D3935" }}
+                        >
+                          {user.bookings?.length > 0
+                            ? user.bookings.length
+                            : "-"}
+                        </span>
+                      ) : (
+                        <span className="text-gray-500 text-sm">0</span>
+                      )}
+                    </div>
                   </td>
-                  <td className="p-4">
-                    <span className="text-gray-500 text-sm">-</span>
+                  <td
+                    className="p-0 cursor-pointer"
+                    onClick={() => setWorkshopsUser(user)}
+                  >
+                    <div className="w-full h-full p-4">
+                      {(user.workshops?.length ?? 0) > 0 ? (
+                        <span
+                          className="text-sm font-semibold underline transition-colors hover:opacity-70"
+                          style={{ color: "#3D3935" }}
+                        >
+                          {user.workshops?.length > 0
+                            ? user.workshops.length
+                            : "-"}
+                        </span>
+                      ) : (
+                        <span className="text-gray-500 text-sm">0</span>
+                      )}
+                    </div>
                   </td>
                   <td className="p-4 text-gray-600">
                     {new Date(user.created_at || "").toLocaleDateString(
@@ -624,16 +725,15 @@ export function AdminUsers() {
           );
         })()}
 
-      {/* User Details Modal */}
-      {selectedUser && (
+      {/* Bookings Modal */}
+      {bookingsUser && (
         <>
-          {/* Backdrop */}
           <div
-            className="fixed inset-0 bg-black bg-opacity-50 z-40"
-            onClick={() => setSelectedUser(null)}
+            style={{ backgroundColor: "#000000d9" }}
+            className="fixed inset-0 z-40"
+            onClick={() => setBookingsUser(null)}
           />
 
-          {/* Modal */}
           <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <Card
               className="p-8 border-2"
@@ -641,10 +741,11 @@ export function AdminUsers() {
             >
               <div className="flex items-center justify-between mb-6">
                 <h2 className="font-semibold" style={{ color: "#3D3935" }}>
-                  {selectedUser.name} - Appointment History
+                  Bookings - {bookingsUser.full_name} (
+                  {bookingsUser.bookings?.length ?? 0})
                 </h2>
                 <button
-                  onClick={() => setSelectedUser(null)}
+                  onClick={() => setBookingsUser(null)}
                   className="w-8 h-8 flex items-center justify-center border-2 transition-colors hover:bg-gray-100"
                   style={{
                     borderColor: "#DCD4CD",
@@ -656,115 +757,116 @@ export function AdminUsers() {
                 </button>
               </div>
 
-              {/* User Info Summary */}
-              <div
-                className="mb-8 p-4 border-2"
-                style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
-              >
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Email</p>
-                    <p className="font-medium" style={{ color: "#3D3935" }}>
-                      {selectedUser.email}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Phone</p>
-                    <p className="font-medium" style={{ color: "#3D3935" }}>
-                      {selectedUser.phone}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Address</p>
-                    <p className="font-medium" style={{ color: "#3D3935" }}>
-                      {selectedUser.address}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Member Since</p>
-                    <p className="font-medium" style={{ color: "#3D3935" }}>
-                      {selectedUser.joined}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Booking Sessions */}
-              <div className="mb-8">
-                <h3
-                  className="font-semibold mb-4 pb-2 border-b-2"
-                  style={{ color: "#3D3935", borderColor: "#DCD4CD" }}
-                >
-                  Booking Sessions (
-                  {
-                    selectedUser.appointmentHistory.filter(
-                      (a) => a.type === "session",
-                    )?.length
-                  }
+              <div className="space-y-3">
+                {[...(bookingsUser.bookings ?? [])]
+                  .sort(
+                    (a, b) =>
+                      new Date(b.appointment_date as string).getTime() -
+                      new Date(a.appointment_date as string).getTime(),
                   )
-                </h3>
-                <div className="space-y-3">
-                  {selectedUser.appointmentHistory
-                    .filter((appointment) => appointment.type === "session")
-                    .map((appointment) => (
-                      <div
-                        key={appointment.id}
-                        className="p-4 border-2"
-                        style={{ borderColor: "#DCD4CD" }}
-                      >
-                        <div className="grid grid-cols-4 gap-4">
-                          <div>
-                            <p className="text-sm text-gray-500">Date</p>
-                            <p
-                              className="font-medium"
-                              style={{ color: "#3D3935" }}
-                            >
-                              {appointment.date}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Time</p>
-                            <p
-                              className="font-medium"
-                              style={{ color: "#3D3935" }}
-                            >
-                              {appointment.time}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Service</p>
-                            <p
-                              className="font-medium"
-                              style={{ color: "#3D3935" }}
-                            >
-                              {appointment.service}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">Price</p>
-                            <p
-                              className="font-medium"
-                              style={{ color: "#3D3935" }}
-                            >
-                              £{appointment.price}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-500">People</p>
-                            <p
-                              className="font-medium"
-                              style={{ color: "#3D3935" }}
-                            >
-                              {appointment.people}{" "}
-                              {appointment.people === 1 ? "Person" : "People"}
-                            </p>
-                          </div>
-                        </div>
-                        {appointment.promoCode && (
-                          <div
-                            className="mt-3 pt-3 border-t"
-                            style={{ borderColor: "#DCD4CD" }}
+                  .map((booking: Booking) => (
+                    <div
+                      key={booking.id}
+                      className="p-4 border-2"
+                      style={{ borderColor: "#DCD4CD" }}
+                    >
+                      <div className="flex flex-wrap items-center gap-2 mb-4">
+                        <span
+                          className="px-3 py-1 text-sm font-semibold"
+                          style={getBookingStatusStyle(booking.status)}
+                        >
+                          {BOOKING_STATUS_LABELS[
+                            booking.status as BookingStatus
+                          ] || booking.status}
+                        </span>
+                        <span
+                          className="px-3 py-1 text-sm font-semibold"
+                          style={getPaymentStatusStyle(booking.payment_status)}
+                        >
+                          {PAYMENT_STATUS_LABELS[booking.payment_status] ||
+                            booking.payment_status}
+                        </span>
+                        <span
+                          className="ml-auto text-lg font-bold"
+                          style={{ color: "#3D3935" }}
+                        >
+                          {formatMoney(booking.total_amount)}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <p className="text-sm text-gray-500">Date</p>
+                          <p
+                            className="font-medium"
+                            style={{ color: "#3D3935" }}
                           >
+                            {formatDateLabel(booking.appointment_date)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Time</p>
+                          <p
+                            className="font-medium"
+                            style={{ color: "#3D3935" }}
+                          >
+                            {booking.appointment_time}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">People</p>
+                          <p
+                            className="font-medium"
+                            style={{ color: "#3D3935" }}
+                          >
+                            {booking.people_numbers}{" "}
+                            {booking.people_numbers === 1 ? "Person" : "People"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">District</p>
+                          <p
+                            className="font-medium"
+                            style={{ color: "#3D3935" }}
+                          >
+                            {booking.district || "-"}
+                          </p>
+                        </div>
+                        <div className="md:col-span-2">
+                          <p className="text-sm text-gray-500">Address</p>
+                          <p
+                            className="font-medium"
+                            style={{ color: "#3D3935" }}
+                          >
+                            {booking.address || "-"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Subtotal</p>
+                          <p
+                            className="font-medium"
+                            style={{ color: "#3D3935" }}
+                          >
+                            {formatMoney(booking.subtotal_amount)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500">Discount</p>
+                          <p
+                            className="font-medium"
+                            style={{ color: "#3D3935" }}
+                          >
+                            {formatMoney(booking.discount_amount)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {(booking.promo_code_code || booking.notes) && (
+                        <div
+                          className="mt-3 pt-3 border-t space-y-2"
+                          style={{ borderColor: "#DCD4CD" }}
+                        >
+                          {booking.promo_code_code && (
                             <p className="text-sm">
                               <span className="text-gray-500">
                                 Promo Code:{" "}
@@ -776,125 +878,213 @@ export function AdminUsers() {
                                   color: "#3D3935",
                                 }}
                               >
-                                {appointment.promoCode}
+                                {booking.promo_code_code}
                               </span>
                             </p>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  {selectedUser.appointmentHistory.filter(
-                    (a) => a.type === "session",
-                  )?.length === 0 && (
-                    <p className="text-gray-500 text-center py-4">
-                      No booking sessions found
-                    </p>
-                  )}
-                </div>
+                          )}
+                          {booking.notes && (
+                            <p className="text-sm">
+                              <span className="text-gray-500">Notes: </span>
+                              <span style={{ color: "#3D3935" }}>
+                                {booking.notes}
+                              </span>
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                {(bookingsUser.bookings?.length ?? 0) === 0 && (
+                  <p className="text-gray-500 text-center py-4">
+                    No bookings found
+                  </p>
+                )}
+              </div>
+            </Card>
+          </div>
+        </>
+      )}
+
+      {/* Workshops Modal */}
+      {workshopsUser && (
+        <>
+          <div
+            style={{ backgroundColor: "#000000d9" }}
+            className="fixed inset-0 z-40"
+            onClick={() => setWorkshopsUser(null)}
+          />
+
+          <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <Card
+              className="p-8 border-2"
+              style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="font-semibold" style={{ color: "#3D3935" }}>
+                  Workshops - {workshopsUser.full_name} (
+                  {workshopsUser.workshops?.length ?? 0})
+                </h2>
+                <button
+                  onClick={() => setWorkshopsUser(null)}
+                  className="w-8 h-8 flex items-center justify-center border-2 transition-colors hover:bg-gray-100"
+                  style={{
+                    borderColor: "#DCD4CD",
+                    color: "#3D3935",
+                    backgroundColor: "transparent",
+                  }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
 
-              {/* Training Sessions */}
-              <div>
-                <h3
-                  className="font-semibold mb-4 pb-2 border-b-2"
-                  style={{ color: "#3D3935", borderColor: "#DCD4CD" }}
-                >
-                  Training Sessions (
-                  {
-                    selectedUser.appointmentHistory.filter(
-                      (a) => a.type === "training",
-                    )?.length
-                  }
+              <div className="space-y-3">
+                {[...((workshopsUser.workshops as UserWorkshop[]) ?? [])]
+                  .sort(
+                    (a, b) =>
+                      new Date(b.created_at || 0).getTime() -
+                      new Date(a.created_at || 0).getTime(),
                   )
-                </h3>
-                <div className="space-y-3">
-                  {selectedUser.appointmentHistory
-                    .filter((appointment) => appointment.type === "training")
-                    .map((appointment) => (
+                  .map((workshop) => {
+                    const status = workshop.status || "";
+                    const paymentStatus = workshop.payment_status || "";
+                    const title =
+                      workshop.workshops?.title || "Workshop booking";
+
+                    return (
                       <div
-                        key={appointment.id}
+                        key={workshop.id}
                         className="p-4 border-2"
                         style={{ borderColor: "#DCD4CD" }}
                       >
-                        <div className="grid grid-cols-4 gap-4">
-                          <div>
-                            <p className="text-sm text-gray-500">Date</p>
+                        <div className="flex flex-wrap items-center gap-2 mb-4">
+                          <span
+                            className="px-3 py-1 text-sm font-semibold"
+                            style={getBookingStatusStyle(status)}
+                          >
+                            {WORKSHOP_BOOKING_STATUS_LABELS[
+                              status as WorkshopBookingStatus
+                            ] ||
+                              status ||
+                              "Unknown"}
+                          </span>
+                          <span
+                            className="px-3 py-1 text-sm font-semibold"
+                            style={getPaymentStatusStyle(paymentStatus)}
+                          >
+                            {WORKSHOP_PAYMENT_STATUS_LABELS[
+                              paymentStatus as WorkshopPaymentStatus
+                            ] ||
+                              paymentStatus ||
+                              "Unknown"}
+                          </span>
+                          {workshop.workshops?.price != null && (
+                            <span
+                              className="ml-auto text-lg font-bold"
+                              style={{ color: "#3D3935" }}
+                            >
+                              {formatMoney(workshop.workshops.price)}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div className="md:col-span-2">
+                            <p className="text-sm text-gray-500">Workshop</p>
                             <p
                               className="font-medium"
                               style={{ color: "#3D3935" }}
                             >
-                              {appointment.date}
+                              {title}
                             </p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Time</p>
+                            <p className="text-sm text-gray-500">
+                              Preferred Month
+                            </p>
                             <p
                               className="font-medium"
                               style={{ color: "#3D3935" }}
                             >
-                              {appointment.time}
+                              {workshop.preferred_month
+                                ? workshop.preferred_month
+                                    .charAt(0)
+                                    .toUpperCase() +
+                                  workshop.preferred_month.slice(1)
+                                : "-"}
                             </p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Service</p>
+                            <p className="text-sm text-gray-500">
+                              Scheduled Date
+                            </p>
                             <p
                               className="font-medium"
                               style={{ color: "#3D3935" }}
                             >
-                              {appointment.service}
+                              {formatDateLabel(workshop.scheduled_date)}
                             </p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Price</p>
+                            <p className="text-sm text-gray-500">Participant</p>
                             <p
                               className="font-medium"
                               style={{ color: "#3D3935" }}
                             >
-                              £{appointment.price}
+                              {workshop.participant_name || "-"}
                             </p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">People</p>
+                            <p className="text-sm text-gray-500">Phone</p>
                             <p
                               className="font-medium"
                               style={{ color: "#3D3935" }}
                             >
-                              {appointment.people}{" "}
-                              {appointment.people === 1 ? "Person" : "People"}
+                              {workshop.participant_phone || "-"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Email</p>
+                            <p
+                              className="font-medium"
+                              style={{ color: "#3D3935" }}
+                            >
+                              {workshop.participant_email || "-"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Booked On</p>
+                            <p
+                              className="font-medium"
+                              style={{ color: "#3D3935" }}
+                            >
+                              {formatDateLabel(workshop.created_at)}
                             </p>
                           </div>
                         </div>
-                        {appointment.promoCode && (
+
+                        {workshop.notes && (
                           <div
                             className="mt-3 pt-3 border-t"
                             style={{ borderColor: "#DCD4CD" }}
                           >
                             <p className="text-sm">
-                              <span className="text-gray-500">
-                                Promo Code:{" "}
-                              </span>
-                              <span
-                                className="font-semibold px-2 py-1"
-                                style={{
-                                  backgroundColor: "#E9CFCA",
-                                  color: "#3D3935",
-                                }}
-                              >
-                                {appointment.promoCode}
+                              <span className="text-gray-500">Notes: </span>
+                              <span style={{ color: "#3D3935" }}>
+                                {workshop.notes}
                               </span>
                             </p>
                           </div>
                         )}
                       </div>
-                    ))}
-                  {selectedUser.appointmentHistory.filter(
-                    (a) => a.type === "training",
-                  ).length === 0 && (
-                    <p className="text-gray-500 text-center py-4">
-                      No training sessions found
-                    </p>
-                  )}
-                </div>
+                    );
+                  })}
+
+                {(workshopsUser.workshops?.length ?? 0) === 0 && (
+                  <p className="text-gray-500 text-center py-4">
+                    No workshops found
+                  </p>
+                )}
               </div>
             </Card>
           </div>

@@ -21,7 +21,9 @@ export const getAllUsers = async (): Promise<User[]> => {
 
     const { data, error } = await supabase
       .from("users")
-      .select("*, user_notes(*), bookings!bookings_user_id_fkey(*)")
+      .select(
+        "*, user_notes(*), bookings!bookings_user_id_fkey(*), workshop_bookings(*, workshops(title, price))",
+      )
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -36,12 +38,13 @@ export const getAllUsers = async (): Promise<User[]> => {
 
     const validatedUsers =
       data?.map((user) => {
-        const { user_notes, ...rest } = user as any;
+        const { user_notes, workshop_bookings, ...rest } =
+          user as any;
         const validated = validateUser({
           ...rest,
           notes: user_notes ?? [],
           bookings: user.bookings ?? [],
-          workshops: user.workshops ?? [],
+          workshops: workshop_bookings ?? user.workshops ?? [],
         });
         console.log("✅ Validated user:", {
           name: validated.full_name,
@@ -50,6 +53,8 @@ export const getAllUsers = async (): Promise<User[]> => {
           postcode: validated.postcode,
           district: validated.district,
           notesCount: validated.notes?.length ?? 0,
+          bookingsCount: validated.bookings?.length ?? 0,
+          workshopsCount: validated.workshops?.length ?? 0,
         });
         return validated;
       }) || [];
