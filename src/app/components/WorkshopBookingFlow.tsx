@@ -34,6 +34,7 @@ import {
 import {
   updateUser,
 } from "../src/lib/db/users";
+import { isPlaceholderFullName } from "../src/lib/auth/profile-sync";
 import { User as AppUser } from "../src/schema/user.schema";
 
 interface WorkshopBookingFlowProps {
@@ -112,11 +113,17 @@ export function WorkshopBookingFlow({
   const [isSavingParticipant, setIsSavingParticipant] = useState(false);
 
   const prefillFromProfile = useCallback((userProfile: AppUser) => {
+    const profileName = isPlaceholderFullName(
+      userProfile.full_name,
+      userProfile.phone,
+    )
+      ? ""
+      : userProfile.full_name;
     setBookingData((prev) => ({
       ...prev,
       user_id: userProfile.id ?? "",
       participant_phone: userProfile.phone?.replaceAll(" ", "") ?? "",
-      participant_name: prev.participant_name || userProfile.full_name,
+      participant_name: prev.participant_name || profileName,
       participant_email: prev.participant_email || userProfile.email || "",
     }));
   }, []);

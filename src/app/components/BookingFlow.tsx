@@ -11,13 +11,7 @@ import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Calendar } from "./ui/calendar";
 import { Card, CardContent } from "./ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
+
 import {
   Dropdown,
   DropdownTrigger,
@@ -29,7 +23,10 @@ import { VisuallyHidden } from "./ui/visually-hidden";
 import { Separator } from "./ui/separator";
 import { PhoneAuthForm } from "../src/components/auth/PhoneAuthForm";
 import { useAuth } from "../src/hooks/useAuth";
-import { parseAddressFromProfile } from "../src/lib/auth/profile-sync";
+import {
+  isPlaceholderFullName,
+  parseAddressFromProfile,
+} from "../src/lib/auth/profile-sync";
 import {
   COUNTRY_CODES,
   parsePhoneParts,
@@ -212,13 +209,17 @@ export function BookingFlow({
   const [isServicesLoading, setIsServicesLoading] = useState(false);
 
   const prefillFromProfile = useCallback((userProfile: AppUser) => {
-    const { houseNumber, street } = parseAddressFromProfile(userProfile.address);
+    const { houseNumber, street } = parseAddressFromProfile(
+      userProfile.address,
+    );
     const { countryCodeId, phoneNumber } = parsePhoneParts(userProfile.phone);
     setExistingUserAddress(userProfile.address || "");
     setBookingData((prev) => ({
       ...prev,
       user_id: userProfile.id ?? "",
-      name: userProfile.full_name,
+      name: isPlaceholderFullName(userProfile.full_name, userProfile.phone)
+        ? ""
+        : userProfile.full_name,
       countryCode: countryCodeId,
       phoneNumber,
       district: userProfile.district || "",
@@ -447,7 +448,6 @@ export function BookingFlow({
       if (bookingData.user_id) {
         await updateUser({
           id: bookingData.user_id,
-          full_name: bookingData.name,
           address: `${bookingData.houseNumber} ${bookingData.street}`,
           district: bookingData.district,
         });
@@ -774,8 +774,7 @@ export function BookingFlow({
 
       await updateUser({
         id: bookingData.user_id,
-        full_name: bookingData.name,
-        address: `${bookingData.houseNumber} ${bookingData.street}, ${bookingData.district}`,
+        address: `${bookingData.houseNumber} ${bookingData.street}`,
         district: bookingData.district,
       });
 

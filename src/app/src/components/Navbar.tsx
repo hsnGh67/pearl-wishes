@@ -1,10 +1,11 @@
 import logo from 'figma:asset/de725b32570940ed7773a5a87deed14a098ee089.png';
-import { Menu, X, Phone, Settings, LogOut } from 'lucide-react';
+import { Menu, X, Phone, Settings, LogOut, LogIn } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../../components/ui/button';
 import { BookingFlow } from '../../components/BookingFlow';
 import { useAuth } from '../hooks/useAuth';
+import { isPlaceholderFullName } from '../lib/auth/profile-sync';
 import { PhoneAuthDialog } from './auth/PhoneAuthDialog';
 import {
   Dialog,
@@ -86,6 +87,7 @@ export function Navbar() {
             >
               <Phone className="h-5 w-5" />
             </Button>
+            {isAuthenticated && (
             <Button 
               variant="outline"
               style={{ 
@@ -100,18 +102,13 @@ export function Navbar() {
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'linear-gradient(to right, #FCEAE0, #EACAB8)';
               }}
-              onClick={() => isAuthenticated ? signOut() : setLoginOpen(true)}
+              onClick={() => signOut()}
             >
-              {isAuthenticated ? (
-                <>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sign Out
-                </>
-              ) : (
-                'Sign In'
-              )}
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign Out
             </Button>
-            {isAdmin && (
+            )}
+            {(!isAuthenticated || isAdmin) && (
             <Button 
               variant="outline"
               size="icon"
@@ -127,10 +124,14 @@ export function Navbar() {
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'linear-gradient(to right, #FCEAE0, #EACAB8)';
               }}
-              onClick={() => navigate('/admin')}
-              title="Admin Panel"
+              onClick={() => isAdmin ? navigate('/admin') : setLoginOpen(true)}
+              title={isAdmin ? 'Admin Panel' : 'Sign In'}
             >
-              <Settings className="h-5 w-5" />
+              {isAdmin ? (
+                <Settings className="h-5 w-5" />
+              ) : (
+                <LogIn className="h-5 w-5" />
+              )}
             </Button>
             )}
             <Button 
@@ -229,7 +230,7 @@ export function Navbar() {
                 setIsOpen(false);
               }}
             >
-              Sign Out{profile?.full_name ? ` (${profile.full_name})` : ''}
+              Sign Out{profile?.full_name && !isPlaceholderFullName(profile.full_name, profile.phone) ? ` (${profile.full_name})` : ''}
             </button>
             )}
             <div className="pt-2">

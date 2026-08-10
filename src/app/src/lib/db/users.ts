@@ -339,7 +339,17 @@ export const updateUser = async (userData: UserUpdate): Promise<User> => {
       data: { id: validatedData.id },
     });
 
-    const { id, ...updateFields } = validatedData;
+    const { id, ...validatedFields } = validatedData;
+
+    // Only patch keys the caller explicitly provided (avoids schema defaults
+    // like role: "client" silently overwriting existing columns).
+    const updateFields = Object.fromEntries(
+      Object.entries(validatedFields).filter(
+        ([key]) =>
+          key in userData &&
+          userData[key as keyof UserUpdate] !== undefined,
+      ),
+    );
 
     const { data, error } = await supabase
       .from("users")

@@ -102,7 +102,11 @@ export type UserCreate = z.infer<typeof UserCreateSchema>;
  */
 export const UserUpdateSchema = UserSchema.partial()
   .required({ id: true })
-  .omit({ bookings: true, workshops: true, notes: true });
+  .omit({ bookings: true, workshops: true, notes: true })
+  .extend({
+    // Optional without default — otherwise omitted role becomes "client" on every update
+    role: z.nativeEnum(UserRole).optional(),
+  });
 
 export type UserUpdate = z.infer<typeof UserUpdateSchema>;
 

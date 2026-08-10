@@ -1,10 +1,11 @@
 import logo from "figma:asset/de725b32570940ed7773a5a87deed14a098ee089.png";
-import { Menu, X, Phone, Settings, LogOut } from "lucide-react";
+import { Menu, X, Phone, Settings, LogOut, LogIn } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "../../../components/ui/button";
 import { BookingFlow } from "../../../components/BookingFlow";
 import { useAuth } from "../../hooks/useAuth";
+import { isPlaceholderFullName } from "../../lib/auth/profile-sync";
 import { PhoneAuthDialog } from "../auth/PhoneAuthDialog";
 import {
   Dialog,
@@ -106,34 +107,30 @@ export function WorkshopsNavbar() {
             >
               <Phone className="h-5 w-5" />
             </Button>
-            <Button
-              variant="outline"
-              style={{
-                background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
-                borderColor: "#3D3935",
-                color: "#3D3935",
-              }}
-              className="border-2 transition-all"
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background =
-                  "linear-gradient(to right, #EACAB8, #D0A096)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background =
-                  "linear-gradient(to right, #FCEAE0, #EACAB8)";
-              }}
-              onClick={() => (isAuthenticated ? signOut() : setLoginOpen(true))}
-            >
-              {isAuthenticated ? (
-                <>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  Sign Out
-                </>
-              ) : (
-                "Sign In"
-              )}
-            </Button>
-            {isAdmin && (
+            {isAuthenticated && (
+              <Button
+                variant="outline"
+                style={{
+                  background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                  borderColor: "#3D3935",
+                  color: "#3D3935",
+                }}
+                className="border-2 transition-all"
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background =
+                    "linear-gradient(to right, #EACAB8, #D0A096)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background =
+                    "linear-gradient(to right, #FCEAE0, #EACAB8)";
+                }}
+                onClick={() => signOut()}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Sign Out
+              </Button>
+            )}
+            {(!isAuthenticated || isAdmin) && (
               <Button
                 variant="outline"
                 size="icon"
@@ -151,10 +148,16 @@ export function WorkshopsNavbar() {
                   e.currentTarget.style.background =
                     "linear-gradient(to right, #FCEAE0, #EACAB8)";
                 }}
-                onClick={() => navigate("/admin")}
-                title="Admin Panel"
+                onClick={() =>
+                  isAdmin ? navigate("/admin") : setLoginOpen(true)
+                }
+                title={isAdmin ? "Admin Panel" : "Sign In"}
               >
-                <Settings className="h-5 w-5" />
+                {isAdmin ? (
+                  <Settings className="h-5 w-5" />
+                ) : (
+                  <LogIn className="h-5 w-5" />
+                )}
               </Button>
             )}
             <Button
@@ -258,7 +261,7 @@ export function WorkshopsNavbar() {
                   setIsOpen(false);
                 }}
               >
-                Sign Out{profile?.full_name ? ` (${profile.full_name})` : ""}
+                Sign Out{profile?.full_name && !isPlaceholderFullName(profile.full_name, profile.phone) ? ` (${profile.full_name})` : ""}
               </button>
             )}
             <div className="pt-2">
