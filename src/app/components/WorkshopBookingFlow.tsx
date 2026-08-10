@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -18,19 +18,9 @@ import {
 import { Separator } from "./ui/separator";
 import { VisuallyHidden } from "./ui/visually-hidden";
 import { Textarea } from "./ui/textarea";
+import { PhoneAuthForm } from "../src/components/auth/PhoneAuthForm";
+import { useAuth } from "../src/hooks/useAuth";
 import { createWorkshopBooking } from "../src/lib/db/workshop-bookings";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from "./ui/input-otp";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "./ui/select";
 import {
   WorkshopBookingCreate,
   WorkshopBookingStatus,
@@ -42,30 +32,15 @@ import {
   WorkshopDisplay,
 } from "../src/schema/workshop.schema";
 import {
-  createUser,
-  getUserByPhone,
+  updateUser,
 } from "../src/lib/db/users";
-import { UserCreate } from "../src/schema/user.schema";
+import { User as AppUser } from "../src/schema/user.schema";
 
 interface WorkshopBookingFlowProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   workshop: WorkshopDisplay;
 }
-
-const countryCodes = [
-  { id: "uk-44", code: "+44", country: "United Kingdom" },
-  { id: "us-1", code: "+1", country: "United States" },
-  { id: "fr-33", code: "+33", country: "France" },
-  { id: "de-49", code: "+49", country: "Germany" },
-  { id: "it-39", code: "+39", country: "Italy" },
-  { id: "es-34", code: "+34", country: "Spain" },
-  { id: "pt-351", code: "+351", country: "Portugal" },
-  { id: "nl-31", code: "+31", country: "Netherlands" },
-  { id: "be-32", code: "+32", country: "Belgium" },
-  { id: "ch-41", code: "+41", country: "Switzerland" },
-  { id: "ie-353", code: "+353", country: "Ireland" },
-];
 
 type BookingStep =
   | "overview"
@@ -119,9 +94,7 @@ export function WorkshopBookingFlow({
   workshop,
 }: WorkshopBookingFlowProps) {
   const [step, setStep] = useState<BookingStep>("overview");
-  const [otpCode, setOtpCode] = useState("");
-  const [countryCode, setCountryCode] = useState("uk-44");
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const { isAuthenticated, profile } = useAuth();
   const [bookingData, setBookingData] =
     useState<WorkshopBookingCreate>({
       workshop_id: workshop.id,
@@ -136,7 +109,23 @@ export function WorkshopBookingFlow({
       notes: "",
     });
   const [receiptNumber, setReceiptNumber] = useState("");
-  const [isAddingNewUser, setIsAddingNewUser] = useState(false);
+  const [isSavingParticipant, setIsSavingParticipant] = useState(false);
+
+  const prefillFromProfile = useCallback((userProfile: AppUser) => {
+    setBookingData((prev) => ({
+      ...prev,
+      user_id: userProfile.id ?? "",
+      participant_phone: userProfile.phone?.replaceAll(" ", "") ?? "",
+      participant_name: prev.participant_name || userProfile.full_name,
+      participant_email: prev.participant_email || userProfile.email || "",
+    }));
+  }, []);
+
+  useEffect(() => {
+    if (open && isAuthenticated && profile && step === "participant") {
+      prefillFromProfile(profile);
+    }
+  }, [open, isAuthenticated, profile, step, prefillFromProfile]);
 
   const handleClose = () => {
     setStep("overview");
@@ -151,74 +140,33 @@ export function WorkshopBookingFlow({
       payment_intent_id: "",
       notes: "",
     });
-    setIsAddingNewUser(false);
+    setIsSavingParticipant(false);
     setReceiptNumber("");
-    setOtpCode("");
-    setPhoneNumber("");
-    setCountryCode("uk-44");
     onOpenChange(false);
   };
 
-  const handlePhoneSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsAddingNewUser(true);
-    if (phoneNumber && otpCode.length === 6) {
-      const zipCode =
-        countryCodes.find((c) => c.id === countryCode)?.code ||
-        "";
-      const userPhone = `${zipCode}${phoneNumber.replaceAll(" ", "")}`;
-      // Check if user exists in database
-      let existingUser = await getUserByPhone(userPhone);
-      if (existingUser) {
-        console.log(
-          "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-          existingUser,
-        );
-        // Autofill user data
-
-        setBookingData({
-          ...bookingData,
-          participant_phone: userPhone.replaceAll(" ", ""),
-          user_id: existingUser.id,
-        });
-        setStep("review");
-        setIsAddingNewUser(false);
-      } else {
-        await handleCreateUser({
-          full_name: bookingData.participant_name,
-          phone: userPhone.replaceAll(" ", ""),
-          email: bookingData.participant_email,
-          address: "",
-          district: "",
-          role: "client",
-        });
-      }
+  const handleParticipantContinue = async () => {
+    if (
+      !bookingData.user_id ||
+      !bookingData.participant_name ||
+      !bookingData.participant_email
+    ) {
+      return;
     }
-  };
 
-  const handleCreateUser = async (userData: UserCreate) => {
+    setIsSavingParticipant(true);
     try {
-      const existingUser = await createUser(userData);
-      console.log("user created ===>", existingUser);
-      setBookingData({
-        ...bookingData,
-        participant_phone: existingUser.phone.replaceAll(
-          " ",
-          "",
-        ),
-        participant_email: existingUser.email,
-        user_id: existingUser.id,
+      await updateUser({
+        id: bookingData.user_id,
+        full_name: bookingData.participant_name,
+        email: bookingData.participant_email,
       });
-      setIsAddingNewUser(false);
       setStep("review");
-    } catch (e) {
-      console.log("error creating user ===>", e);
-      const error = e as { details: string };
-      setIsAddingNewUser(false);
-      alert(
-        error?.details ||
-          "Failed to create user. Please try again.",
-      );
+    } catch (error) {
+      console.error("Failed to update participant profile:", error);
+      alert("Failed to save your details. Please try again.");
+    } finally {
+      setIsSavingParticipant(false);
     }
   };
 
@@ -635,17 +583,21 @@ export function WorkshopBookingFlow({
             <DialogHeader>
               <DialogTitle>Participant Information</DialogTitle>
               <DialogDescription>
-                Enter your contact details for workshop
+                Verify your phone and enter your contact details for workshop
                 coordination
               </DialogDescription>
             </DialogHeader>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handlePhoneSubmit(e);
-              }}
-              className="py-4 space-y-6"
-            >
+            <div className="py-4 space-y-6">
+              <PhoneAuthForm
+                variant="embedded"
+                title="Phone Verification"
+                description="Verify your WhatsApp number to continue"
+                submitLabel="Verify phone"
+                onSuccess={(userProfile) => {
+                  prefillFromProfile(userProfile);
+                }}
+              />
+
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="fullName">Full Name</Label>
@@ -662,77 +614,6 @@ export function WorkshopBookingFlow({
                     }
                     required
                   />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="whatsapp">
-                    WhatsApp Number
-                  </Label>
-                  <div className="flex gap-2">
-                    <Select
-                      value={countryCode}
-                      onValueChange={(value) => {
-                        console.log("Country", value);
-                        setCountryCode(value);
-                      }}
-                    >
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {countryCodes.map((item) => (
-                          <SelectItem
-                            key={item.id}
-                            value={item.id}
-                          >
-                            {item.code} {item.country}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      id="phone"
-                      type="tel"
-                      placeholder="7XXX XXXXXX"
-                      value={phoneNumber}
-                      onChange={(e) =>
-                        setPhoneNumber(e.target.value)
-                      }
-                      className="flex-1"
-                      required
-                    />
-                  </div>
-                  <p
-                    className="text-xs"
-                    style={{ color: "#3D3935", opacity: 0.6 }}
-                  >
-                    We'll use WhatsApp to coordinate final
-                    workshop details
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="otp">Verification Code</Label>
-                  <div className="flex justify-center">
-                    <InputOTP
-                      maxLength={6}
-                      value={otpCode}
-                      onChange={(value: string) =>
-                        setOtpCode(value)
-                      }
-                    >
-                      <InputOTPGroup>
-                        <InputOTPSlot index={0} />
-                        <InputOTPSlot index={1} />
-                        <InputOTPSlot index={2} />
-                        <InputOTPSlot index={3} />
-                        <InputOTPSlot index={4} />
-                        <InputOTPSlot index={5} />
-                      </InputOTPGroup>
-                    </InputOTP>
-                  </div>
-                  <p className="text-sm text-gray-500 text-center">
-                    Enter the 6-digit code to verify your number
-                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -781,98 +662,46 @@ export function WorkshopBookingFlow({
                   Back
                 </Button>
                 <Button
-                  type="submit"
+                  type="button"
                   className="flex-1 transition-all"
                   style={{
                     backgroundColor:
                       bookingData.participant_name &&
-                      phoneNumber &&
-                      otpCode &&
-                      bookingData.participant_email
+                      bookingData.participant_email &&
+                      bookingData.user_id
                         ? "#3D3935"
                         : "#DCD4CD",
                     background:
                       bookingData.participant_name &&
-                      phoneNumber &&
-                      otpCode &&
-                      bookingData.participant_email
+                      bookingData.participant_email &&
+                      bookingData.user_id
                         ? "#3D3935"
                         : "#DCD4CD",
                     color:
                       bookingData.participant_name &&
-                      phoneNumber &&
-                      otpCode &&
-                      bookingData.participant_email
+                      bookingData.participant_email &&
+                      bookingData.user_id
                         ? "transparent"
                         : "#3D3935",
                     cursor:
                       bookingData.participant_name &&
-                      phoneNumber &&
-                      otpCode &&
-                      bookingData.participant_email
+                      bookingData.participant_email &&
+                      bookingData.user_id
                         ? "pointer"
                         : "not-allowed",
                   }}
-                  onMouseEnter={(
-                    e: React.MouseEvent<HTMLButtonElement>,
-                  ) => {
-                    if (
-                      bookingData.participant_name &&
-                      phoneNumber &&
-                      otpCode &&
-                      bookingData.participant_email
-                    ) {
-                      e.currentTarget.style.backgroundColor =
-                        "#1F1F1F";
-                      e.currentTarget.style.background =
-                        "#1F1F1F";
-                    }
-                  }}
-                  onMouseLeave={(
-                    e: React.MouseEvent<HTMLButtonElement>,
-                  ) => {
-                    if (
-                      bookingData.participant_name &&
-                      phoneNumber &&
-                      otpCode &&
-                      bookingData.participant_email
-                    ) {
-                      e.currentTarget.style.backgroundColor =
-                        "#3D3935";
-                      e.currentTarget.style.background =
-                        "#3D3935";
-                    }
-                  }}
+                  onClick={handleParticipantContinue}
                   disabled={
                     !bookingData.participant_name ||
-                    !otpCode ||
-                    !phoneNumber ||
                     !bookingData.participant_email ||
-                    isAddingNewUser
+                    !bookingData.user_id ||
+                    isSavingParticipant
                   }
                 >
-                  {otpCode &&
-                  phoneNumber &&
-                  bookingData.participant_email &&
-                  !isAddingNewUser ? (
-                    <span
-                      style={{
-                        background:
-                          "linear-gradient(to right, #FCEAE0, #EACAB8)",
-                        WebkitBackgroundClip: "text",
-                        backgroundClip: "text",
-                        WebkitTextFillColor: "transparent",
-                        color: "transparent",
-                      }}
-                    >
-                      Continue
-                    </span>
-                  ) : (
-                    "Checking..."
-                  )}
+                  {isSavingParticipant ? "Saving..." : "Continue"}
                 </Button>
               </div>
-            </form>
+            </div>
           </>
         )}
 

@@ -422,6 +422,76 @@ export const getUserByPhone = async (phone: string): Promise<User | null> => {
 };
 
 /**
+ * Get user by Supabase Auth ID
+ */
+export const getUserByAuthId = async (authId: string): Promise<User | null> => {
+  try {
+    dbLogger.info("Fetching user by auth_id", {
+      table: "users",
+      data: { authId },
+    });
+
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("auth_id", authId)
+      .maybeSingle();
+
+    if (error) {
+      dbLogger.error("Failed to fetch user by auth_id", {
+        table: "users",
+        error,
+      });
+      throw error;
+    }
+
+    if (!data) {
+      return null;
+    }
+
+    return validateUser(data);
+  } catch (error) {
+    dbLogger.error("Error in getUserByAuthId", { error });
+    throw error;
+  }
+};
+
+/**
+ * Link an existing profile to a Supabase Auth user
+ */
+export const linkAuthId = async (
+  userId: string,
+  authId: string,
+): Promise<User> => {
+  try {
+    dbLogger.info("Linking auth_id to user", {
+      table: "users",
+      data: { userId, authId },
+    });
+
+    const { data, error } = await supabase
+      .from("users")
+      .update({ auth_id: authId })
+      .eq("id", userId)
+      .select()
+      .single();
+
+    if (error) {
+      dbLogger.error("Failed to link auth_id", {
+        table: "users",
+        error,
+      });
+      throw error;
+    }
+
+    return validateUser(data);
+  } catch (error) {
+    dbLogger.error("Error in linkAuthId", { error });
+    throw error;
+  }
+};
+
+/**
  * Add a note to a user
  */
 export const addUserNote = async (

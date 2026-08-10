@@ -1,8 +1,11 @@
-import { Outlet, Link, useLocation } from 'react-router';
+import { Outlet, Link, useLocation, useNavigate } from 'react-router';
 import { Users, Calendar, CreditCard, FileText, LayoutDashboard, LogOut, Scissors, Sparkles, Tag } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
 export function AdminLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
 
   const menuItems = [
     { path: '/admin', label: 'Dashboard', icon: LayoutDashboard },
@@ -67,7 +70,22 @@ export function AdminLayout() {
         </nav>
 
         {/* Logout */}
-        <div className="p-4 border-t-2" style={{ borderColor: '#3D3935' }}>
+        <div className="p-4 border-t-2 space-y-2" style={{ borderColor: '#3D3935' }}>
+          <button
+            type="button"
+            onClick={async () => {
+              await signOut();
+              navigate('/');
+            }}
+            className="flex w-full items-center gap-3 px-4 py-3 border-2 hover:border-gray-400 transition-all"
+            style={{
+              borderColor: '#DCD4CD',
+              color: '#3D3935',
+            }}
+          >
+            <LogOut className="w-5 h-5" />
+            <span>Sign Out</span>
+          </button>
           <Link
             to="/"
             className="flex items-center gap-3 px-4 py-3 border-2 hover:border-gray-400 transition-all"
@@ -76,7 +94,6 @@ export function AdminLayout() {
               color: '#3D3935',
             }}
           >
-            <LogOut className="w-5 h-5" />
             <span>Back to Website</span>
           </Link>
         </div>

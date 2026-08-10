@@ -525,6 +525,9 @@ export function AdminUsers() {
                         <Phone className="w-4 h-4" />
                         {user.phone || "N/A"}
                       </div>
+                      <div className="text-xs text-gray-500">
+                        Auth: {user.auth_id ? "Linked" : "Not linked"}
+                      </div>
                     </div>
                   </td>
                   <td className="p-4">

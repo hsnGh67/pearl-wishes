@@ -38,6 +38,7 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
  */
 export const UserSchema = z.object({
   id: z.string().uuid().optional(),
+  auth_id: z.string().uuid().nullable().optional(),
   email: z
     .string()
     .regex(
@@ -89,6 +90,9 @@ export const UserCreateSchema = UserSchema.omit({
   id: true,
   created_at: true,
   updated_at: true,
+  bookings: true,
+  workshops: true,
+  notes: true,
 });
 
 export type UserCreate = z.infer<typeof UserCreateSchema>;
@@ -96,9 +100,9 @@ export type UserCreate = z.infer<typeof UserCreateSchema>;
 /**
  * User Update Input
  */
-export const UserUpdateSchema = UserSchema.partial().required({
-  id: true,
-});
+export const UserUpdateSchema = UserSchema.partial()
+  .required({ id: true })
+  .omit({ bookings: true, workshops: true, notes: true });
 
 export type UserUpdate = z.infer<typeof UserUpdateSchema>;
 

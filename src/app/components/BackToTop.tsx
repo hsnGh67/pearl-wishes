@@ -32,18 +32,17 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { Separator } from "./ui/separator";
-import {
-  InputOTP,
-  InputOTPGroup,
-  InputOTPSlot,
-} from "./ui/input-otp";
+import { PhoneAuthForm } from "../src/components/auth/PhoneAuthForm";
+import { useAuth } from "../src/hooks/useAuth";
+import { parseAddressFromProfile } from "../src/lib/auth/profile-sync";
+import { COUNTRY_CODES } from "../src/lib/constants/country-codes";
+import { User as AppUser } from "../src/schema/user.schema";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "./ui/collapsible";
 import { VisuallyHidden } from "./ui/visually-hidden";
-import { findUserByPhone } from "../src/data/users";
 import {
   getBookedTimesForDate,
   type BookedTimeSlot,
@@ -54,10 +53,7 @@ import {
   PaymentStatus,
 } from "../src/schema/booking.schema";
 import { createBookingWithTreatments } from "../src/lib/db/booking-with-treatments";
-import {
-  createUser,
-  getUserByPhone,
-} from "../src/lib/db/users";
+import { createUser, updateUser } from "../src/lib/db/users";
 import { getActiveServices } from "../src/lib/db/services";
 
 interface BookingFlowProps {
@@ -91,10 +87,10 @@ interface ServiceBooking {
 }
 
 interface BookingData {
+  user_id: string;
   name: string;
   countryCode: string;
   phoneNumber: string;
-  otpCode: string;
   district: string;
   street: string;
   houseNumber: string;
@@ -128,20 +124,6 @@ const addOns = [
     duration: 20,
     description: "Safe removal of existing gel polish",
   },
-];
-
-const countryCodes = [
-  { id: "uk-44", code: "+44", country: "United Kingdom" },
-  { id: "us-1", code: "+1", country: "United States" },
-  { id: "fr-33", code: "+33", country: "France" },
-  { id: "de-49", code: "+49", country: "Germany" },
-  { id: "it-39", code: "+39", country: "Italy" },
-  { id: "es-34", code: "+34", country: "Spain" },
-  { id: "pt-351", code: "+351", country: "Portugal" },
-  { id: "nl-31", code: "+31", country: "Netherlands" },
-  { id: "be-32", code: "+32", country: "Belgium" },
-  { id: "ch-41", code: "+41", country: "Switzerland" },
-  { id: "ie-353", code: "+353", country: "Ireland" },
 ];
 
 const londonDistricts = [
@@ -237,16 +219,17 @@ export function BookingFlow({
   open,
   onOpenChange,
 }: BookingFlowProps) {
+  const { isAuthenticated, profile } = useAuth();
   const [getTimeSlotsState, setGetTimeSlotsState] = useState({
     isLoading: false,
     hasError: false,
   });
   const [step, setStep] = useState<BookingStep>("phone");
   const [bookingData, setBookingData] = useState<BookingData>({
+    user_id: "",
     name: "",
     countryCode: "uk-44",
     phoneNumber: "",
-    otpCode: "",
     district: "",
     street: "",
     houseNumber: "",
@@ -291,6 +274,26 @@ export function BookingFlow({
   >([]);
   const [isServicesLoading, setIsServicesLoading] =
     useState(false);
+
+  const prefillFromProfile = useCallback((userProfile: AppUser) => {
+    const { houseNumber, street } = parseAddressFromProfile(userProfile.address);
+    setExistingUserAddress(userProfile.address || "");
+    setBookingData((prev) => ({
+      ...prev,
+      user_id: userProfile.id ?? "",
+      name: userProfile.full_name,
+      district: userProfile.district || "",
+      street,
+      houseNumber,
+    }));
+  }, []);
+
+  useEffect(() => {
+    if (open && isAuthenticated && profile && step === "phone") {
+      prefillFromProfile(profile);
+      setStep("address");
+    }
+  }, [open, isAuthenticated, profile, step, prefillFromProfile]);
 
   // Payment & Booking Saving State
   const [paymentState, setPaymentState] = useState({
@@ -462,45 +465,6 @@ export function BookingFlow({
       peopleLevelGaps;
 
     return { totalPrice, totalDuration };
-  };
-
-  const handlePhoneSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (
-      bookingData.phoneNumber &&
-      bookingData.otpCode.length === 6
-    ) {
-      // Check if user exists in database
-      const existingUser = findUserByPhone(
-        bookingData.phoneNumber,
-      );
-      if (existingUser) {
-        // Autofill user data
-        setExistingUserAddress(existingUser.address);
-
-        // Parse address like "123 Oxford Street, London, W1D 2HG"
-        const addressParts = existingUser.address.split(",");
-        let houseNum = "";
-        let streetName = "";
-
-        if (addressParts.length >= 2) {
-          const streetPart = addressParts[0].trim(); // "123 Oxford Street"
-          const match = streetPart.match(/^(\d+)\s+(.+)$/);
-          if (match) {
-            houseNum = match[1]; // "123"
-            streetName = match[2]; // "Oxford Street"
-          }
-        }
-
-        setBookingData({
-          ...bookingData,
-          name: existingUser.name,
-          houseNumber: houseNum,
-          street: streetName,
-        });
-      }
-      setStep("address");
-    }
   };
 
   const handleDistrictSelect = (district: string) => {
@@ -765,7 +729,7 @@ export function BookingFlow({
 
       try {
         const zipCode =
-          countryCodes.find(
+          COUNTRY_CODES.find(
             (c) => c.id === bookingData.countryCode,
           )?.code || "";
         console.log("zipCode ==>", zipCode);
@@ -883,10 +847,10 @@ export function BookingFlow({
   const handleClose = () => {
     setStep("phone");
     setBookingData({
+      user_id: "",
       name: "",
       countryCode: "uk-44",
       phoneNumber: "",
-      otpCode: "",
       district: "",
       street: "",
       houseNumber: "",
@@ -924,152 +888,16 @@ export function BookingFlow({
         </VisuallyHidden>
         {/* Step 1: Phone & OTP */}
         {step === "phone" && (
-          <>
-            <DialogHeader>
-              <DialogTitle>Phone Verification</DialogTitle>
-              <DialogDescription>
-                Enter your phone number to get started
-              </DialogDescription>
-            </DialogHeader>
-            <form
-              onSubmit={handlePhoneSubmit}
-              className="space-y-6 py-4"
-            >
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <div className="flex gap-2">
-                  <Select
-                    value={bookingData.countryCode}
-                    onValueChange={(value) => {
-                      console.log("Country", value);
-                      setBookingData({
-                        ...bookingData,
-                        countryCode: value,
-                      });
-                    }}
-                  >
-                    <SelectTrigger className="w-[140px]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {countryCodes.map((item) => (
-                        <SelectItem
-                          key={item.id}
-                          value={item.id}
-                        >
-                          {item.code} {item.country}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    placeholder="7XXX XXXXXX"
-                    value={bookingData.phoneNumber}
-                    onChange={(e) =>
-                      setBookingData({
-                        ...bookingData,
-                        phoneNumber: e.target.value,
-                      })
-                    }
-                    className="flex-1"
-                    required
-                  />
-                </div>
-                <p className="text-sm text-gray-500">
-                  We'll send you a verification code to confirm
-                  your booking
-                </p>
-              </div>
-
-              <Separator />
-
-              <div className="space-y-2">
-                <Label htmlFor="otp">Verification Code</Label>
-                <div className="flex justify-center">
-                  <InputOTP
-                    maxLength={6}
-                    value={bookingData.otpCode}
-                    onChange={(value) =>
-                      setBookingData({
-                        ...bookingData,
-                        otpCode: value,
-                      })
-                    }
-                  >
-                    <InputOTPGroup>
-                      <InputOTPSlot index={0} />
-                      <InputOTPSlot index={1} />
-                      <InputOTPSlot index={2} />
-                      <InputOTPSlot index={3} />
-                      <InputOTPSlot index={4} />
-                      <InputOTPSlot index={5} />
-                    </InputOTPGroup>
-                  </InputOTP>
-                </div>
-                <p className="text-sm text-gray-500 text-center">
-                  Enter the 6-digit code to verify your number
-                </p>
-              </div>
-              <Button
-                type="submit"
-                className="w-full transition-all"
-                style={{
-                  backgroundColor:
-                    bookingData.otpCode.length === 6
-                      ? "#3D3935"
-                      : "#DCD4CD",
-                  background:
-                    bookingData.otpCode.length === 6
-                      ? "#3D3935"
-                      : "#DCD4CD",
-                  color:
-                    bookingData.otpCode.length === 6
-                      ? "transparent"
-                      : "#3D3935",
-                  cursor:
-                    bookingData.otpCode.length === 6
-                      ? "pointer"
-                      : "not-allowed",
-                }}
-                onMouseEnter={(e) => {
-                  if (bookingData.otpCode.length === 6) {
-                    e.currentTarget.style.backgroundColor =
-                      "#1F1F1F";
-                    e.currentTarget.style.background =
-                      "#1F1F1F";
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (bookingData.otpCode.length === 6) {
-                    e.currentTarget.style.backgroundColor =
-                      "#3D3935";
-                    e.currentTarget.style.background =
-                      "#3D3935";
-                  }
-                }}
-                disabled={bookingData.otpCode.length !== 6}
-              >
-                {bookingData.otpCode.length === 6 ? (
-                  <span
-                    style={{
-                      background:
-                        "linear-gradient(to right, #FCEAE0, #EACAB8)",
-                      WebkitBackgroundClip: "text",
-                      backgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      color: "transparent",
-                    }}
-                  >
-                    Continue
-                  </span>
-                ) : (
-                  "Continue"
-                )}
-              </Button>
-            </form>
-          </>
+          <PhoneAuthForm
+            variant="embedded"
+            title="Phone Verification"
+            description="Verify your number to continue booking"
+            submitLabel="Continue"
+            onSuccess={(userProfile) => {
+              prefillFromProfile(userProfile);
+              setStep("address");
+            }}
+          />
         )}
 
         {/* Step 2: Address Selection */}
@@ -2677,7 +2505,7 @@ export function BookingFlow({
                         style={{ color: "#3D3935" }}
                       >
                         {
-                          countryCodes.find(
+                          COUNTRY_CODES.find(
                             (c) =>
                               c.id === bookingData.countryCode,
                           )?.code
@@ -3251,7 +3079,7 @@ export function BookingFlow({
                     <span className="text-gray-600">Phone</span>
                     <span className="text-gray-800">
                       {
-                        countryCodes.find(
+                        COUNTRY_CODES.find(
                           (c) =>
                             c.id === bookingData.countryCode,
                         )?.code
@@ -3313,7 +3141,7 @@ export function BookingFlow({
                   Thank you, {bookingData.name}! A confirmation
                   has been sent to{" "}
                   {
-                    countryCodes.find(
+                    COUNTRY_CODES.find(
                       (c) => c.id === bookingData.countryCode,
                     )?.code
                   }{" "}
