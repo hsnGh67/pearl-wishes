@@ -32,3 +32,29 @@ export function toE164(countryCodeId: string, phoneNumber: string): string {
 export function normalizePhone(phone: string): string {
   return phone.replace(/\s/g, "");
 }
+
+export function parsePhoneParts(phone?: string | null): {
+  countryCodeId: string;
+  phoneNumber: string;
+} {
+  if (!phone) {
+    return { countryCodeId: DEFAULT_COUNTRY_CODE_ID, phoneNumber: "" };
+  }
+
+  const normalized = normalizePhone(phone);
+  const digits = normalized.replace(/\D/g, "");
+  const withPlus = normalized.startsWith("+") ? normalized : `+${digits}`;
+
+  const matched = [...COUNTRY_CODES]
+    .sort((a, b) => b.code.length - a.code.length)
+    .find((item) => withPlus.startsWith(item.code));
+
+  if (!matched) {
+    return { countryCodeId: DEFAULT_COUNTRY_CODE_ID, phoneNumber: digits };
+  }
+
+  return {
+    countryCodeId: matched.id,
+    phoneNumber: withPlus.slice(matched.code.length),
+  };
+}

@@ -26,10 +26,14 @@ import {
 } from "./ui/dropdown";
 import { Check, CreditCard, Users, User, ChevronDown } from "lucide-react";
 import { VisuallyHidden } from "./ui/visually-hidden";
+import { Separator } from "./ui/separator";
 import { PhoneAuthForm } from "../src/components/auth/PhoneAuthForm";
 import { useAuth } from "../src/hooks/useAuth";
 import { parseAddressFromProfile } from "../src/lib/auth/profile-sync";
-import { COUNTRY_CODES } from "../src/lib/constants/country-codes";
+import {
+  COUNTRY_CODES,
+  parsePhoneParts,
+} from "../src/lib/constants/country-codes";
 import { User as AppUser } from "../src/schema/user.schema";
 import {
   getBookedTimesForDate,
@@ -209,11 +213,14 @@ export function BookingFlow({
 
   const prefillFromProfile = useCallback((userProfile: AppUser) => {
     const { houseNumber, street } = parseAddressFromProfile(userProfile.address);
+    const { countryCodeId, phoneNumber } = parsePhoneParts(userProfile.phone);
     setExistingUserAddress(userProfile.address || "");
     setBookingData((prev) => ({
       ...prev,
       user_id: userProfile.id ?? "",
       name: userProfile.full_name,
+      countryCode: countryCodeId,
+      phoneNumber,
       district: userProfile.district || "",
       street,
       houseNumber,

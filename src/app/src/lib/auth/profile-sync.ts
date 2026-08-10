@@ -33,7 +33,7 @@ export async function syncProfile(authUser: AuthUser): Promise<User> {
   return await createUser({
     auth_id: authId,
     phone,
-    full_name: phone ?? "User",
+    full_name: "User",
     role: UserRole.CLIENT,
   });
 }

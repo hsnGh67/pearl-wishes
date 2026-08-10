@@ -260,19 +260,52 @@ export const createUser = async (userData: UserCreate): Promise<User> => {
   try {
     const validatedData = validateUserCreate(userData);
 
+    // Only insert real users-table columns (never bookings/workshops/notes)
+    const insertPayload = {
+      auth_id: validatedData.auth_id ?? null,
+      email: validatedData.email ?? null,
+      full_name: validatedData.full_name,
+      phone: validatedData.phone,
+      role: validatedData.role,
+      address: validatedData.address || null,
+      postcode: validatedData.postcode || null,
+      district: validatedData.district || null,
+    };
+
     console.log("userData ===>", userData);
     dbLogger.info("Creating new user", {
       table: "users",
-      data: { email: validatedData.email },
+      data: { email: insertPayload.email },
     });
 
     const { data, error } = await supabase
       .from("users")
-      .insert([validatedData])
+      .insert([insertPayload])
       .select()
       .single();
 
     if (error) {
+      // Unique conflict (auth_id / phone) — return existing row
+      const isConflict =
+        error.code === "23505" ||
+        (error as { status?: number }).status === 409 ||
+        /duplicate|unique|conflict/i.test(error.message ?? "");
+
+      if (isConflict) {
+        if (insertPayload.auth_id) {
+          const existingByAuth = await getUserByAuthId(insertPayload.auth_id);
+          if (existingByAuth) {
+            return existingByAuth;
+          }
+        }
+        if (insertPayload.phone) {
+          const existingByPhone = await getUserByPhone(insertPayload.phone);
+          if (existingByPhone) {
+            return existingByPhone;
+          }
+        }
+      }
+
       dbLogger.error("Failed to create user", {
         table: "users",
         error,
