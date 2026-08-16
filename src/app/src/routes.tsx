@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router";
+import { createBrowserRouter, Navigate } from "react-router";
 import { MainLayout } from "./components/layout/MainLayout";
 import { AdminLayout } from "./components/admin/AdminLayout";
 import { AdminRoute } from "./components/auth/AdminRoute";
@@ -62,6 +62,7 @@ export const router = createBrowserRouter([
           { path: "test-booking-creation", element: <TestBookingCreation /> },
         ],
       },
+      { path: "*", element: <Navigate to="/admin" replace /> },
     ],
   },
 ]);

@@ -19,7 +19,7 @@ import {
 import { COUNTRY_CODES } from "../../lib/constants/country-codes";
 import { usePhoneAuth } from "../../hooks/usePhoneAuth";
 import { useAuth } from "../../hooks/useAuth";
-import { User } from "../../schema/user.schema";
+import { User, UserRole } from "../../schema/user.schema";
 
 interface PhoneAuthFormProps {
   variant?: "page" | "embedded" | "dialog";
@@ -109,6 +109,11 @@ export function PhoneAuthForm({
     onSuccess?.(profile);
 
     if (redirectTo) {
+      const isAdminTarget = redirectTo.startsWith("/admin");
+      if (isAdminTarget && profile.role !== UserRole.ADMIN) {
+        navigate("/", { replace: true });
+        return;
+      }
       navigate(redirectTo, { replace: true });
     }
   };

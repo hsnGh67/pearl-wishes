@@ -101,12 +101,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, nextSession) => {
       setSession(nextSession);
-      if (nextSession?.user) {
-        await loadProfile(nextSession);
-      } else {
-        setProfile(null);
+      try {
+        if (nextSession?.user) {
+          setIsLoading(true);
+          await loadProfile(nextSession);
+        } else {
+          setProfile(null);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-      setIsLoading(false);
     });
 
     return () => {
