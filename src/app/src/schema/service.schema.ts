@@ -58,8 +58,7 @@ export const ServiceSchema = z.object({
   is_add_on: z.boolean().default(false).optional(),
   display_order: z.number().int().min(0).optional(),
   image_url: z
-    .string()
-    .url()
+    .union([z.string().url(), z.literal("")])
     .nullable()
     .optional()
     .transform((val) => val || ""),
@@ -75,12 +74,13 @@ export const CategorySchema = z.object({
     .max(100),
   description: z
     .string()
-    .min(10, "Description must be at least 10 characters")
-    .max(500),
+    .max(500)
+    .nullable()
+    .optional()
+    .transform((val) => val || ""),
   is_active: z.boolean().default(true),
   image_url: z
-    .string()
-    .url()
+    .union([z.string().url(), z.literal("")])
     .nullable()
     .optional()
     .transform((val) => val || ""),

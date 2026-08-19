@@ -61,6 +61,7 @@ export function AdminServices() {
   // Load services from database
   useEffect(() => {
     loadServices();
+    loadCategories();
 
     // Subscribe to realtime changes
     const unsubscribe = subscribeToServices({
@@ -138,6 +139,7 @@ export function AdminServices() {
         description: "",
         image_url: "",
       });
+      await loadCategories();
       await loadServices();
     } catch (error) {
       console.error("Failed to create category:", error);
@@ -244,6 +246,16 @@ export function AdminServices() {
     }
   };
 
+  const getCategoryName = (categoryId?: string) => {
+    if (!categoryId) {
+      return "—";
+    }
+
+    return (
+      categories.find((category) => category.id === categoryId)?.name || "—"
+    );
+  };
+
   const handleUpdateService = async () => {
     try {
       if (selectedService) {
@@ -306,7 +318,7 @@ export function AdminServices() {
     },
     {
       label: "Categories",
-      value: new Set(services.map((s) => s.category)).size.toString(),
+      value: new Set(services.map((s) => s.category_id)).size.toString(),
     },
   ];
 
@@ -411,7 +423,9 @@ export function AdminServices() {
                       {service.name}
                     </span>
                   </td>
-                  <td className="p-4 text-gray-600">{service.category}</td>
+                  <td className="p-4 text-gray-600">
+                    {getCategoryName(service.category_id)}
+                  </td>
                   <td className="p-4 text-gray-600">{service.duration}</td>
                   <td className="p-4">
                     <span
@@ -1106,7 +1120,7 @@ export function AdminServices() {
                 {selectedService.name}
               </p>
               <div className="flex gap-4 text-sm text-gray-600">
-                <span>{selectedService.category}</span>
+                <span>{getCategoryName(selectedService.category_id)}</span>
                 <span>•</span>
                 <span>{selectedService.duration}</span>
                 <span>•</span>
