@@ -14,4 +14,5 @@ export * from './district.schema';
 export * from './workshop.schema';
 export * from './workshop-booking.schema';
 export * from './why-choose-us.schema';
+export * from './awards-certifications.schema';
 export * from './validation';

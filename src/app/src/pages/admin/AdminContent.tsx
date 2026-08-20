@@ -44,8 +44,13 @@ import {
   saveContactAndHours,
 } from "../../lib/db/studio-contact";
 import { getWhyChooseUs, saveWhyChooseUs } from "../../lib/db/why-choose-us";
+import { getAwards, saveAwards } from "../../lib/db/awards-certifications";
 import { mapBusinessHourToHourRow } from "../../schema/studio-contact.schema";
 import { DEFAULT_WHY_ITEMS, WhyCard } from "../../schema/why-choose-us.schema";
+import {
+  AwardCard,
+  DEFAULT_AWARD_ITEMS,
+} from "../../schema/awards-certifications.schema";
 import { getAllServices } from "../../lib/db/services";
 import { Service } from "../../schema/service.schema";
 import {
@@ -155,13 +160,6 @@ interface HourRow {
   id: string;
   day: string;
   time: string;
-}
-interface AwardCard {
-  id: string;
-  imageUrl: string;
-  name: string;
-  year: string;
-  issuer: string;
 }
 interface ContactFields {
   id?: string;
@@ -532,24 +530,12 @@ export function AdminContent() {
   const [hoursDraft, setHoursDraft] = useState<HourRow[]>([]);
   const [isSavingContact, setIsSavingContact] = useState(false);
 
-  const [awardItems, setAwardItems] = useState<AwardCard[]>([
-    {
-      id: "a1",
-      imageUrl: "",
-      name: "Best Mobile Beauty Service",
-      year: "2023",
-      issuer: "London Beauty Awards",
-    },
-    {
-      id: "a2",
-      imageUrl: "",
-      name: "Five Star Excellence",
-      year: "2024",
-      issuer: "UK Nail Industry Association",
-    },
-  ]);
+  const [awardItems, setAwardItems] =
+    useState<AwardCard[]>(DEFAULT_AWARD_ITEMS);
   const [awardsDraft, setAwardsDraft] = useState<AwardCard[]>([]);
   const awardFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const awardsPendingFiles = useRef<Record<string, File>>({});
+  const [isSavingAwards, setIsSavingAwards] = useState(false);
 
   const flashAboutSaved = (key: string) => {
     setAboutSaved(key);
@@ -698,6 +684,18 @@ export function AdminContent() {
     }
   };
 
+  const getAwardsSection = async () => {
+    try {
+      const data = await getAwards();
+
+      if (data.length > 0) {
+        setAwardItems(data);
+      }
+    } catch (error) {
+      console.error("Error fetching awards certifications cards:", error);
+    }
+  };
+
   useEffect(() => {
     getTestimonialSection();
     getHeroSection();
@@ -707,6 +705,7 @@ export function AdminContent() {
     getServices();
     getContactSection();
     getWhyChooseUsSection();
+    getAwardsSection();
   }, []);
 
   useEffect(() => {
@@ -3182,8 +3181,10 @@ export function AdminContent() {
       setAwardsDraft((prev) =>
         prev.map((a) => (a.id === id ? { ...a, [field]: value } : a)),
       );
-    const removeAward = (id: string) =>
+    const removeAward = (id: string) => {
+      delete awardsPendingFiles.current[id];
       setAwardsDraft((prev) => prev.filter((a) => a.id !== id));
+    };
     const addAward = () =>
       setAwardsDraft((prev) => [
         ...prev,
@@ -3197,6 +3198,7 @@ export function AdminContent() {
       ]);
     const handleAwardImage = (id: string, file: File | null) => {
       if (!file) return;
+      awardsPendingFiles.current[id] = file;
       updateAward(id, "imageUrl", URL.createObjectURL(file));
     };
 
@@ -3209,13 +3211,42 @@ export function AdminContent() {
           "about-awards",
           "Awards & Certifications",
           () => {
+            awardsPendingFiles.current = {};
             setEditingAboutCard("about-awards");
             setAwardsDraft([...awardItems]);
           },
-          () => {
-            setAwardItems([...awardsDraft]);
-            setEditingAboutCard(null);
-            flashAboutSaved("about-awards");
+          async () => {
+            setIsSavingAwards(true);
+            try {
+              const itemsToSave = await Promise.all(
+                awardsDraft.map(async (item) => {
+                  const pendingFile = awardsPendingFiles.current[item.id];
+                  if (pendingFile) {
+                    const imageUrl = await uploadImageAndGetUrl(
+                      pendingFile,
+                      "awards",
+                    );
+                    return { ...item, imageUrl };
+                  }
+                  return {
+                    ...item,
+                    imageUrl: item.imageUrl.startsWith("blob:")
+                      ? ""
+                      : item.imageUrl,
+                  };
+                }),
+              );
+              const saved = await saveAwards(itemsToSave);
+              setAwardItems(saved);
+              awardsPendingFiles.current = {};
+              setEditingAboutCard(null);
+              flashAboutSaved("about-awards");
+            } catch (error) {
+              console.error("Error saving awards certifications cards:", error);
+              alert("Failed to save Awards & Certifications. Please try again.");
+            } finally {
+              setIsSavingAwards(false);
+            }
           },
           <span
             className="text-xs px-2 py-0.5 rounded-sm"
@@ -3223,6 +3254,7 @@ export function AdminContent() {
           >
             {items.length} {items.length === 1 ? "badge" : "badges"}
           </span>,
+          isSavingAwards,
         )}
 
         {!isEditing ? (
