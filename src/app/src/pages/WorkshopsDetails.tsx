@@ -6,7 +6,9 @@ import { ChevronDown } from "lucide-react";
 type Props = {
   workshopDetails: WorkshopDisplay;
 };
-export default function WorkshopsDetails({ workshopDetails }: Props) {
+export default function WorkshopsDetails({
+  workshopDetails,
+}: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
   const learningPoints = workshopDetails.highlights;
@@ -14,11 +16,15 @@ export default function WorkshopsDetails({ workshopDetails }: Props) {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const selectedWorkshopId = params.get("workshopId");
-    if (selectedWorkshopId && selectedWorkshopId === workshopDetails.id) {
+    if (
+      selectedWorkshopId &&
+      selectedWorkshopId === workshopDetails.id
+    ) {
       window.scrollTo({
         top:
-          document.getElementById(`workshop-${workshopDetails.id}`)
-            ?.offsetTop || 0,
+          document.getElementById(
+            `workshop-${workshopDetails.id}`,
+          )?.offsetTop || 0,
         behavior: "smooth",
       });
     }
@@ -58,32 +64,41 @@ export default function WorkshopsDetails({ workshopDetails }: Props) {
             >
               {workshopDetails.title}
             </h2>
-            <p className="text-lg" style={{ color: "#3D3935", opacity: 0.8 }}>
+            <p
+              className="text-lg"
+              style={{ color: "#3D3935", opacity: 0.8 }}
+            >
               {workshopDetails.description}
             </p>
           </div>
 
           {/* What You'll Learn */}
           <div className="mb-10">
-            <h3 className="text-xl mb-6" style={{ color: "#3D3935" }}>
+            <h3
+              className="text-xl mb-6"
+              style={{ color: "#3D3935" }}
+            >
               What You'll Learn
             </h3>
             <div className="relative">
               <ol className="space-y-3">
-                {(isExpanded ? learningPoints : learningPoints.slice(0, 3)).map(
-                  (point, index) => (
-                    <li
-                      key={index}
-                      className="flex items-start gap-3"
-                      style={{ color: "#3D3935" }}
-                    >
-                      <span className="font-medium flex-shrink-0">
-                        {index + 1}.
-                      </span>
-                      <span style={{ opacity: 0.85 }}>{point}</span>
-                    </li>
-                  ),
-                )}
+                {(isExpanded
+                  ? learningPoints
+                  : learningPoints.slice(0, 3)
+                ).map((point, index) => (
+                  <li
+                    key={index}
+                    className="flex items-start gap-3"
+                    style={{ color: "#3D3935" }}
+                  >
+                    <span className="font-medium flex-shrink-0">
+                      {index + 1}.
+                    </span>
+                    <span style={{ opacity: 0.85 }}>
+                      {point}
+                    </span>
+                  </li>
+                ))}
               </ol>
               {!isExpanded && learningPoints.length > 3 && (
                 <div
@@ -102,7 +117,9 @@ export default function WorkshopsDetails({ workshopDetails }: Props) {
                 style={{
                   borderColor: "#DCD4CD",
                   color: "#3D3935",
-                  background: isExpanded ? "transparent" : "#E9CFCA",
+                  background: isExpanded
+                    ? "transparent"
+                    : "#E9CFCA",
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.background = isExpanded
@@ -131,7 +148,10 @@ export default function WorkshopsDetails({ workshopDetails }: Props) {
           {/* Duration + What's Included */}
           <div className="grid lg:grid-cols-2 gap-8 mb-10">
             <div>
-              <h3 className="text-xl mb-4" style={{ color: "#3D3935" }}>
+              <h3
+                className="text-xl mb-4"
+                style={{ color: "#3D3935" }}
+              >
                 Course Duration
               </h3>
               <div className="grid grid-cols-3 gap-3 mb-3">
@@ -157,7 +177,10 @@ export default function WorkshopsDetails({ workshopDetails }: Props) {
                       border: "1px solid #DCD4CD",
                     }}
                   >
-                    <p className="text-xs mb-0.5" style={{ color: "#9ca3af" }}>
+                    <p
+                      className="text-xs mb-0.5"
+                      style={{ color: "#9ca3af" }}
+                    >
                       {fact.label}
                     </p>
                     <p
@@ -229,21 +252,23 @@ export default function WorkshopsDetails({ workshopDetails }: Props) {
             >
               Starting from £{workshopDetails.price}
             </div>
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
               <button
                 onClick={() => setBookingOpen(true)}
-                className="h-12 px-8 py-3 border-2 transition-all"
+                className="w-full sm:w-auto h-12 px-8 py-3 border-2 transition-all"
                 style={{
                   borderColor: "#3D3935",
                   backgroundColor: "#3D3935",
                   color: "#FEFCFA",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#1F1F1F";
+                  e.currentTarget.style.backgroundColor =
+                    "#1F1F1F";
                   e.currentTarget.style.borderColor = "#1F1F1F";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "#3D3935";
+                  e.currentTarget.style.backgroundColor =
+                    "#3D3935";
                   e.currentTarget.style.borderColor = "#3D3935";
                 }}
               >
@@ -257,10 +282,12 @@ export default function WorkshopsDetails({ workshopDetails }: Props) {
                   color: "#3D3935",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#E9CFCA";
+                  e.currentTarget.style.backgroundColor =
+                    "#E9CFCA";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "transparent";
+                  e.currentTarget.style.backgroundColor =
+                    "transparent";
                 }}
                 onClick={() => {
                   window.open(

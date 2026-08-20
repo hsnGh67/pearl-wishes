@@ -13,4 +13,5 @@ export * from './content.schema';
 export * from './district.schema';
 export * from './workshop.schema';
 export * from './workshop-booking.schema';
+export * from './why-choose-us.schema';
 export * from './validation';

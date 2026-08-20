@@ -25,9 +25,9 @@ export function Features() {
   const [isLoading, setIsLoading] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const [open, setOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState<Service | undefined>(
-    undefined,
-  );
+  const [selectedService, setSelectedService] = useState<
+    Service | undefined
+  >(undefined);
 
   const handleBook = (service: Service) => {
     setSelectedService(service);
@@ -68,9 +68,12 @@ export function Features() {
           >
             Our Treatments
           </h2>
-          <p className="max-w-2xl mx-auto px-4" style={{ color: "#3D3935" }}>
-            Discover our range of premium nail care services designed to make
-            you look and feel your best
+          <p
+            className="max-w-2xl mx-auto px-4"
+            style={{ color: "#3D3935" }}
+          >
+            Discover our range of premium nail care services
+            designed to make you look and feel your best
           </p>
         </div>
 
@@ -78,7 +81,9 @@ export function Features() {
         <div className="flex md:grid overflow-x-auto md:overflow-x-visible gap-4 md:gap-6 lg:gap-8 md:grid-cols-2 lg:grid-cols-3 snap-x snap-mandatory md:snap-none px-4 md:px-0">
           {isLoading ? (
             <div className="flex justify-center items-center h-full">
-              <span className="text-sm text-gray-500">Loading...</span>
+              <span className="text-sm text-gray-500">
+                Loading...
+              </span>
             </div>
           ) : (
             servicesToShow.map((service, index) => (
@@ -121,7 +126,8 @@ export function Features() {
                   <Button
                     className="w-full transition-colors min-h-[48px] md:min-h-[44px] text-base md:text-sm"
                     style={{
-                      background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                      background:
+                        "linear-gradient(to right, #FCEAE0, #EACAB8)",
                       color: "#3D3935",
                     }}
                     onMouseEnter={(e) => {
@@ -132,7 +138,9 @@ export function Features() {
                       e.currentTarget.style.background =
                         "linear-gradient(to right, #FCEAE0, #EACAB8)";
                     }}
-                    onClick={() => handleBook(service as Service)}
+                    onClick={() =>
+                      handleBook(service as Service)
+                    }
                   >
                     Book Now
                   </Button>

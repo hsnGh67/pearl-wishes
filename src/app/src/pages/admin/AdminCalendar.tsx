@@ -25,7 +25,10 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { useState, useEffect } from "react";
-import { getAllBookings, updateBooking } from "../../lib/db/bookings";
+import {
+  getAllBookings,
+  updateBooking,
+} from "../../lib/db/bookings";
 import {
   Booking,
   BookingStatus,
@@ -103,35 +106,43 @@ export function AdminCalendar() {
   const [users, setUsers] = useState<UserType[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
-  const [workshopBookings, setWorkshopBookings] = useState<WorkshopBooking[]>(
-    [],
-  );
-  const [workshopSessions, setWorkshopSessions] = useState<WorkshopSession[]>(
-    [],
-  );
+  const [workshopBookings, setWorkshopBookings] = useState<
+    WorkshopBooking[]
+  >([]);
+  const [workshopSessions, setWorkshopSessions] = useState<
+    WorkshopSession[]
+  >([]);
   const [loading, setLoading] = useState(true);
-  const [selectedWorkshopSession, setSelectedWorkshopSession] = useState<
-    WorkshopSession | undefined
-  >(undefined);
-  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
+  const [selectedWorkshopSession, setSelectedWorkshopSession] =
+    useState<WorkshopSession | undefined>(undefined);
+  const [selectedBooking, setSelectedBooking] =
+    useState<Booking | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedWorkshopBooking, setSelectedWorkshopBooking] =
     useState<WorkshopBooking | null>(null);
-  const [isWorkshopDetailsOpen, setIsWorkshopDetailsOpen] = useState(false);
-  const [isBookingFormOpen, setIsBookingFormOpen] = useState(false);
+  const [isWorkshopDetailsOpen, setIsWorkshopDetailsOpen] =
+    useState(false);
+  const [isBookingFormOpen, setIsBookingFormOpen] =
+    useState(false);
   const [bookingFormMode, setBookingFormMode] = useState<
     "create" | "reschedule"
   >("create");
   const [bookingToReschedule, setBookingToReschedule] =
     useState<Booking | null>(null);
-  const [isScheduleDrawerOpen, setIsScheduleDrawerOpen] = useState(false);
-  const [isEditWorkshopDrawerOpen, setIsEditWorkshopDrawerOpen] =
+  const [isScheduleDrawerOpen, setIsScheduleDrawerOpen] =
     useState(false);
+  const [
+    isEditWorkshopDrawerOpen,
+    setIsEditWorkshopDrawerOpen,
+  ] = useState(false);
   const [editWorkshopSessionId, setEditWorkshopSessionId] =
     useState<string>("");
-  const [editWorkshopId, setEditWorkshopId] = useState<string>("");
-  const [scheduledRuns, setScheduledRuns] = useState<ScheduledRun[]>([]);
+  const [editWorkshopId, setEditWorkshopId] =
+    useState<string>("");
+  const [scheduledRuns, setScheduledRuns] = useState<
+    ScheduledRun[]
+  >([]);
 
   const loadData = async () => {
     try {
@@ -170,7 +181,10 @@ export function AdminCalendar() {
 
       try {
         workshopSessionsData = await getAllWorkshopSessions();
-        console.log("workshopSessionsData ===========>", workshopSessionsData);
+        console.log(
+          "workshopSessionsData ===========>",
+          workshopSessionsData,
+        );
       } catch (err) {
         // Silently handle - error already logged by dbLogger
       }
@@ -249,7 +263,9 @@ export function AdminCalendar() {
     }
   };
 
-  const handleWorkshopBookingClick = (workshopBooking: WorkshopBooking) => {
+  const handleWorkshopBookingClick = (
+    workshopBooking: WorkshopBooking,
+  ) => {
     setSelectedWorkshopBooking(workshopBooking);
     setIsWorkshopDetailsOpen(true);
   };
@@ -279,11 +295,17 @@ export function AdminCalendar() {
   const navigateDate = (direction: "prev" | "next") => {
     const newDate = new Date(currentDate);
     if (viewType === "day") {
-      newDate.setDate(newDate.getDate() + (direction === "next" ? 1 : -1));
+      newDate.setDate(
+        newDate.getDate() + (direction === "next" ? 1 : -1),
+      );
     } else if (viewType === "week") {
-      newDate.setDate(newDate.getDate() + (direction === "next" ? 7 : -7));
+      newDate.setDate(
+        newDate.getDate() + (direction === "next" ? 7 : -7),
+      );
     } else {
-      newDate.setMonth(newDate.getMonth() + (direction === "next" ? 1 : -1));
+      newDate.setMonth(
+        newDate.getMonth() + (direction === "next" ? 1 : -1),
+      );
     }
     setCurrentDate(newDate);
   };
@@ -332,10 +354,15 @@ export function AdminCalendar() {
       const customerName = user?.full_name?.toLowerCase() || "";
 
       // Search by phone number (remove spaces and special characters)
-      const phone = user?.phone?.replace(/[\s\-\(\)]/g, "").toLowerCase() || "";
+      const phone =
+        user?.phone?.replace(/[\s\-\(\)]/g, "").toLowerCase() ||
+        "";
       const searchPhone = query.replace(/[\s\-\(\)]/g, "");
 
-      return customerName.includes(query) || phone.includes(searchPhone);
+      return (
+        customerName.includes(query) ||
+        phone.includes(searchPhone)
+      );
     });
   };
 
@@ -347,7 +374,9 @@ export function AdminCalendar() {
         const bookingDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         return bookingDate === dateStr;
       })
-      .sort((a, b) => a.appointment_time.localeCompare(b.appointment_time));
+      .sort((a, b) =>
+        a.appointment_time.localeCompare(b.appointment_time),
+      );
   };
 
   const getWorkshopSessionssForDate = (date: Date) => {
@@ -359,7 +388,9 @@ export function AdminCalendar() {
         const sessionDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
         return sessionDate === dateStr;
       })
-      .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+      .sort((a, b) =>
+        (a.date || "").localeCompare(b.date || ""),
+      );
   };
 
   const getScheduledSessionsForDate = (date: Date) => {
@@ -377,14 +408,19 @@ export function AdminCalendar() {
   };
 
   const getBookingsCount = (date: Date) => {
-    return getBookingsForDate(date).length + getWorkshopSessionssForDate(date).length;
+    return (
+      getBookingsForDate(date).length +
+      getWorkshopSessionssForDate(date).length
+    );
   };
 
   if (loading) {
     return (
       <div className="p-8">
         <div className="flex items-center justify-center h-64">
-          <div className="text-gray-600">Loading calendar...</div>
+          <div className="text-gray-600">
+            Loading calendar...
+          </div>
         </div>
       </div>
     );
@@ -397,7 +433,9 @@ export function AdminCalendar() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-gray-800 mb-2">Calendar</h1>
-          <p className="text-gray-600">Manage appointments and schedules</p>
+          <p className="text-gray-600">
+            Manage appointments and schedules
+          </p>
         </div>
         <div className="flex gap-3">
           <Button
@@ -449,7 +487,10 @@ export function AdminCalendar() {
       </div>
 
       {/* Search Bar */}
-      <Card className="p-4 mb-6 border-2" style={{ borderColor: "#DCD4CD" }}>
+      <Card
+        className="p-4 mb-6 border-2"
+        style={{ borderColor: "#DCD4CD" }}
+      >
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
           <Input
@@ -475,16 +516,25 @@ export function AdminCalendar() {
         {searchQuery && (
           <div className="mt-2 text-sm text-gray-600">
             {filterBookings(bookings).length} result
-            {filterBookings(bookings).length !== 1 ? "s" : ""} found
+            {filterBookings(bookings).length !== 1
+              ? "s"
+              : ""}{" "}
+            found
           </div>
         )}
       </Card>
 
       {/* Color Legend */}
-      <Card className="p-4 mb-6 border-2" style={{ borderColor: "#DCD4CD" }}>
+      <Card
+        className="p-4 mb-6 border-2"
+        style={{ borderColor: "#DCD4CD" }}
+      >
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold text-sm" style={{ color: "#3D3935" }}>
+            <h3
+              className="font-semibold text-sm"
+              style={{ color: "#3D3935" }}
+            >
               Appointment Types
             </h3>
             <div className="flex items-center gap-6">
@@ -498,8 +548,14 @@ export function AdminCalendar() {
                   }}
                 />
                 <div className="flex items-center gap-1.5">
-                  <User className="w-4 h-4" style={{ color: "#3D3935" }} />
-                  <span className="text-sm" style={{ color: "#3D3935" }}>
+                  <User
+                    className="w-4 h-4"
+                    style={{ color: "#3D3935" }}
+                  />
+                  <span
+                    className="text-sm"
+                    style={{ color: "#3D3935" }}
+                  >
                     Nail Treatments
                   </span>
                 </div>
@@ -519,7 +575,10 @@ export function AdminCalendar() {
                     className="w-4 h-4"
                     style={{ color: "#3D3935" }}
                   />
-                  <span className="text-sm" style={{ color: "#3D3935" }}>
+                  <span
+                    className="text-sm"
+                    style={{ color: "#3D3935" }}
+                  >
                     Workshops
                   </span>
                 </div>
@@ -534,27 +593,33 @@ export function AdminCalendar() {
                     borderColor: "#3D3935",
                   }}
                 />
-                <span className="text-sm" style={{ color: "#3D3935" }}>
+                <span
+                  className="text-sm"
+                  style={{ color: "#3D3935" }}
+                >
                   Cancelled
                 </span>
               </div>
             </div>
           </div>
 
-          <div>
+          <div className="flex items-center gap-4 p-[0px] m-[0px]">
             <h3
-              className="font-semibold text-sm mb-3"
+              className="font-semibold text-sm"
               style={{ color: "#3D3935" }}
             >
-              Status Legend
+              Status    
             </h3>
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-6 mx-[232px] my-[0px]">
               <div className="flex items-center gap-2">
                 <span
                   className="inline-flex w-4 h-4 rounded-full"
                   style={{ backgroundColor: "#34D399" }}
                 />
-                <span className="text-sm" style={{ color: "#3D3935" }}>
+                <span
+                  className="text-sm"
+                  style={{ color: "#3D3935" }}
+                >
                   Successful
                 </span>
               </div>
@@ -563,7 +628,10 @@ export function AdminCalendar() {
                   className="inline-flex w-4 h-4 rounded-full"
                   style={{ backgroundColor: "#FBBF24" }}
                 />
-                <span className="text-sm" style={{ color: "#3D3935" }}>
+                <span
+                  className="text-sm"
+                  style={{ color: "#3D3935" }}
+                >
                   Pending
                 </span>
               </div>
@@ -572,7 +640,10 @@ export function AdminCalendar() {
                   className="inline-flex w-4 h-4 rounded-full"
                   style={{ backgroundColor: "#F87171" }}
                 />
-                <span className="text-sm" style={{ color: "#3D3935" }}>
+                <span
+                  className="text-sm"
+                  style={{ color: "#3D3935" }}
+                >
                   Cancelled
                 </span>
               </div>
@@ -582,12 +653,20 @@ export function AdminCalendar() {
       </Card>
 
       {/* View Selector & Navigation */}
-      <Card className="p-6 mb-6 border-2" style={{ borderColor: "#DCD4CD" }}>
+      <Card
+        className="p-6 mb-6 border-2"
+        style={{ borderColor: "#DCD4CD" }}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Calendar className="w-6 h-6" style={{ color: "#3D3935" }} />
+            <Calendar
+              className="w-6 h-6"
+              style={{ color: "#3D3935" }}
+            />
             <div>
-              <h3 style={{ color: "#3D3935" }}>{formatDateHeader()}</h3>
+              <h3 style={{ color: "#3D3935" }}>
+                {formatDateHeader()}
+              </h3>
               <p className="text-sm text-gray-600">
                 {bookings.length} total appointments
               </p>
@@ -606,7 +685,9 @@ export function AdminCalendar() {
                 className="px-4 py-2 text-sm font-medium transition-colors"
                 style={{
                   backgroundColor:
-                    viewType === "day" ? "#E9CFCA" : "transparent",
+                    viewType === "day"
+                      ? "#E9CFCA"
+                      : "transparent",
                   color: "#3D3935",
                 }}
               >
@@ -618,7 +699,9 @@ export function AdminCalendar() {
                 className="px-4 py-2 text-sm font-medium transition-colors"
                 style={{
                   backgroundColor:
-                    viewType === "week" ? "#E9CFCA" : "transparent",
+                    viewType === "week"
+                      ? "#E9CFCA"
+                      : "transparent",
                   color: "#3D3935",
                 }}
               >
@@ -630,7 +713,9 @@ export function AdminCalendar() {
                 className="px-4 py-2 text-sm font-medium transition-colors"
                 style={{
                   backgroundColor:
-                    viewType === "month" ? "#E9CFCA" : "transparent",
+                    viewType === "month"
+                      ? "#E9CFCA"
+                      : "transparent",
                   color: "#3D3935",
                 }}
               >
@@ -679,7 +764,9 @@ export function AdminCalendar() {
           getServiceName={getServiceName}
           getService={getService}
           onBookingClick={handleBookingClick}
-          scheduledSessions={getScheduledSessionsForDate(currentDate)}
+          scheduledSessions={getScheduledSessionsForDate(
+            currentDate,
+          )}
         />
       )}
       {viewType === "week" && (
@@ -694,7 +781,10 @@ export function AdminCalendar() {
         />
       )}
       {viewType === "month" && (
-        <MonthView date={currentDate} getBookingsCount={getBookingsCount} />
+        <MonthView
+          date={currentDate}
+          getBookingsCount={getBookingsCount}
+        />
       )}
 
       {/* Booking Details Dialog */}
@@ -723,13 +813,20 @@ export function AdminCalendar() {
           onCancel={async () => {
             if (!selectedWorkshopBooking?.id) return;
             try {
-              await cancelWorkshopBooking(selectedWorkshopBooking.id);
+              await cancelWorkshopBooking(
+                selectedWorkshopBooking.id,
+              );
               await loadData();
               setIsWorkshopDetailsOpen(false);
               setSelectedWorkshopBooking(null);
             } catch (error) {
-              console.error("Failed to cancel workshop booking:", error);
-              alert("Failed to cancel workshop booking. Please try again.");
+              console.error(
+                "Failed to cancel workshop booking:",
+                error,
+              );
+              alert(
+                "Failed to cancel workshop booking. Please try again.",
+              );
             }
           }}
         />
@@ -759,14 +856,17 @@ export function AdminCalendar() {
         workshops={workshops}
         workshopBookings={workshopBookings}
         onScheduleCreated={(sessions, workshop) => {
-          const capMatch = workshop.class_type?.match(/(\d+)\s*student/i);
+          const capMatch =
+            workshop.class_type?.match(/(\d+)\s*student/i);
           setScheduledRuns((prev) => [
             ...prev,
             {
               sessions,
               workshopTitle: workshop.title,
               studentCount: 0,
-              capacity: capMatch ? parseInt(capMatch[1], 10) : 3,
+              capacity: capMatch
+                ? parseInt(capMatch[1], 10)
+                : 3,
             },
           ]);
         }}
@@ -805,17 +905,21 @@ function BookingDetailsDialog({
   onCancel: () => void;
   onReschedule?: () => void;
 }) {
-  const [treatments, setTreatments] = useState<BookingTreatment[]>([]);
-  const [loadingTreatments, setLoadingTreatments] = useState(false);
-  const [activeTreatmentCount, setActiveTreatmentCount] = useState(0);
-  const [isCancellationModalOpen, setIsCancellationModalOpen] = useState(false);
-  const [selectedTreatmentIds, setSelectedTreatmentIds] = useState<string[]>(
-    [],
-  );
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(
-    booking.payment_status,
-  );
-  const [isUpdatingPayment, setIsUpdatingPayment] = useState(false);
+  const [treatments, setTreatments] = useState<
+    BookingTreatment[]
+  >([]);
+  const [loadingTreatments, setLoadingTreatments] =
+    useState(false);
+  const [activeTreatmentCount, setActiveTreatmentCount] =
+    useState(0);
+  const [isCancellationModalOpen, setIsCancellationModalOpen] =
+    useState(false);
+  const [selectedTreatmentIds, setSelectedTreatmentIds] =
+    useState<string[]>([]);
+  const [paymentStatus, setPaymentStatus] =
+    useState<PaymentStatus>(booking.payment_status);
+  const [isUpdatingPayment, setIsUpdatingPayment] =
+    useState(false);
 
   useEffect(() => {
     if (open && booking.id) {
@@ -862,12 +966,16 @@ function BookingDetailsDialog({
     const activeTreatments = treatments.filter(
       (t) => t.status === BookingTreatmentStatus.ACTIVE,
     );
-    if (selectedTreatmentIds.length === activeTreatments.length) {
+    if (
+      selectedTreatmentIds.length === activeTreatments.length
+    ) {
       // Deselect all
       setSelectedTreatmentIds([]);
     } else {
       // Select all active
-      setSelectedTreatmentIds(activeTreatments.map((t) => t.id!));
+      setSelectedTreatmentIds(
+        activeTreatments.map((t) => t.id!),
+      );
     }
   };
 
@@ -895,7 +1003,9 @@ function BookingDetailsDialog({
       await loadTreatments();
 
       // Check if all treatments are now cancelled
-      const activeCount = await getActiveTreatmentCount(booking.id!);
+      const activeCount = await getActiveTreatmentCount(
+        booking.id!,
+      );
       if (activeCount === 0) {
         // If no active treatments left, cancel the whole booking
         await onCancel();
@@ -911,7 +1021,11 @@ function BookingDetailsDialog({
   };
 
   const handleCancelTreatment = async (treatmentId: string) => {
-    if (!window.confirm("Are you sure you want to cancel this treatment?")) {
+    if (
+      !window.confirm(
+        "Are you sure you want to cancel this treatment?",
+      )
+    ) {
       return;
     }
 
@@ -920,7 +1034,9 @@ function BookingDetailsDialog({
       await loadTreatments();
 
       // Check if all treatments are now cancelled
-      const activeCount = await getActiveTreatmentCount(booking.id!);
+      const activeCount = await getActiveTreatmentCount(
+        booking.id!,
+      );
       if (activeCount === 0) {
         // If no active treatments left, cancel the whole booking
         await onCancel();
@@ -933,7 +1049,9 @@ function BookingDetailsDialog({
 
   const handleCancelAllTreatments = async () => {
     if (
-      !window.confirm("Are you sure you want to cancel the entire appointment?")
+      !window.confirm(
+        "Are you sure you want to cancel the entire appointment?",
+      )
     ) {
       return;
     }
@@ -941,7 +1059,9 @@ function BookingDetailsDialog({
     await onCancel();
   };
 
-  const handlePaymentStatusChange = async (newStatus: PaymentStatus) => {
+  const handlePaymentStatusChange = async (
+    newStatus: PaymentStatus,
+  ) => {
     if (!booking.id) return;
 
     try {
@@ -957,7 +1077,9 @@ function BookingDetailsDialog({
       // Successfully updated - status will persist in database
     } catch (error) {
       console.error("Failed to update payment status:", error);
-      alert("Failed to update payment status. Please try again.");
+      alert(
+        "Failed to update payment status. Please try again.",
+      );
       setPaymentStatus(booking.payment_status); // Revert on error
     } finally {
       setIsUpdatingPayment(false);
@@ -1003,7 +1125,9 @@ function BookingDetailsDialog({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex flex-col gap-1">
-                <span className="text-xs text-gray-600">Booking Status</span>
+                <span className="text-xs text-gray-600">
+                  Booking Status
+                </span>
                 <div
                   className="px-4 py-2 font-semibold text-sm"
                   style={{
@@ -1020,11 +1144,15 @@ function BookingDetailsDialog({
                 </div>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-xs text-gray-600">Payment Status</span>
+                <span className="text-xs text-gray-600">
+                  Payment Status
+                </span>
                 <Select
                   value={paymentStatus}
                   onValueChange={(value) =>
-                    handlePaymentStatusChange(value as PaymentStatus)
+                    handlePaymentStatusChange(
+                      value as PaymentStatus,
+                    )
                   }
                   disabled={isUpdatingPayment}
                 >
@@ -1034,9 +1162,11 @@ function BookingDetailsDialog({
                       backgroundColor:
                         paymentStatus === PaymentStatus.PAID
                           ? "#E9CFCA"
-                          : paymentStatus === PaymentStatus.UNPAID
+                          : paymentStatus ===
+                              PaymentStatus.UNPAID
                             ? "#F1DFC0"
-                            : paymentStatus === PaymentStatus.PARTIALL_PAID
+                            : paymentStatus ===
+                                PaymentStatus.PARTIALL_PAID
                               ? "#DCD4CD"
                               : "#EADDD5",
                       borderColor: "#DCD4CD",
@@ -1046,11 +1176,17 @@ function BookingDetailsDialog({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={PaymentStatus.PAID}>Paid</SelectItem>
-                    <SelectItem value={PaymentStatus.PARTIALL_PAID}>
+                    <SelectItem value={PaymentStatus.PAID}>
+                      Paid
+                    </SelectItem>
+                    <SelectItem
+                      value={PaymentStatus.PARTIALL_PAID}
+                    >
                       Partially Paid
                     </SelectItem>
-                    <SelectItem value={PaymentStatus.PARTIALL_REFUNDED}>
+                    <SelectItem
+                      value={PaymentStatus.PARTIALL_REFUNDED}
+                    >
                       Partially Refunded
                     </SelectItem>
                     <SelectItem value={PaymentStatus.UNPAID}>
@@ -1063,7 +1199,10 @@ function BookingDetailsDialog({
                 </Select>
               </div>
             </div>
-            <div className="text-xl font-bold" style={{ color: "#3D3935" }}>
+            <div
+              className="text-xl font-bold"
+              style={{ color: "#3D3935" }}
+            >
               £{booking.total_amount.toFixed(2)}
             </div>
           </div>
@@ -1075,7 +1214,10 @@ function BookingDetailsDialog({
               style={{ borderColor: "#DCD4CD" }}
             >
               <div className="flex items-center justify-between">
-                <h4 className="font-semibold" style={{ color: "#3D3935" }}>
+                <h4
+                  className="font-semibold"
+                  style={{ color: "#3D3935" }}
+                >
                   Treatments ({activeTreatmentCount} active)
                 </h4>
                 {canBeCancelled && activeTreatmentCount > 0 && (
@@ -1106,11 +1248,13 @@ function BookingDetailsDialog({
                       style={{
                         borderColor: "#DCD4CD",
                         backgroundColor:
-                          treatment.status === BookingTreatmentStatus.CANCELLED
+                          treatment.status ===
+                          BookingTreatmentStatus.CANCELLED
                             ? "#FAF7F5"
                             : "white",
                         opacity:
-                          treatment.status === BookingTreatmentStatus.CANCELLED
+                          treatment.status ===
+                          BookingTreatmentStatus.CANCELLED
                             ? 0.6
                             : 1,
                       }}
@@ -1136,10 +1280,15 @@ function BookingDetailsDialog({
                           </span>
                         )}
                       </div>
-                      <div className="text-sm" style={{ color: "#3D3935" }}>
+                      <div
+                        className="text-sm"
+                        style={{ color: "#3D3935" }}
+                      >
                         {treatment.service_name}{" "}
                         {treatment.addOns.length > 0 ? "(" : ""}
-                        {treatment.addOns.map((a) => `${a.name} `)}
+                        {treatment.addOns.map(
+                          (a) => `${a.name} `,
+                        )}
                         {treatment.addOns.length > 0 ? ")" : ""}
                       </div>
                       <div className="text-xs text-gray-600 mt-1">
@@ -1164,7 +1313,10 @@ function BookingDetailsDialog({
             className="border-2 p-4 space-y-3"
             style={{ borderColor: "#DCD4CD" }}
           >
-            <h4 className="font-semibold" style={{ color: "#3D3935" }}>
+            <h4
+              className="font-semibold"
+              style={{ color: "#3D3935" }}
+            >
               Customer Information
             </h4>
             <div className="space-y-2">
@@ -1177,13 +1329,17 @@ function BookingDetailsDialog({
               {user?.email && (
                 <div className="flex items-center gap-3">
                   <Mail className="w-4 h-4 text-gray-600" />
-                  <span style={{ color: "#3D3935" }}>{user.email}</span>
+                  <span style={{ color: "#3D3935" }}>
+                    {user.email}
+                  </span>
                 </div>
               )}
               {user?.phone && (
                 <div className="flex items-center gap-3">
                   <Phone className="w-4 h-4 text-gray-600" />
-                  <span style={{ color: "#3D3935" }}>{user.phone}</span>
+                  <span style={{ color: "#3D3935" }}>
+                    {user.phone}
+                  </span>
                 </div>
               )}
             </div>
@@ -1194,45 +1350,65 @@ function BookingDetailsDialog({
             className="border-2 p-4 space-y-3"
             style={{ borderColor: "#DCD4CD" }}
           >
-            <h4 className="font-semibold" style={{ color: "#3D3935" }}>
+            <h4
+              className="font-semibold"
+              style={{ color: "#3D3935" }}
+            >
               Appointment Details
             </h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <div className="text-sm text-gray-600 mb-1">Service</div>
+                <div className="text-sm text-gray-600 mb-1">
+                  Service
+                </div>
                 {treatments.map((treatment) => (
                   <div
                     key={treatment.id}
                     className="font-medium"
                     style={{ color: "#3D3935" }}
                   >
-                    {treatment?.service_name || "Unknown Service"}
+                    {treatment?.service_name ||
+                      "Unknown Service"}
                   </div>
                 ))}
               </div>
               <div>
-                <div className="text-sm text-gray-600 mb-1">Duration</div>
-                <div className="font-medium" style={{ color: "#3D3935" }}>
+                <div className="text-sm text-gray-600 mb-1">
+                  Duration
+                </div>
+                <div
+                  className="font-medium"
+                  style={{ color: "#3D3935" }}
+                >
                   {totalDuration || 60} minutes
                 </div>
               </div>
               <div>
-                <div className="text-sm text-gray-600 mb-1">Date</div>
-                <div className="font-medium" style={{ color: "#3D3935" }}>
-                  {new Date(booking.appointment_date).toLocaleDateString(
-                    "en-GB",
-                    {
-                      weekday: "long",
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    },
-                  )}
+                <div className="text-sm text-gray-600 mb-1">
+                  Date
+                </div>
+                <div
+                  className="font-medium"
+                  style={{ color: "#3D3935" }}
+                >
+                  {new Date(
+                    booking.appointment_date,
+                  ).toLocaleDateString("en-GB", {
+                    weekday: "long",
+                    year: "numeric",
+                    month: "long",
+                    day: "numeric",
+                  })}
                 </div>
               </div>
               <div>
-                <div className="text-sm text-gray-600 mb-1">Time</div>
-                <div className="font-medium" style={{ color: "#3D3935" }}>
+                <div className="text-sm text-gray-600 mb-1">
+                  Time
+                </div>
+                <div
+                  className="font-medium"
+                  style={{ color: "#3D3935" }}
+                >
                   {booking.appointment_time}
                 </div>
               </div>
@@ -1244,14 +1420,19 @@ function BookingDetailsDialog({
             className="border-2 p-4 space-y-3"
             style={{ borderColor: "#DCD4CD" }}
           >
-            <h4 className="font-semibold" style={{ color: "#3D3935" }}>
+            <h4
+              className="font-semibold"
+              style={{ color: "#3D3935" }}
+            >
               Location
             </h4>
             <div className="space-y-2">
               <div className="flex items-start gap-3">
                 <MapPin className="w-4 h-4 text-gray-600 mt-1" />
                 <div>
-                  <div style={{ color: "#3D3935" }}>{booking.address}</div>
+                  <div style={{ color: "#3D3935" }}>
+                    {booking.address}
+                  </div>
                   <div className="text-sm text-gray-600">
                     {booking.postcode} • {booking.district}
                   </div>
@@ -1266,10 +1447,16 @@ function BookingDetailsDialog({
               className="border-2 p-4 space-y-3"
               style={{ borderColor: "#DCD4CD" }}
             >
-              <h4 className="font-semibold" style={{ color: "#3D3935" }}>
+              <h4
+                className="font-semibold"
+                style={{ color: "#3D3935" }}
+              >
                 Notes
               </h4>
-              <p className="text-sm" style={{ color: "#3D3935" }}>
+              <p
+                className="text-sm"
+                style={{ color: "#3D3935" }}
+              >
                 {booking.notes}
               </p>
             </div>
@@ -1281,7 +1468,10 @@ function BookingDetailsDialog({
               className="border-2 p-4 space-y-3"
               style={{ borderColor: "#DCD4CD" }}
             >
-              <h4 className="font-semibold" style={{ color: "#3D3935" }}>
+              <h4
+                className="font-semibold"
+                style={{ color: "#3D3935" }}
+              >
                 Payment Information
               </h4>
               <div className="flex items-center gap-3">
@@ -1355,8 +1545,9 @@ function BookingDetailsDialog({
               Select Treatments to Cancel
             </DialogTitle>
             <DialogDescription>
-              Choose which treatments you want to cancel. You can select one,
-              multiple, or all active treatments.
+              Choose which treatments you want to cancel. You
+              can select one, multiple, or all active
+              treatments.
             </DialogDescription>
           </DialogHeader>
 
@@ -1374,8 +1565,11 @@ function BookingDetailsDialog({
                   checked={
                     selectedTreatmentIds.length ===
                       treatments.filter(
-                        (t) => t.status === BookingTreatmentStatus.ACTIVE,
-                      ).length && selectedTreatmentIds.length > 0
+                        (t) =>
+                          t.status ===
+                          BookingTreatmentStatus.ACTIVE,
+                      ).length &&
+                    selectedTreatmentIds.length > 0
                   }
                   onCheckedChange={handleSelectAll}
                   id="select-all"
@@ -1389,7 +1583,9 @@ function BookingDetailsDialog({
                   Select All (
                   {
                     treatments.filter(
-                      (t) => t.status === BookingTreatmentStatus.ACTIVE,
+                      (t) =>
+                        t.status ===
+                        BookingTreatmentStatus.ACTIVE,
                     ).length
                   }{" "}
                   active treatments)
@@ -1400,7 +1596,10 @@ function BookingDetailsDialog({
             {/* Treatment List */}
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {treatments
-                .filter((t) => t.status === BookingTreatmentStatus.ACTIVE)
+                .filter(
+                  (t) =>
+                    t.status === BookingTreatmentStatus.ACTIVE,
+                )
                 .map((treatment) => (
                   <div
                     key={treatment.id}
@@ -1408,7 +1607,9 @@ function BookingDetailsDialog({
                     style={{ borderColor: "#DCD4CD" }}
                   >
                     <Checkbox
-                      checked={selectedTreatmentIds.includes(treatment.id!)}
+                      checked={selectedTreatmentIds.includes(
+                        treatment.id!,
+                      )}
                       onCheckedChange={() =>
                         handleToggleTreatment(treatment.id!)
                       }
@@ -1431,7 +1632,10 @@ function BookingDetailsDialog({
                           {treatment.person_name}
                         </span>
                       </div>
-                      <div className="text-sm" style={{ color: "#3D3935" }}>
+                      <div
+                        className="text-sm"
+                        style={{ color: "#3D3935" }}
+                      >
                         {treatment.service_name}
                       </div>
                       <div className="text-xs text-gray-600 mt-1">
@@ -1446,7 +1650,10 @@ function BookingDetailsDialog({
             {/* Selected Count */}
             <div className="text-sm text-gray-600">
               {selectedTreatmentIds.length} treatment
-              {selectedTreatmentIds.length !== 1 ? "s" : ""} selected
+              {selectedTreatmentIds.length !== 1
+                ? "s"
+                : ""}{" "}
+              selected
             </div>
           </div>
 
@@ -1471,11 +1678,16 @@ function BookingDetailsDialog({
               style={{
                 borderColor: "#3D3935",
                 backgroundColor:
-                  selectedTreatmentIds.length === 0 ? "#DCD4CD" : "#D0A096",
+                  selectedTreatmentIds.length === 0
+                    ? "#DCD4CD"
+                    : "#D0A096",
                 color: "#3D3935",
-                opacity: selectedTreatmentIds.length === 0 ? 0.5 : 1,
+                opacity:
+                  selectedTreatmentIds.length === 0 ? 0.5 : 1,
                 cursor:
-                  selectedTreatmentIds.length === 0 ? "not-allowed" : "pointer",
+                  selectedTreatmentIds.length === 0
+                    ? "not-allowed"
+                    : "pointer",
               }}
             >
               Confirm Cancellation
@@ -1500,7 +1712,8 @@ function WorkshopBookingDetailsDialog({
   onCancel: () => void;
 }) {
   const canBeCancelled =
-    workshopBooking.booking_status !== WorkshopBookingStatus.CANCELLED;
+    workshopBooking.booking_status !==
+    WorkshopBookingStatus.CANCELLED;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1510,7 +1723,10 @@ function WorkshopBookingDetailsDialog({
       >
         <DialogHeader>
           <div className="flex items-center gap-2">
-            <GraduationCap className="w-5 h-5" style={{ color: "#3D3935" }} />
+            <GraduationCap
+              className="w-5 h-5"
+              style={{ color: "#3D3935" }}
+            />
             <DialogTitle style={{ color: "#3D3935" }}>
               Workshop Booking Details
             </DialogTitle>
@@ -1528,7 +1744,9 @@ function WorkshopBookingDetailsDialog({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex flex-col gap-1">
-                <span className="text-xs text-gray-600">Booking Status</span>
+                <span className="text-xs text-gray-600">
+                  Booking Status
+                </span>
                 <div
                   className="px-4 py-2 font-semibold text-sm"
                   style={{
@@ -1547,7 +1765,9 @@ function WorkshopBookingDetailsDialog({
                 </div>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-xs text-gray-600">Payment Status</span>
+                <span className="text-xs text-gray-600">
+                  Payment Status
+                </span>
                 <div
                   className="px-4 py-2 text-sm"
                   style={{
@@ -1570,7 +1790,10 @@ function WorkshopBookingDetailsDialog({
             className="border-2 p-4 space-y-3"
             style={{ borderColor: "#DCD4CD" }}
           >
-            <h4 className="font-semibold" style={{ color: "#3D3935" }}>
+            <h4
+              className="font-semibold"
+              style={{ color: "#3D3935" }}
+            >
               Participant Information
             </h4>
             <div className="space-y-2">
@@ -1606,14 +1829,20 @@ function WorkshopBookingDetailsDialog({
             }}
           >
             <div className="flex items-center gap-2">
-              <GraduationCap className="w-5 h-5" style={{ color: "#3D3935" }} />
-              <h4 className="font-semibold" style={{ color: "#3D3935" }}>
+              <GraduationCap
+                className="w-5 h-5"
+                style={{ color: "#3D3935" }}
+              />
+              <h4
+                className="font-semibold"
+                style={{ color: "#3D3935" }}
+              >
                 Workshop Booking
               </h4>
             </div>
             <p className="text-sm text-gray-600">
-              Workshop booking received. Coordination details will be sent via
-              WhatsApp.
+              Workshop booking received. Coordination details
+              will be sent via WhatsApp.
             </p>
           </div>
 
@@ -1623,7 +1852,10 @@ function WorkshopBookingDetailsDialog({
               className="border-2 p-4 space-y-3"
               style={{ borderColor: "#DCD4CD" }}
             >
-              <h4 className="font-semibold" style={{ color: "#3D3935" }}>
+              <h4
+                className="font-semibold"
+                style={{ color: "#3D3935" }}
+              >
                 Payment Information
               </h4>
               <div className="flex items-center gap-2">
@@ -1693,33 +1925,48 @@ function DayView({
   getUserName: (id: string) => string;
   getServiceName: (id: string) => string;
   getService: (id: string) => Service | undefined;
-  onBookingClick: (booking: Booking, type: "booking" | "workshop") => void;
+  onBookingClick: (
+    booking: Booking,
+    type: "booking" | "workshop",
+  ) => void;
 }) {
   // Get business hours for this specific date
   const { startHour, endHour } = getBusinessHoursForDate(date);
   const hoursCount = endHour - startHour;
 
-  const timeSlots = Array.from({ length: hoursCount }, (_, i) => {
-    const hour = i + startHour;
-    return `${hour.toString().padStart(2, "0")}:00`;
-  });
+  const timeSlots = Array.from(
+    { length: hoursCount },
+    (_, i) => {
+      const hour = i + startHour;
+      return `${hour.toString().padStart(2, "0")}:00`;
+    },
+  );
 
   // Helper function to calculate end time
-  const getEndTime = (startTime: string, durationMinutes: number) => {
+  const getEndTime = (
+    startTime: string,
+    durationMinutes: number,
+  ) => {
     const [hours, minutes] = startTime.split(":").map(Number);
     const startDate = new Date();
     startDate.setHours(hours, minutes, 0, 0);
-    const endDate = new Date(startDate.getTime() + durationMinutes * 60000);
+    const endDate = new Date(
+      startDate.getTime() + durationMinutes * 60000,
+    );
     return `${endDate.getHours().toString().padStart(2, "0")}:${endDate.getMinutes().toString().padStart(2, "0")}`;
   };
 
   // Helper to calculate position and height
-  const getBookingStyle = (startTime: string, duration: number) => {
+  const getBookingStyle = (
+    startTime: string,
+    duration: number,
+  ) => {
     const [hours, minutes] = startTime.split(":").map(Number);
     const offsetHours = hours - startHour; // Use the startHour from business hours
     const offsetMinutes = minutes;
 
-    const topPosition = offsetHours * 80 + (offsetMinutes / 60) * 80;
+    const topPosition =
+      offsetHours * 80 + (offsetMinutes / 60) * 80;
     const height = (duration / 60) * 80;
 
     return {
@@ -1734,13 +1981,23 @@ function DayView({
     <div className="relative">
       {/* Time slots background */}
       {timeSlots.map((time) => (
-        <div key={time} className="flex gap-4" style={{ height: "80px" }}>
+        <div
+          key={time}
+          className="flex gap-4"
+          style={{ height: "80px" }}
+        >
           <div className="w-20 pt-2 text-right">
-            <span className="text-sm font-medium" style={{ color: "#3D3935" }}>
+            <span
+              className="text-sm font-medium"
+              style={{ color: "#3D3935" }}
+            >
               {time}
             </span>
           </div>
-          <div className="flex-1 border-2" style={{ borderColor: "#DCD4CD" }} />
+          <div
+            className="flex-1 border-2"
+            style={{ borderColor: "#DCD4CD" }}
+          />
         </div>
       ))}
 
@@ -1752,8 +2009,14 @@ function DayView({
         {bookings.map((booking) => {
           const service = getService(booking.service_id);
           const duration = service?.duration || 90;
-          const endTime = getEndTime(booking.appointment_time, duration);
-          const style = getBookingStyle(booking.appointment_time, duration);
+          const endTime = getEndTime(
+            booking.appointment_time,
+            duration,
+          );
+          const style = getBookingStyle(
+            booking.appointment_time,
+            duration,
+          );
 
           return (
             <Card
@@ -1777,7 +2040,9 @@ function DayView({
                     <span
                       className="inline-flex w-2.5 h-2.5 rounded-full"
                       style={{
-                        backgroundColor: getStatusDotColor(booking.status),
+                        backgroundColor: getStatusDotColor(
+                          booking.status,
+                        ),
                       }}
                     />
                     <Clock
@@ -1803,7 +2068,10 @@ function DayView({
                       {getUserName(booking.user_id)}
                     </span>
                   </div>
-                  <p className="text-sm truncate" style={{ color: "#3D3935" }}>
+                  <p
+                    className="text-sm truncate"
+                    style={{ color: "#3D3935" }}
+                  >
                     {getServiceName(booking.service_id)}
                   </p>
                   <div className="flex items-center gap-2 mt-1">
@@ -1831,8 +2099,14 @@ function DayView({
         {workshopBookings
           .filter((s) => s.date === dayDate)
           .map((s, i) => {
-            const startStr = s.starts_at.split(":").slice(0, 2).join(":");
-            const endStr = s.ends_at.split(":").slice(0, 2).join(":");
+            const startStr = s.starts_at
+              .split(":")
+              .slice(0, 2)
+              .join(":");
+            const endStr = s.ends_at
+              .split(":")
+              .slice(0, 2)
+              .join(":");
             const style = getBookingStyle(startStr, 120);
             return (
               <Card
@@ -1849,7 +2123,11 @@ function DayView({
                 <div className="flex items-center gap-2 mb-1">
                   <span
                     className="inline-flex w-2.5 h-2.5 rounded-full"
-                    style={{ backgroundColor: getStatusDotColor(s.status) }}
+                    style={{
+                      backgroundColor: getStatusDotColor(
+                        s.status,
+                      ),
+                    }}
                   />
                   <GraduationCap
                     className="w-3 h-3 flex-shrink-0"
@@ -1859,7 +2137,10 @@ function DayView({
                     className="text-sm font-bold"
                     style={{ color: "#3D3935" }}
                   >
-                    {s.starts_at.split(":").slice(0, 2).join(":")}
+                    {s.starts_at
+                      .split(":")
+                      .slice(0, 2)
+                      .join(":")}
                     {endStr ? ` - ${endStr}` : ""}
                   </span>
                 </div>
@@ -1880,7 +2161,9 @@ function DayView({
                           height: "5px",
                           borderRadius: "50%",
                           backgroundColor:
-                            di < s.people_numbers ? "#3D3935" : "transparent",
+                            di < s.people_numbers
+                              ? "#3D3935"
+                              : "transparent",
                           border: "1px solid #3D3935",
                           flexShrink: 0,
                         }}
@@ -1944,14 +2227,17 @@ function WeekView({
         <div className="flex gap-2 mb-4">
           <div className="w-16"></div>
           {weekDays.map((day, idx) => {
-            const isToday = day.toDateString() === new Date().toDateString();
+            const isToday =
+              day.toDateString() === new Date().toDateString();
             return (
               <div
                 key={idx}
                 className="flex-1 text-center p-2 border-2 h-16 overflow-hidden"
                 style={{
                   borderColor: "#DCD4CD",
-                  backgroundColor: isToday ? "#E9CFCA" : "transparent",
+                  backgroundColor: isToday
+                    ? "#E9CFCA"
+                    : "transparent",
                 }}
               >
                 <div className="text-xs text-gray-600 truncate">
@@ -1959,15 +2245,23 @@ function WeekView({
                     weekday: "short",
                   })}
                 </div>
-                <div className="font-semibold truncate" style={{ color: "#3D3935" }}>
+                <div
+                  className="font-semibold truncate"
+                  style={{ color: "#3D3935" }}
+                >
                   {day.getDate()}
                 </div>
                 <div className="text-xs text-gray-600 truncate">
                   {(() => {
                     const dayDateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
-                    const wsCount = workshopBookings.filter((s) => s.date === dayDateStr).length;
-                    return getBookingsForDate(day).length + wsCount;
-                  })()} appts
+                    const wsCount = workshopBookings.filter(
+                      (s) => s.date === dayDateStr,
+                    ).length;
+                    return (
+                      getBookingsForDate(day).length + wsCount
+                    );
+                  })()}{" "}
+                  appts
                 </div>
               </div>
             );
@@ -1979,7 +2273,10 @@ function WeekView({
           {timeSlots.map((time) => (
             <div key={time} className="flex gap-2">
               <div className="w-16 text-right pt-1">
-                <span className="text-xs" style={{ color: "#3D3935" }}>
+                <span
+                  className="text-xs"
+                  style={{ color: "#3D3935" }}
+                >
                   {time}
                 </span>
               </div>
@@ -1988,13 +2285,17 @@ function WeekView({
                 const dayBookings = bookings.filter((b) => {
                   if (!b.appointment_time) return false;
                   const bookingTime = b.appointment_date;
-                  return bookingTime === day.toISOString().split("T")[0];
+                  return (
+                    bookingTime ===
+                    day.toISOString().split("T")[0]
+                  );
                 });
 
-                const workshopSessions = workshopBookings.filter((s) => {
-                  if (!s.date) return false;
-                  return s.date === dayDate;
-                });
+                const workshopSessions =
+                  workshopBookings.filter((s) => {
+                    if (!s.date) return false;
+                    return s.date === dayDate;
+                  });
 
                 // Check if this time slot is outside business hours for this day
                 const isSunday = day.getDay() === 0;
@@ -2016,7 +2317,9 @@ function WeekView({
                   >
                     {dayBookings
                       .filter((b) =>
-                        b.appointment_time.startsWith(time.split(":")[0]),
+                        b.appointment_time.startsWith(
+                          time.split(":")[0],
+                        ),
                       )
                       .map((booking) => (
                         <div
@@ -2031,16 +2334,19 @@ function WeekView({
                                   : "#F1DFC0",
                             borderLeft: "3px solid #3D3935",
                           }}
-                          onClick={() => onBookingClick(booking, "booking")}
+                          onClick={() =>
+                            onBookingClick(booking, "booking")
+                          }
                           title={`${getUserName(booking.user_id)} - ${getServiceName(booking.service_id)}`}
                         >
                           <div className="flex items-center gap-2">
                             <span
                               className="inline-flex w-2.5 h-2.5 rounded-full"
                               style={{
-                                backgroundColor: getStatusDotColor(
-                                  booking.status,
-                                ),
+                                backgroundColor:
+                                  getStatusDotColor(
+                                    booking.status,
+                                  ),
                               }}
                             />
                             <div
@@ -2054,7 +2360,9 @@ function WeekView({
                             {getUserName(booking.user_id)}
                           </div>
                           <div className="truncate text-gray-600 flex-row align-middle flex">
-                            {new Array(parseInt(booking.people_numbers))
+                            {new Array(
+                              parseInt(booking.people_numbers),
+                            )
                               .fill(null)
                               .map((_, idx) => (
                                 <div
@@ -2077,7 +2385,11 @@ function WeekView({
                         </div>
                       ))}
                     {workshopSessions
-                      .filter((s) => s.starts_at.startsWith(time.split(":")[0]))
+                      .filter((s) =>
+                        s.starts_at.startsWith(
+                          time.split(":")[0],
+                        ),
+                      )
                       .map((s, si) => (
                         <div
                           key={`ws-${si}`}
@@ -2088,21 +2400,31 @@ function WeekView({
                             cursor: "pointer",
                           }}
                           title={`${s.title} `}
-                          onClick={() => onBookingClick(s, "workshop")}
+                          onClick={() =>
+                            onBookingClick(s, "workshop")
+                          }
                         >
                           <div className="flex items-center gap-2">
                             <span
                               className="inline-flex w-2.5 h-2.5 rounded-full"
                               style={{
-                                backgroundColor: getStatusDotColor(s.status),
+                                backgroundColor:
+                                  getStatusDotColor(s.status),
                               }}
                             />
                             <div
                               className="font-semibold truncate"
                               style={{ color: "#3D3935" }}
                             >
-                              {s.starts_at.split(":").slice(0, 2).join(":")} -{" "}
-                              {s.ends_at.split(":").slice(0, 2).join(":")}
+                              {s.starts_at
+                                .split(":")
+                                .slice(0, 2)
+                                .join(":")}{" "}
+                              -{" "}
+                              {s.ends_at
+                                .split(":")
+                                .slice(0, 2)
+                                .join(":")}
                             </div>
                           </div>
                           <div
@@ -2193,7 +2515,15 @@ function MonthView({
     });
   }
 
-  const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const weekDays = [
+    "Mon",
+    "Tue",
+    "Wed",
+    "Thu",
+    "Fri",
+    "Sat",
+    "Sun",
+  ];
 
   return (
     <div>
@@ -2213,7 +2543,9 @@ function MonthView({
       {/* Calendar grid */}
       <div className="grid grid-cols-7 gap-2">
         {days.map((day, idx) => {
-          const isToday = day.date.toDateString() === new Date().toDateString();
+          const isToday =
+            day.date.toDateString() ===
+            new Date().toDateString();
           const bookingsCount = getBookingsCount(day.date);
 
           return (
@@ -2247,7 +2579,8 @@ function MonthView({
                       color: "white",
                     }}
                   >
-                    {bookingsCount} {bookingsCount === 1 ? "appt" : "appts"}
+                    {bookingsCount}{" "}
+                    {bookingsCount === 1 ? "appt" : "appts"}
                   </div>
                 </div>
               )}

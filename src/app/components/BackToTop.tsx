@@ -275,25 +275,41 @@ export function BookingFlow({
   const [isServicesLoading, setIsServicesLoading] =
     useState(false);
 
-  const prefillFromProfile = useCallback((userProfile: AppUser) => {
-    const { houseNumber, street } = parseAddressFromProfile(userProfile.address);
-    setExistingUserAddress(userProfile.address || "");
-    setBookingData((prev) => ({
-      ...prev,
-      user_id: userProfile.id ?? "",
-      name: userProfile.full_name,
-      district: userProfile.district || "",
-      street,
-      houseNumber,
-    }));
-  }, []);
+  const prefillFromProfile = useCallback(
+    (userProfile: AppUser) => {
+      const { houseNumber, street } = parseAddressFromProfile(
+        userProfile.address,
+      );
+      setExistingUserAddress(userProfile.address || "");
+      setBookingData((prev) => ({
+        ...prev,
+        user_id: userProfile.id ?? "",
+        name: userProfile.full_name,
+        district: userProfile.district || "",
+        street,
+        houseNumber,
+      }));
+    },
+    [],
+  );
 
   useEffect(() => {
-    if (open && isAuthenticated && profile && step === "phone") {
+    if (
+      open &&
+      isAuthenticated &&
+      profile &&
+      step === "phone"
+    ) {
       prefillFromProfile(profile);
       setStep("address");
     }
-  }, [open, isAuthenticated, profile, step, prefillFromProfile]);
+  }, [
+    open,
+    isAuthenticated,
+    profile,
+    step,
+    prefillFromProfile,
+  ]);
 
   // Payment & Booking Saving State
   const [paymentState, setPaymentState] = useState({
@@ -2408,12 +2424,10 @@ export function BookingFlow({
                     color: "transparent",
                   }}
                   onMouseEnter={(e) => {
-                    if (
-                      !(
-                        bookingData.voucherCode.trim() !== "" &&
-                        bookingData.discount === 0
-                      )
-                    ) {
+                    if (!(
+                      bookingData.voucherCode.trim() !== "" &&
+                      bookingData.discount === 0
+                    )) {
                       e.currentTarget.style.backgroundColor =
                         "#1F1F1F";
                       e.currentTarget.style.background =

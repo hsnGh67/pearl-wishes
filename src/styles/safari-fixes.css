@@ -1,0 +1,169 @@
+/* ============================================================
+ * safari-fixes.css — Pearl Wishes Studio
+ *
+ * DIAGNOSIS
+ * ---------
+ * Three root causes for hover/color failures in Safari:
+ *
+ * 1. oklch() CSS variables without hex fallbacks.
+ *    Safari added oklch() support in v15.4 (Mar 2022). Older
+ *    versions silently discard the assignment, leaving
+ *    --foreground, --card-foreground, --ring etc. undefined.
+ *    Consequence: text rendered by `text-foreground` is invisible;
+ *    borders using `border-border` / `outline-ring` disappear;
+ *    the body @layer base `text-foreground` paint produces no color.
+ *
+ * 2. JS `style.background` mutation + `transition-colors` mismatch.
+ *    Tailwind's `transition-colors` expands to:
+ *      transition-property: color, background-color, border-color, ...
+ *    The onMouseEnter handlers mutate `element.style.background`
+ *    (the shorthand) not `element.style.backgroundColor` (the
+ *    longhand). Safari does not cross-match these in its compositing
+ *    pipeline, so the repaint is deferred or dropped entirely.
+ *    Fix: move hover state to CSS :hover rules and use
+ *    background-color (longhand) for the animated property.
+ *
+ * 3. overflow:hidden on a CSS-scaled element clips box-shadow.
+ *    The Feature cards use `hover:scale-[1.03]` + a custom shadow,
+ *    but the Card root has `overflow-hidden`. On scale, the painted
+ *    shadow is clipped at the original unscaled boundary, so the
+ *    elevation effect is invisible. The image slot has its own
+ *    overflow-hidden div — removing it from the Card root is safe.
+ *
+ * ============================================================
+ *
+ * DO NOT LIST
+ * -----------
+ *  ✗ DO NOT use navigator.userAgent for browser detection — fragile,
+ *    breaks on UA changes, and blocked in privacy-focused Safari modes
+ *  ✗ DO NOT write `transition: all` on any interactive element —
+ *    triggers full repaint on every animated frame; always list only
+ *    the specific properties being animated
+ *  ✗ DO NOT escalate z-index randomly to "fix" stacking bugs —
+ *    diagnose the stacking context; arbitrary z-index creates new bugs
+ *  ✗ DO NOT use `will-change: transform` globally — wastes GPU memory;
+ *    apply only to the one element being animated, remove after
+ *  ✗ DO NOT mutate `element.style.background` in JS for hover colors —
+ *    use `element.style.backgroundColor` or CSS :hover so
+ *    transition-colors (which watches background-color) can fire
+ *  ✗ DO NOT remove `pointer-events: none` from decorative absolute
+ *    overlays — Safari's stricter hit-testing will silently block
+ *    :hover on sibling/child elements beneath the overlay
+ *  ✗ DO NOT add hex fallbacks inside @theme inline — that block maps
+ *    variables to Tailwind design tokens and should not hold fallbacks
+ *
+ * ============================================================ */
+
+
+/* ----------------------------------------------------------
+ * 1. oklch() CSS variable hex fallbacks
+ *
+ *    Activated only when the browser does not support oklch().
+ *    Hex values are perceptual approximations of the original
+ *    oklch() declarations in globals.css.
+ *
+ *    Variables already using hex in globals.css are omitted:
+ *    --background, --card, --primary, --secondary-foreground,
+ *    --muted, --muted-foreground, --accent, --accent-foreground,
+ *    --destructive, --destructive-foreground, --border,
+ *    --input, --input-background, --switch-background,
+ *    --sidebar-primary
+ * ---------------------------------------------------------- */
+@supports not (color: oklch(0 0 0)) {
+  :root {
+    /* oklch(0.145 0 0) ≈ near-black */
+    --foreground:                  #1c1a19;
+    --card-foreground:             #1c1a19;
+    --popover-foreground:          #1c1a19;
+
+    /* oklch(1 0 0) = white */
+    --popover:                     #ffffff;
+    --primary-foreground:          #ffffff;
+
+    /* oklch(0.95 0.0058 264.53) ≈ off-white with faint lavender */
+    --secondary:                   #f2f2f4;
+
+    /* oklch(0.708 0 0) ≈ mid grey */
+    --ring:                        #b3b3b3;
+
+    /* Chart palette — approximate perceptual matches */
+    --chart-1:                     #d9620e; /* oklch(0.646 0.222 41.116)  warm orange  */
+    --chart-2:                     #2e9488; /* oklch(0.6   0.118 184.704) teal         */
+    --chart-3:                     #235c84; /* oklch(0.398 0.07  227.392) navy         */
+    --chart-4:                     #c9ab14; /* oklch(0.828 0.189 84.429)  yellow       */
+    --chart-5:                     #c07d14; /* oklch(0.769 0.188 70.08)   amber        */
+
+    /* Sidebar tokens */
+    --sidebar:                     #f9f9f9; /* oklch(0.985 0 0) */
+    --sidebar-foreground:          #1c1a19; /* oklch(0.145 0 0) */
+    --sidebar-primary-foreground:  #f9f9f9; /* oklch(0.985 0 0) */
+    --sidebar-accent:              #f6f6f6; /* oklch(0.97  0 0) */
+    --sidebar-accent-foreground:   #303030; /* oklch(0.205 0 0) */
+    --sidebar-border:              #ebebeb; /* oklch(0.922 0 0) */
+    --sidebar-ring:                #b3b3b3; /* oklch(0.708 0 0) */
+  }
+}
+
+
+/* ----------------------------------------------------------
+ * 2. -webkit-backdrop-filter companion
+ *
+ *    Tailwind v4 may not emit the -webkit- prefix for
+ *    backdrop-blur utilities. Safari requires the prefixed form
+ *    for frosted-glass effects; without it the Navbar backdrop
+ *    is opaque on Safari < 18.
+ *
+ *    This block targets only WebKit — Chrome and Firefox do not
+ *    implement -webkit-backdrop-filter and ignore this block.
+ * ---------------------------------------------------------- */
+@supports (-webkit-backdrop-filter: blur(1px)) {
+  [class*="backdrop-blur"] {
+    -webkit-backdrop-filter: var(--tw-backdrop-blur, blur(4px));
+  }
+}
+
+
+/* ----------------------------------------------------------
+ * 3. Pearl button — CSS-native hover (fixes Safari drop)
+ *
+ *    Replaces onMouseEnter/onMouseLeave JS mutation pattern.
+ *    Applied via className="pearl-btn" — see Features.tsx Button.
+ *
+ *    transition-property lists only the properties that animate;
+ *    background-color is the longhand that transition-colors watches.
+ *    background-image is cleared on hover so the solid color shows.
+ *
+ *    This CSS block is NOT in a @layer, so it has higher cascade
+ *    priority than Tailwind utilities (@layer utilities) and will
+ *    correctly override any bg-* class on the Button component.
+ * ---------------------------------------------------------- */
+.pearl-btn {
+  background-image: linear-gradient(to right, #FCEAE0, #EACAB8);
+  background-color: #FCEAE0; /* solid fallback; also the animated target */
+  /* List only animated properties — never transition: all */
+  transition-property: background-color, background-image, box-shadow;
+  transition-duration: 200ms;
+  transition-timing-function: ease-out;
+}
+
+.pearl-btn:hover,
+.pearl-btn:focus-visible {
+  background-image: none;    /* drop gradient → solid color on hover */
+  background-color: #D0A096; /* transition-colors can animate this correctly */
+}
+
+
+/* ----------------------------------------------------------
+ * 4. Feature card — prevent overflow:hidden from clipping shadow
+ *
+ *    Card root .pearl-service-card gets overflow:visible so the
+ *    hover box-shadow paints outside the original card boundary
+ *    when scale-[1.03] is applied.
+ *
+ *    The image slot (.pearl-card-img) retains its own clip — it
+ *    already has overflow-hidden as an inline Tailwind class and
+ *    is unaffected by this override.
+ * ---------------------------------------------------------- */
+.pearl-service-card {
+  overflow: visible;
+}

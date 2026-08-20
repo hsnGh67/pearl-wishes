@@ -1,5 +1,12 @@
 import logo from "figma:asset/de725b32570940ed7773a5a87deed14a098ee089.png";
-import { Menu, X, Phone, Settings, LogOut, LogIn } from "lucide-react";
+import {
+  Menu,
+  X,
+  Phone,
+  Settings,
+  LogOut,
+  LogIn,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Button } from "../../../components/ui/button";
@@ -20,10 +27,12 @@ export function WorkshopsNavbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
-  const [whatsappModalOpen, setWhatsappModalOpen] = useState(false);
+  const [whatsappModalOpen, setWhatsappModalOpen] =
+    useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const navigate = useNavigate();
-  const { isAuthenticated, isAdmin, profile, signOut } = useAuth();
+  const { isAuthenticated, isAdmin, profile, signOut } =
+    useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -35,7 +44,8 @@ export function WorkshopsNavbar() {
     };
 
     window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
+    return () =>
+      window.removeEventListener("scroll", handleScroll);
   }, []);
 
   return (
@@ -44,7 +54,8 @@ export function WorkshopsNavbar() {
         isScrolled ? "shadow-md" : ""
       }`}
       style={{
-        background: "linear-gradient(to left, #FCEAE0, #EACAB8)",
+        background:
+          "linear-gradient(to left, #FCEAE0, #EACAB8)",
       }}
     >
       <div
@@ -90,7 +101,8 @@ export function WorkshopsNavbar() {
               variant="outline"
               size="icon"
               style={{
-                background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                background:
+                  "linear-gradient(to right, #FCEAE0, #EACAB8)",
                 borderColor: "#3D3935",
                 color: "#3D3935",
               }}
@@ -111,7 +123,8 @@ export function WorkshopsNavbar() {
               <Button
                 variant="outline"
                 style={{
-                  background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                  background:
+                    "linear-gradient(to right, #FCEAE0, #EACAB8)",
                   borderColor: "#3D3935",
                   color: "#3D3935",
                 }}
@@ -135,7 +148,8 @@ export function WorkshopsNavbar() {
                 variant="outline"
                 size="icon"
                 style={{
-                  background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                  background:
+                    "linear-gradient(to right, #FCEAE0, #EACAB8)",
                   borderColor: "#3D3935",
                   color: "#3D3935",
                 }}
@@ -149,7 +163,9 @@ export function WorkshopsNavbar() {
                     "linear-gradient(to right, #FCEAE0, #EACAB8)";
                 }}
                 onClick={() =>
-                  isAdmin ? navigate("/admin") : setLoginOpen(true)
+                  isAdmin
+                    ? navigate("/admin")
+                    : setLoginOpen(true)
                 }
                 title={isAdmin ? "Admin Panel" : "Sign In"}
               >
@@ -168,18 +184,21 @@ export function WorkshopsNavbar() {
                 color: "transparent",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#1F1F1F";
+                e.currentTarget.style.backgroundColor =
+                  "#1F1F1F";
                 e.currentTarget.style.background = "#1F1F1F";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#3D3935";
+                e.currentTarget.style.backgroundColor =
+                  "#3D3935";
                 e.currentTarget.style.background = "#3D3935";
               }}
               onClick={() => setBookingOpen(true)}
             >
               <span
                 style={{
-                  background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                  background:
+                    "linear-gradient(to right, #FCEAE0, #EACAB8)",
                   WebkitBackgroundClip: "text",
                   backgroundClip: "text",
                   WebkitTextFillColor: "transparent",
@@ -217,13 +236,7 @@ export function WorkshopsNavbar() {
             >
               About
             </a>
-            <a
-              href="/#services"
-              className="block px-3 py-2 text-gray-700 hover:text-[#3D3935] hover:bg-gray-50 rounded-md"
-              onClick={() => setIsOpen(false)}
-            >
-              Treatments
-            </a>
+            
             <a
               href="/workshops"
               className="block px-3 py-2 text-gray-700 hover:text-[#3D3935] hover:bg-gray-50 rounded-md"
@@ -261,7 +274,14 @@ export function WorkshopsNavbar() {
                   setIsOpen(false);
                 }}
               >
-                Sign Out{profile?.full_name && !isPlaceholderFullName(profile.full_name, profile.phone) ? ` (${profile.full_name})` : ""}
+                Sign Out
+                {profile?.full_name &&
+                !isPlaceholderFullName(
+                  profile.full_name,
+                  profile.phone,
+                )
+                  ? ` (${profile.full_name})`
+                  : ""}
               </button>
             )}
             <div className="pt-2">
@@ -272,11 +292,13 @@ export function WorkshopsNavbar() {
                   color: "#E9CFCA",
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = "#1F1F1F";
+                  e.currentTarget.style.backgroundColor =
+                    "#1F1F1F";
                   e.currentTarget.style.color = "#D0A096";
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = "#3D3935";
+                  e.currentTarget.style.backgroundColor =
+                    "#3D3935";
                   e.currentTarget.style.color = "#E9CFCA";
                 }}
                 onClick={() => {
@@ -291,10 +313,19 @@ export function WorkshopsNavbar() {
         </div>
       )}
 
-      <BookingFlow open={bookingOpen} onOpenChange={setBookingOpen} />
-      <PhoneAuthDialog open={loginOpen} onOpenChange={setLoginOpen} />
+      <BookingFlow
+        open={bookingOpen}
+        onOpenChange={setBookingOpen}
+      />
+      <PhoneAuthDialog
+        open={loginOpen}
+        onOpenChange={setLoginOpen}
+      />
 
-      <Dialog open={whatsappModalOpen} onOpenChange={setWhatsappModalOpen}>
+      <Dialog
+        open={whatsappModalOpen}
+        onOpenChange={setWhatsappModalOpen}
+      >
         <DialogContent
           className="sm:max-w-[425px] border-2 rounded-none p-8 bg-[#f9efef]"
           style={{ borderColor: "#3D3935" }}
@@ -304,8 +335,9 @@ export function WorkshopsNavbar() {
               Contact Us on WhatsApp
             </DialogTitle>
             <DialogDescription className="text-gray-600">
-              This will take you to WhatsApp where you can message us directly
-              for any questions or enquiries.
+              This will take you to WhatsApp where you can
+              message us directly for any questions or
+              enquiries.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-8 gap-4 sm:justify-center">
@@ -324,21 +356,27 @@ export function WorkshopsNavbar() {
                 color: "transparent",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = "#1F1F1F";
+                e.currentTarget.style.backgroundColor =
+                  "#1F1F1F";
                 e.currentTarget.style.background = "#1F1F1F";
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.backgroundColor = "#3D3935";
+                e.currentTarget.style.backgroundColor =
+                  "#3D3935";
                 e.currentTarget.style.background = "#3D3935";
               }}
               onClick={() => {
                 setWhatsappModalOpen(false);
-                window.open("https://wa.me/447123456789", "_blank");
+                window.open(
+                  "https://wa.me/447123456789",
+                  "_blank",
+                );
               }}
             >
               <span
                 style={{
-                  background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                  background:
+                    "linear-gradient(to right, #FCEAE0, #EACAB8)",
                   WebkitBackgroundClip: "text",
                   backgroundClip: "text",
                   WebkitTextFillColor: "transparent",
@@ -356,7 +394,11 @@ export function WorkshopsNavbar() {
                 />
                 Open WhatsApp
               </span>
-              <svg width="0" height="0" style={{ position: "absolute" }}>
+              <svg
+                width="0"
+                height="0"
+                style={{ position: "absolute" }}
+              >
                 <defs>
                   <linearGradient
                     id="whatsapp-gradient"

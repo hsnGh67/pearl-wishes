@@ -1,7 +1,16 @@
-import { Phone, Mail, MapPin, Clock, Facebook, Instagram } from "lucide-react";
-import { CONTACT_INFO } from "../../lib/constants";
+import {
+  Phone,
+  Mail,
+  MapPin,
+  Clock,
+  Facebook,
+  Instagram,
+} from "lucide-react";
+import { useStudioContact } from "../../hooks/useStudioContact";
 
 export function Footer() {
+  const { contact, hours } = useStudioContact();
+
   return (
     <footer
       id="contact"
@@ -17,7 +26,8 @@ export function Footer() {
             </h3>
             <p
               style={{
-                background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                background:
+                  "linear-gradient(to right, #FCEAE0, #EACAB8)",
                 WebkitBackgroundClip: "text",
                 backgroundClip: "text",
                 WebkitTextFillColor: "transparent",
@@ -39,14 +49,15 @@ export function Footer() {
                 />
                 <span
                   style={{
-                    background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                    background:
+                      "linear-gradient(to right, #FCEAE0, #EACAB8)",
                     WebkitBackgroundClip: "text",
                     backgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                     color: "transparent",
                   }}
                 >
-                  {CONTACT_INFO.phone}
+                  {contact.phone}
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -56,14 +67,15 @@ export function Footer() {
                 />
                 <span
                   style={{
-                    background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                    background:
+                      "linear-gradient(to right, #FCEAE0, #EACAB8)",
                     WebkitBackgroundClip: "text",
                     backgroundClip: "text",
                     WebkitTextFillColor: "transparent",
                     color: "transparent",
                   }}
                 >
-                  info@pearlwishesstudio.com
+                  {contact.email}
                 </span>
               </div>
             </div>
@@ -72,35 +84,31 @@ export function Footer() {
           {/* Hours */}
           <div>
             <h3 className="mb-4">Business Hours</h3>
-            <div className="space-y-2" style={{ color: "#DCD4CD" }}>
+            <div
+              className="space-y-2"
+              style={{ color: "#DCD4CD" }}
+            >
               <div className="flex items-start gap-3">
                 <Clock
                   className="w-5 h-5 flex-shrink-0 mt-1"
                   style={{ color: "#DCD4CD" }}
                 />
                 <div>
-                  <div
-                    style={{
-                      background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
-                      WebkitBackgroundClip: "text",
-                      backgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      color: "transparent",
-                    }}
-                  >
-                    Monday to Saturday: 10:00 AM - 6:00 PM
-                  </div>
-                  <div
-                    style={{
-                      background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
-                      WebkitBackgroundClip: "text",
-                      backgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      color: "transparent",
-                    }}
-                  >
-                    Sunday: 11:00 AM - 5:00 PM
-                  </div>
+                  {hours.map((hour) => (
+                    <div
+                      key={hour.id}
+                      style={{
+                        background:
+                          "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                        WebkitBackgroundClip: "text",
+                        backgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                        color: "transparent",
+                      }}
+                    >
+                      {hour.day}: {hour.time}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -115,7 +123,9 @@ export function Footer() {
               <a href="#" className="transition-colors">
                 <Facebook
                   className="w-6 h-6"
-                  style={{ stroke: "url(#footerSocialGradient)" }}
+                  style={{
+                    stroke: "url(#footerSocialGradient)",
+                  }}
                 />
               </a>
               <a
@@ -126,10 +136,16 @@ export function Footer() {
               >
                 <Instagram
                   className="w-6 h-6"
-                  style={{ stroke: "url(#footerSocialGradient)" }}
+                  style={{
+                    stroke: "url(#footerSocialGradient)",
+                  }}
                 />
               </a>
-              <svg width="0" height="0" style={{ position: "absolute" }}>
+              <svg
+                width="0"
+                height="0"
+                style={{ position: "absolute" }}
+              >
                 <defs>
                   <linearGradient
                     id="footerSocialGradient"
@@ -147,14 +163,16 @@ export function Footer() {
           </div>
           <p
             style={{
-              background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+              background:
+                "linear-gradient(to right, #FCEAE0, #EACAB8)",
               WebkitBackgroundClip: "text",
               backgroundClip: "text",
               WebkitTextFillColor: "transparent",
               color: "transparent",
             }}
           >
-            &copy; 2025 Pearl Wishes Studio. All rights reserved.
+            &copy; 2025 Pearl Wishes Studio. All rights
+            reserved.
           </p>
         </div>
       </div>

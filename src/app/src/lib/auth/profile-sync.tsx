@@ -25,7 +25,9 @@ export function isPlaceholderFullName(
     return true;
   }
 
-  if (name.toLowerCase() === PLACEHOLDER_FULL_NAME.toLowerCase()) {
+  if (
+    name.toLowerCase() === PLACEHOLDER_FULL_NAME.toLowerCase()
+  ) {
     return true;
   }
 
@@ -36,7 +38,11 @@ export function isPlaceholderFullName(
   if (phone) {
     const nameDigits = digitsOnly(name);
     const phoneDigits = digitsOnly(phone);
-    if (nameDigits && phoneDigits && nameDigits === phoneDigits) {
+    if (
+      nameDigits &&
+      phoneDigits &&
+      nameDigits === phoneDigits
+    ) {
       return true;
     }
   }
@@ -61,7 +67,8 @@ async function normalizePlaceholderName(
   // Persist cleanup when the DB still stores a phone-shaped name
   if (
     user.id &&
-    user.full_name.trim().toLowerCase() !== PLACEHOLDER_FULL_NAME.toLowerCase()
+    user.full_name.trim().toLowerCase() !==
+      PLACEHOLDER_FULL_NAME.toLowerCase()
   ) {
     try {
       return await updateUser({
@@ -76,27 +83,45 @@ async function normalizePlaceholderName(
   return normalized;
 }
 
-export async function syncProfile(authUser: AuthUser): Promise<User> {
+export async function syncProfile(
+  authUser: AuthUser,
+): Promise<User> {
   const authId = authUser.id;
-  const phone = authUser.phone ? normalizePhone(authUser.phone) : undefined;
+  const phone = authUser.phone
+    ? normalizePhone(authUser.phone)
+    : undefined;
 
   const existingByAuth = await getUserByAuthId(authId);
   if (existingByAuth) {
-    return await normalizePlaceholderName(existingByAuth, phone);
+    return await normalizePlaceholderName(
+      existingByAuth,
+      phone,
+    );
   }
 
   if (phone) {
     const existingByPhone = await getUserByPhone(phone);
     console.log("existingByPhone", existingByPhone);
     if (existingByPhone) {
-      if (existingByPhone.auth_id && existingByPhone.auth_id !== authId) {
-        throw new Error("This phone number is linked to another account.");
+      if (
+        existingByPhone.auth_id &&
+        existingByPhone.auth_id !== authId
+      ) {
+        throw new Error(
+          "This phone number is linked to another account.",
+        );
       }
       if (!existingByPhone.auth_id) {
-        const linked = await linkAuthId(existingByPhone.id!, authId);
+        const linked = await linkAuthId(
+          existingByPhone.id!,
+          authId,
+        );
         return await normalizePlaceholderName(linked, phone);
       }
-      return await normalizePlaceholderName(existingByPhone, phone);
+      return await normalizePlaceholderName(
+        existingByPhone,
+        phone,
+      );
     }
   }
 
@@ -108,7 +133,9 @@ export async function syncProfile(authUser: AuthUser): Promise<User> {
   });
 }
 
-export function parseAddressFromProfile(address?: string | null): {
+export function parseAddressFromProfile(
+  address?: string | null,
+): {
   houseNumber: string;
   street: string;
 } {

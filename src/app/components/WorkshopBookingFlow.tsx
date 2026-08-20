@@ -31,9 +31,7 @@ import {
   Workshop,
   WorkshopDisplay,
 } from "../src/schema/workshop.schema";
-import {
-  updateUser,
-} from "../src/lib/db/users";
+import { updateUser } from "../src/lib/db/users";
 import { isPlaceholderFullName } from "../src/lib/auth/profile-sync";
 import { User as AppUser } from "../src/schema/user.schema";
 
@@ -110,29 +108,46 @@ export function WorkshopBookingFlow({
       notes: "",
     });
   const [receiptNumber, setReceiptNumber] = useState("");
-  const [isSavingParticipant, setIsSavingParticipant] = useState(false);
+  const [isSavingParticipant, setIsSavingParticipant] =
+    useState(false);
 
-  const prefillFromProfile = useCallback((userProfile: AppUser) => {
-    const profileName = isPlaceholderFullName(
-      userProfile.full_name,
-      userProfile.phone,
-    )
-      ? ""
-      : userProfile.full_name;
-    setBookingData((prev) => ({
-      ...prev,
-      user_id: userProfile.id ?? "",
-      participant_phone: userProfile.phone?.replaceAll(" ", "") ?? "",
-      participant_name: prev.participant_name || profileName,
-      participant_email: prev.participant_email || userProfile.email || "",
-    }));
-  }, []);
+  const prefillFromProfile = useCallback(
+    (userProfile: AppUser) => {
+      const profileName = isPlaceholderFullName(
+        userProfile.full_name,
+        userProfile.phone,
+      )
+        ? ""
+        : userProfile.full_name;
+      setBookingData((prev) => ({
+        ...prev,
+        user_id: userProfile.id ?? "",
+        participant_phone:
+          userProfile.phone?.replaceAll(" ", "") ?? "",
+        participant_name: prev.participant_name || profileName,
+        participant_email:
+          prev.participant_email || userProfile.email || "",
+      }));
+    },
+    [],
+  );
 
   useEffect(() => {
-    if (open && isAuthenticated && profile && step === "participant") {
+    if (
+      open &&
+      isAuthenticated &&
+      profile &&
+      step === "participant"
+    ) {
       prefillFromProfile(profile);
     }
-  }, [open, isAuthenticated, profile, step, prefillFromProfile]);
+  }, [
+    open,
+    isAuthenticated,
+    profile,
+    step,
+    prefillFromProfile,
+  ]);
 
   const handleClose = () => {
     setStep("overview");
@@ -170,7 +185,10 @@ export function WorkshopBookingFlow({
       });
       setStep("review");
     } catch (error) {
-      console.error("Failed to update participant profile:", error);
+      console.error(
+        "Failed to update participant profile:",
+        error,
+      );
       alert("Failed to save your details. Please try again.");
     } finally {
       setIsSavingParticipant(false);
@@ -590,8 +608,8 @@ export function WorkshopBookingFlow({
             <DialogHeader>
               <DialogTitle>Participant Information</DialogTitle>
               <DialogDescription>
-                Verify your phone and enter your contact details for workshop
-                coordination
+                Verify your phone and enter your contact details
+                for workshop coordination
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-6">
@@ -705,7 +723,9 @@ export function WorkshopBookingFlow({
                     isSavingParticipant
                   }
                 >
-                  {isSavingParticipant ? "Saving..." : "Continue"}
+                  {isSavingParticipant
+                    ? "Saving..."
+                    : "Continue"}
                 </Button>
               </div>
             </div>

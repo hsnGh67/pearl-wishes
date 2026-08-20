@@ -20,10 +20,15 @@ export const COUNTRY_CODES: CountryCode[] = [
 
 export const DEFAULT_COUNTRY_CODE_ID = "uk-44";
 
-export function toE164(countryCodeId: string, phoneNumber: string): string {
+export function toE164(
+  countryCodeId: string,
+  phoneNumber: string,
+): string {
   const country =
     COUNTRY_CODES.find((item) => item.id === countryCodeId) ??
-    COUNTRY_CODES.find((item) => item.id === DEFAULT_COUNTRY_CODE_ID);
+    COUNTRY_CODES.find(
+      (item) => item.id === DEFAULT_COUNTRY_CODE_ID,
+    );
   const dialCode = country?.code ?? "+44";
   const digits = phoneNumber.replace(/\D/g, "");
   return `${dialCode}${digits}`;
@@ -38,19 +43,27 @@ export function parsePhoneParts(phone?: string | null): {
   phoneNumber: string;
 } {
   if (!phone) {
-    return { countryCodeId: DEFAULT_COUNTRY_CODE_ID, phoneNumber: "" };
+    return {
+      countryCodeId: DEFAULT_COUNTRY_CODE_ID,
+      phoneNumber: "",
+    };
   }
 
   const normalized = normalizePhone(phone);
   const digits = normalized.replace(/\D/g, "");
-  const withPlus = normalized.startsWith("+") ? normalized : `+${digits}`;
+  const withPlus = normalized.startsWith("+")
+    ? normalized
+    : `+${digits}`;
 
   const matched = [...COUNTRY_CODES]
     .sort((a, b) => b.code.length - a.code.length)
     .find((item) => withPlus.startsWith(item.code));
 
   if (!matched) {
-    return { countryCodeId: DEFAULT_COUNTRY_CODE_ID, phoneNumber: digits };
+    return {
+      countryCodeId: DEFAULT_COUNTRY_CODE_ID,
+      phoneNumber: digits,
+    };
   }
 
   return {

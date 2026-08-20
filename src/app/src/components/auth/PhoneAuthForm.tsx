@@ -74,7 +74,8 @@ function GradientSubmitButton({
       {isActive ? (
         <span
           style={{
-            background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+            background:
+              "linear-gradient(to right, #FCEAE0, #EACAB8)",
             WebkitBackgroundClip: "text",
             backgroundClip: "text",
             WebkitTextFillColor: "transparent",
@@ -155,18 +156,24 @@ export function PhoneAuthForm({
       : "";
 
   return (
-    <div className={`${wrapperClass} ${className ?? ""}`.trim()}>
-      <div className="space-y-1 pb-4">
-        <h2
-          className={
-            variant === "page" ? "text-2xl font-semibold" : "text-lg font-semibold"
-          }
-          style={{ color: "#3D3935" }}
-        >
-          {title}
-        </h2>
-        <p className="text-sm text-gray-500">{description}</p>
-      </div>
+    <div
+      className={`${wrapperClass} ${className ?? ""}`.trim()}
+    >
+      {variant !== "dialog" && (
+        <div className="space-y-1 pb-4">
+          <h2
+            className={
+              variant === "page"
+                ? "text-2xl font-semibold"
+                : "text-lg font-semibold"
+            }
+            style={{ color: "#3D3935" }}
+          >
+            {title}
+          </h2>
+          <p className="text-sm text-gray-500">{description}</p>
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -175,11 +182,17 @@ export function PhoneAuthForm({
       )}
 
       {step === "phone" ? (
-        <form onSubmit={handlePhoneSubmit} className="space-y-6 py-2">
+        <form
+          onSubmit={handlePhoneSubmit}
+          className="space-y-6 py-2"
+        >
           <div className="space-y-2">
             <Label htmlFor="phone">Phone Number</Label>
             <div className="flex gap-2">
-              <Select value={countryCodeId} onValueChange={setCountryCodeId}>
+              <Select
+                value={countryCodeId}
+                onValueChange={setCountryCodeId}
+              >
                 <SelectTrigger className="w-[140px]">
                   <SelectValue />
                 </SelectTrigger>
@@ -197,7 +210,9 @@ export function PhoneAuthForm({
                 placeholder="7XXX XXXXXX"
                 value={phoneNumber}
                 onChange={(e) =>
-                  setPhoneNumber(e.target.value.replace(/[^0-9\s\-()]/g, ""))
+                  setPhoneNumber(
+                    e.target.value.replace(/[^0-9\s\-()]/g, ""),
+                  )
                 }
                 className="flex-1"
                 required
@@ -208,16 +223,28 @@ export function PhoneAuthForm({
             </p>
           </div>
 
-          <GradientSubmitButton disabled={isSending || !phoneNumber.trim()} type="submit">
-            {isSending ? "Sending code..." : "Send verification code"}
+          <GradientSubmitButton
+            disabled={isSending || !phoneNumber.trim()}
+            type="submit"
+          >
+            {isSending
+              ? "Sending code..."
+              : "Send verification code"}
           </GradientSubmitButton>
         </form>
       ) : (
-        <form onSubmit={handleOtpSubmit} className="space-y-6 py-2">
+        <form
+          onSubmit={handleOtpSubmit}
+          className="space-y-6 py-2"
+        >
           <div className="space-y-2">
             <Label htmlFor="otp">Verification Code</Label>
             <div className="flex justify-center">
-              <InputOTP maxLength={6} value={otpCode} onChange={setOtpCode}>
+              <InputOTP
+                maxLength={6}
+                value={otpCode}
+                onChange={setOtpCode}
+              >
                 <InputOTPGroup>
                   <InputOTPSlot index={0} />
                   <InputOTPSlot index={1} />

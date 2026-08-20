@@ -10,6 +10,8 @@ export * from './bookings';
 export * from './booking-treatments';
 export * from './booking-with-treatments';
 export * from './content';
+export * from './studio-contact';
+export * from './why-choose-us';
 export * from './districts';
 export * from './workshops';
 export * from './workshop-bookings';

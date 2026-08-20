@@ -60,7 +60,10 @@ const PAYMENT_STATUS_LABELS: Record<string, string> = {
 };
 
 const getBookingStatusStyle = (status: string) => {
-  if (status === BookingStatus.CANCELLED || status === BookingStatus.NO_SHOW) {
+  if (
+    status === BookingStatus.CANCELLED ||
+    status === BookingStatus.NO_SHOW
+  ) {
     return { backgroundColor: "#DCD4CD", color: "#3D3935" };
   }
   if (
@@ -73,7 +76,10 @@ const getBookingStatusStyle = (status: string) => {
 };
 
 const getPaymentStatusStyle = (status: string) => {
-  if (status === PaymentStatus.PAID || status === WorkshopPaymentStatus.PAID) {
+  if (
+    status === PaymentStatus.PAID ||
+    status === WorkshopPaymentStatus.PAID
+  ) {
     return { backgroundColor: "#E9CFCA", color: "#3D3935" };
   }
   if (
@@ -105,18 +111,30 @@ const formatDateLabel = (dateValue?: string | Date | null) => {
 
 export function AdminUsers() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedAddress, setSelectedAddress] = useState<string | null>(null);
-  const [bookingsUser, setBookingsUser] = useState<User | null>(null);
-  const [workshopsUser, setWorkshopsUser] = useState<User | null>(null);
+  const [selectedAddress, setSelectedAddress] = useState<
+    string | null
+  >(null);
+  const [bookingsUser, setBookingsUser] = useState<User | null>(
+    null,
+  );
+  const [workshopsUser, setWorkshopsUser] =
+    useState<User | null>(null);
   const [notesUser, setNotesUser] = useState<User | null>(null);
   const [newNoteContent, setNewNoteContent] = useState("");
-  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
-  const [editingNoteContent, setEditingNoteContent] = useState("");
-  const [showAddUserModal, setShowAddUserModal] = useState(false);
-  const [filterWorkshopUsers, setFilterWorkshopUsers] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<
+    string | null
+  >(null);
+  const [editingNoteContent, setEditingNoteContent] =
+    useState("");
+  const [showAddUserModal, setShowAddUserModal] =
+    useState(false);
+  const [filterWorkshopUsers, setFilterWorkshopUsers] =
+    useState(false);
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [userToDelete, setUserToDelete] = useState<User | null>(
+    null,
+  );
   const [newUserData, setNewUserData] = useState({
     fullName: "",
     email: "",
@@ -172,19 +190,27 @@ export function AdminUsers() {
     if (!notesUser || !newNoteContent.trim()) return;
 
     try {
-      const newNote = await addUserNote(notesUser.id!, newNoteContent);
+      const newNote = await addUserNote(
+        notesUser.id!,
+        newNoteContent,
+      );
 
       // Optimistically update users array and notesUser state
       setUsers((prevUsers) =>
         prevUsers.map((user) =>
           user.id === notesUser.id
-            ? { ...user, notes: [...(user.notes ?? []), newNote] }
+            ? {
+                ...user,
+                notes: [...(user.notes ?? []), newNote],
+              }
             : user,
         ),
       );
 
       setNotesUser((prev) =>
-        prev ? { ...prev, notes: [...(prev.notes ?? []), newNote] } : null,
+        prev
+          ? { ...prev, notes: [...(prev.notes ?? []), newNote] }
+          : null,
       );
 
       // Clear the input
@@ -199,7 +225,10 @@ export function AdminUsers() {
     if (!notesUser || !editingNoteContent.trim()) return;
 
     try {
-      const updatedNote = await updateUserNote(noteId, editingNoteContent);
+      const updatedNote = await updateUserNote(
+        noteId,
+        editingNoteContent,
+      );
 
       const replaceNote = (notes: Note[]) =>
         notes.map((n) => (n.id === noteId ? updatedNote : n));
@@ -213,7 +242,9 @@ export function AdminUsers() {
       );
 
       setNotesUser((prev) =>
-        prev ? { ...prev, notes: replaceNote(prev.notes ?? []) } : null,
+        prev
+          ? { ...prev, notes: replaceNote(prev.notes ?? []) }
+          : null,
       );
 
       setEditingNoteId(null);
@@ -247,7 +278,9 @@ export function AdminUsers() {
       );
 
       setNotesUser((prev) =>
-        prev ? { ...prev, notes: filterNote(prev.notes ?? []) } : null,
+        prev
+          ? { ...prev, notes: filterNote(prev.notes ?? []) }
+          : null,
       );
     } catch (error) {
       console.error("Failed to delete note:", error);
@@ -265,7 +298,9 @@ export function AdminUsers() {
 
     // Check if user already exists by email
     const emailExists = users.some(
-      (user) => user.email.toLowerCase() === newUserData.email.toLowerCase(),
+      (user) =>
+        user.email.toLowerCase() ===
+        newUserData.email.toLowerCase(),
     );
 
     if (emailExists) {
@@ -321,7 +356,9 @@ export function AdminUsers() {
   };
 
   // Helper function to parse date strings like "Feb 14, 2026"
-  const parseAppointmentDate = (dateStr: string): Date | null => {
+  const parseAppointmentDate = (
+    dateStr: string,
+  ): Date | null => {
     if (!dateStr) return null;
     try {
       return new Date(dateStr);
@@ -338,12 +375,22 @@ export function AdminUsers() {
     let matchesSearch = true;
     if (searchLower) {
       // Remove all non-alphanumeric characters for phone comparison
-      const searchClean = searchLower.replace(/[^a-z0-9@.]/g, "");
-      const phoneClean = (user.phone || "").replace(/[^0-9]/g, "");
-      const emailClean = user.email.toLowerCase().replace(/\s/g, "");
+      const searchClean = searchLower.replace(
+        /[^a-z0-9@.]/g,
+        "",
+      );
+      const phoneClean = (user.phone || "").replace(
+        /[^0-9]/g,
+        "",
+      );
+      const emailClean = user.email
+        .toLowerCase()
+        .replace(/\s/g, "");
 
       matchesSearch =
-        (user.full_name || "").toLowerCase().includes(searchLower) ||
+        (user.full_name || "")
+          .toLowerCase()
+          .includes(searchLower) ||
         emailClean.includes(searchLower) ||
         user.email.toLowerCase().includes(searchLower) ||
         phoneClean.includes(searchClean) ||
@@ -359,7 +406,9 @@ export function AdminUsers() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-gray-800 mb-2">Users</h1>
-          <p className="text-gray-600">Manage your customer database</p>
+          <p className="text-gray-600">
+            Manage your customer database
+          </p>
         </div>
         <Button
           className="flex items-center gap-2 border-2"
@@ -376,7 +425,10 @@ export function AdminUsers() {
       </div>
 
       {/* Search */}
-      <Card className="p-4 mb-6 border-2" style={{ borderColor: "#DCD4CD" }}>
+      <Card
+        className="p-4 mb-6 border-2"
+        style={{ borderColor: "#DCD4CD" }}
+      >
         <div className="space-y-4">
           {/* Search Bar */}
           <div className="flex items-center justify-between gap-3">
@@ -395,7 +447,9 @@ export function AdminUsers() {
                 <input
                   type="checkbox"
                   checked={filterWorkshopUsers}
-                  onChange={(e) => setFilterWorkshopUsers(e.target.checked)}
+                  onChange={(e) =>
+                    setFilterWorkshopUsers(e.target.checked)
+                  }
                   className="w-4 h-4 cursor-pointer"
                   style={{ accentColor: "#E9CFCA" }}
                 />
@@ -414,11 +468,16 @@ export function AdminUsers() {
             className="flex items-center gap-4 pt-3 border-t"
             style={{ borderColor: "#DCD4CD" }}
           >
-            <span className="text-sm font-medium" style={{ color: "#3D3935" }}>
+            <span
+              className="text-sm font-medium"
+              style={{ color: "#3D3935" }}
+            >
               Last Appointment:
             </span>
             <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600">From:</label>
+              <label className="text-sm text-gray-600">
+                From:
+              </label>
               <Input
                 type="date"
                 value={dateFrom}
@@ -432,7 +491,9 @@ export function AdminUsers() {
               />
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-sm text-gray-600">To:</label>
+              <label className="text-sm text-gray-600">
+                To:
+              </label>
               <Input
                 type="date"
                 value={dateTo}
@@ -473,32 +534,62 @@ export function AdminUsers() {
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead style={{ backgroundColor: "#FAF7F5" }}>
-              <tr className="border-b-2" style={{ borderColor: "#DCD4CD" }}>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+              <tr
+                className="border-b-2"
+                style={{ borderColor: "#DCD4CD" }}
+              >
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Name
                 </th>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Contact
                 </th>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Address
                 </th>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Appointments
                 </th>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Workshops
                 </th>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Joined
                 </th>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Last Appointment
                 </th>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Actions
                 </th>
-                <th className="text-left p-4" style={{ color: "#3D3935" }}>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Notes
                 </th>
               </tr>
@@ -511,7 +602,10 @@ export function AdminUsers() {
                   style={{ borderColor: "#DCD4CD" }}
                 >
                   <td className="p-4">
-                    <p className="font-semibold" style={{ color: "#3D3935" }}>
+                    <p
+                      className="font-semibold"
+                      style={{ color: "#3D3935" }}
+                    >
                       {user.full_name}
                     </p>
                   </td>
@@ -526,7 +620,8 @@ export function AdminUsers() {
                         {user.phone || "N/A"}
                       </div>
                       <div className="text-xs text-gray-500">
-                        Auth: {user.auth_id ? "Linked" : "Not linked"}
+                        Auth:{" "}
+                        {user.auth_id ? "Linked" : "Not linked"}
                       </div>
                     </div>
                   </td>
@@ -550,7 +645,9 @@ export function AdminUsers() {
                             : "-"}
                         </span>
                       ) : (
-                        <span className="text-gray-500 text-sm">0</span>
+                        <span className="text-gray-500 text-sm">
+                          0
+                        </span>
                       )}
                     </div>
                   </td>
@@ -569,15 +666,20 @@ export function AdminUsers() {
                             : "-"}
                         </span>
                       ) : (
-                        <span className="text-gray-500 text-sm">0</span>
+                        <span className="text-gray-500 text-sm">
+                          0
+                        </span>
                       )}
                     </div>
                   </td>
                   <td className="p-4 text-gray-600">
-                    {new Date(user.created_at || "").toLocaleDateString(
-                      "en-GB",
-                      { day: "numeric", month: "short", year: "numeric" },
-                    )}
+                    {new Date(
+                      user.created_at || "",
+                    ).toLocaleDateString("en-GB", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })}
                   </td>
                   <td className="p-4 text-gray-600">-</td>
                   <td className="p-4">
@@ -609,7 +711,9 @@ export function AdminUsers() {
                           View
                         </span>
                       ) : (
-                        <span className="text-sm text-gray-400">-</span>
+                        <span className="text-sm text-gray-400">
+                          -
+                        </span>
                       )}
                     </div>
                   </td>
@@ -659,10 +763,16 @@ export function AdminUsers() {
               <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md">
                 <Card
                   className="p-8 border-2"
-                  style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+                  style={{
+                    borderColor: "#DCD4CD",
+                    backgroundColor: "#FEFCFA",
+                  }}
                 >
                   <div className="flex items-center justify-between mb-6">
-                    <h2 className="font-semibold" style={{ color: "#3D3935" }}>
+                    <h2
+                      className="font-semibold"
+                      style={{ color: "#3D3935" }}
+                    >
                       User Address
                     </h2>
                     <button
@@ -683,7 +793,10 @@ export function AdminUsers() {
                     <div>
                       <label
                         className="block text-sm mb-2"
-                        style={{ color: "#3D3935", opacity: 0.7 }}
+                        style={{
+                          color: "#3D3935",
+                          opacity: 0.7,
+                        }}
                       >
                         Address Line 1
                       </label>
@@ -694,7 +807,10 @@ export function AdminUsers() {
                           borderColor: "#DCD4CD",
                         }}
                       >
-                        <p className="text-sm" style={{ color: "#3D3935" }}>
+                        <p
+                          className="text-sm"
+                          style={{ color: "#3D3935" }}
+                        >
                           {houseNumber && `${houseNumber} `}
                           {street || "N/A"}
                         </p>
@@ -705,7 +821,10 @@ export function AdminUsers() {
                     <div>
                       <label
                         className="block text-sm mb-2"
-                        style={{ color: "#3D3935", opacity: 0.7 }}
+                        style={{
+                          color: "#3D3935",
+                          opacity: 0.7,
+                        }}
                       >
                         Address Line 2 (District)
                       </label>
@@ -716,7 +835,10 @@ export function AdminUsers() {
                           borderColor: "#DCD4CD",
                         }}
                       >
-                        <p className="text-sm" style={{ color: "#3D3935" }}>
+                        <p
+                          className="text-sm"
+                          style={{ color: "#3D3935" }}
+                        >
                           {district || "N/A"}
                         </p>
                       </div>
@@ -740,10 +862,16 @@ export function AdminUsers() {
           <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <Card
               className="p-8 border-2"
-              style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+              style={{
+                borderColor: "#DCD4CD",
+                backgroundColor: "#FEFCFA",
+              }}
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="font-semibold" style={{ color: "#3D3935" }}>
+                <h2
+                  className="font-semibold"
+                  style={{ color: "#3D3935" }}
+                >
                   Bookings - {bookingsUser.full_name} (
                   {bookingsUser.bookings?.length ?? 0})
                 </h2>
@@ -764,8 +892,12 @@ export function AdminUsers() {
                 {[...(bookingsUser.bookings ?? [])]
                   .sort(
                     (a, b) =>
-                      new Date(b.appointment_date as string).getTime() -
-                      new Date(a.appointment_date as string).getTime(),
+                      new Date(
+                        b.appointment_date as string,
+                      ).getTime() -
+                      new Date(
+                        a.appointment_date as string,
+                      ).getTime(),
                   )
                   .map((booking: Booking) => (
                     <div
@@ -776,7 +908,9 @@ export function AdminUsers() {
                       <div className="flex flex-wrap items-center gap-2 mb-4">
                         <span
                           className="px-3 py-1 text-sm font-semibold"
-                          style={getBookingStatusStyle(booking.status)}
+                          style={getBookingStatusStyle(
+                            booking.status,
+                          )}
                         >
                           {BOOKING_STATUS_LABELS[
                             booking.status as BookingStatus
@@ -784,10 +918,13 @@ export function AdminUsers() {
                         </span>
                         <span
                           className="px-3 py-1 text-sm font-semibold"
-                          style={getPaymentStatusStyle(booking.payment_status)}
+                          style={getPaymentStatusStyle(
+                            booking.payment_status,
+                          )}
                         >
-                          {PAYMENT_STATUS_LABELS[booking.payment_status] ||
-                            booking.payment_status}
+                          {PAYMENT_STATUS_LABELS[
+                            booking.payment_status
+                          ] || booking.payment_status}
                         </span>
                         <span
                           className="ml-auto text-lg font-bold"
@@ -799,16 +936,22 @@ export function AdminUsers() {
 
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
-                          <p className="text-sm text-gray-500">Date</p>
+                          <p className="text-sm text-gray-500">
+                            Date
+                          </p>
                           <p
                             className="font-medium"
                             style={{ color: "#3D3935" }}
                           >
-                            {formatDateLabel(booking.appointment_date)}
+                            {formatDateLabel(
+                              booking.appointment_date,
+                            )}
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">Time</p>
+                          <p className="text-sm text-gray-500">
+                            Time
+                          </p>
                           <p
                             className="font-medium"
                             style={{ color: "#3D3935" }}
@@ -817,17 +960,23 @@ export function AdminUsers() {
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">People</p>
+                          <p className="text-sm text-gray-500">
+                            People
+                          </p>
                           <p
                             className="font-medium"
                             style={{ color: "#3D3935" }}
                           >
                             {booking.people_numbers}{" "}
-                            {booking.people_numbers === 1 ? "Person" : "People"}
+                            {booking.people_numbers === 1
+                              ? "Person"
+                              : "People"}
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">District</p>
+                          <p className="text-sm text-gray-500">
+                            District
+                          </p>
                           <p
                             className="font-medium"
                             style={{ color: "#3D3935" }}
@@ -836,7 +985,9 @@ export function AdminUsers() {
                           </p>
                         </div>
                         <div className="md:col-span-2">
-                          <p className="text-sm text-gray-500">Address</p>
+                          <p className="text-sm text-gray-500">
+                            Address
+                          </p>
                           <p
                             className="font-medium"
                             style={{ color: "#3D3935" }}
@@ -845,26 +996,35 @@ export function AdminUsers() {
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">Subtotal</p>
+                          <p className="text-sm text-gray-500">
+                            Subtotal
+                          </p>
                           <p
                             className="font-medium"
                             style={{ color: "#3D3935" }}
                           >
-                            {formatMoney(booking.subtotal_amount)}
+                            {formatMoney(
+                              booking.subtotal_amount,
+                            )}
                           </p>
                         </div>
                         <div>
-                          <p className="text-sm text-gray-500">Discount</p>
+                          <p className="text-sm text-gray-500">
+                            Discount
+                          </p>
                           <p
                             className="font-medium"
                             style={{ color: "#3D3935" }}
                           >
-                            {formatMoney(booking.discount_amount)}
+                            {formatMoney(
+                              booking.discount_amount,
+                            )}
                           </p>
                         </div>
                       </div>
 
-                      {(booking.promo_code_code || booking.notes) && (
+                      {(booking.promo_code_code ||
+                        booking.notes) && (
                         <div
                           className="mt-3 pt-3 border-t space-y-2"
                           style={{ borderColor: "#DCD4CD" }}
@@ -887,8 +1047,12 @@ export function AdminUsers() {
                           )}
                           {booking.notes && (
                             <p className="text-sm">
-                              <span className="text-gray-500">Notes: </span>
-                              <span style={{ color: "#3D3935" }}>
+                              <span className="text-gray-500">
+                                Notes:{" "}
+                              </span>
+                              <span
+                                style={{ color: "#3D3935" }}
+                              >
                                 {booking.notes}
                               </span>
                             </p>
@@ -921,10 +1085,16 @@ export function AdminUsers() {
           <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
             <Card
               className="p-8 border-2"
-              style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+              style={{
+                borderColor: "#DCD4CD",
+                backgroundColor: "#FEFCFA",
+              }}
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="font-semibold" style={{ color: "#3D3935" }}>
+                <h2
+                  className="font-semibold"
+                  style={{ color: "#3D3935" }}
+                >
                   Workshops - {workshopsUser.full_name} (
                   {workshopsUser.workshops?.length ?? 0})
                 </h2>
@@ -942,7 +1112,10 @@ export function AdminUsers() {
               </div>
 
               <div className="space-y-3">
-                {[...((workshopsUser.workshops as UserWorkshop[]) ?? [])]
+                {[
+                  ...((workshopsUser.workshops as UserWorkshop[]) ??
+                    []),
+                ]
                   .sort(
                     (a, b) =>
                       new Date(b.created_at || 0).getTime() -
@@ -950,9 +1123,11 @@ export function AdminUsers() {
                   )
                   .map((workshop) => {
                     const status = workshop.status || "";
-                    const paymentStatus = workshop.payment_status || "";
+                    const paymentStatus =
+                      workshop.payment_status || "";
                     const title =
-                      workshop.workshops?.title || "Workshop booking";
+                      workshop.workshops?.title ||
+                      "Workshop booking";
 
                     return (
                       <div
@@ -963,7 +1138,9 @@ export function AdminUsers() {
                         <div className="flex flex-wrap items-center gap-2 mb-4">
                           <span
                             className="px-3 py-1 text-sm font-semibold"
-                            style={getBookingStatusStyle(status)}
+                            style={getBookingStatusStyle(
+                              status,
+                            )}
                           >
                             {WORKSHOP_BOOKING_STATUS_LABELS[
                               status as WorkshopBookingStatus
@@ -973,7 +1150,9 @@ export function AdminUsers() {
                           </span>
                           <span
                             className="px-3 py-1 text-sm font-semibold"
-                            style={getPaymentStatusStyle(paymentStatus)}
+                            style={getPaymentStatusStyle(
+                              paymentStatus,
+                            )}
                           >
                             {WORKSHOP_PAYMENT_STATUS_LABELS[
                               paymentStatus as WorkshopPaymentStatus
@@ -981,19 +1160,24 @@ export function AdminUsers() {
                               paymentStatus ||
                               "Unknown"}
                           </span>
-                          {workshop.workshops?.price != null && (
+                          {workshop.workshops?.price !=
+                            null && (
                             <span
                               className="ml-auto text-lg font-bold"
                               style={{ color: "#3D3935" }}
                             >
-                              {formatMoney(workshop.workshops.price)}
+                              {formatMoney(
+                                workshop.workshops.price,
+                              )}
                             </span>
                           )}
                         </div>
 
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div className="md:col-span-2">
-                            <p className="text-sm text-gray-500">Workshop</p>
+                            <p className="text-sm text-gray-500">
+                              Workshop
+                            </p>
                             <p
                               className="font-medium"
                               style={{ color: "#3D3935" }}
@@ -1013,7 +1197,9 @@ export function AdminUsers() {
                                 ? workshop.preferred_month
                                     .charAt(0)
                                     .toUpperCase() +
-                                  workshop.preferred_month.slice(1)
+                                  workshop.preferred_month.slice(
+                                    1,
+                                  )
                                 : "-"}
                             </p>
                           </div>
@@ -1025,11 +1211,15 @@ export function AdminUsers() {
                               className="font-medium"
                               style={{ color: "#3D3935" }}
                             >
-                              {formatDateLabel(workshop.scheduled_date)}
+                              {formatDateLabel(
+                                workshop.scheduled_date,
+                              )}
                             </p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Participant</p>
+                            <p className="text-sm text-gray-500">
+                              Participant
+                            </p>
                             <p
                               className="font-medium"
                               style={{ color: "#3D3935" }}
@@ -1038,30 +1228,40 @@ export function AdminUsers() {
                             </p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Phone</p>
+                            <p className="text-sm text-gray-500">
+                              Phone
+                            </p>
                             <p
                               className="font-medium"
                               style={{ color: "#3D3935" }}
                             >
-                              {workshop.participant_phone || "-"}
+                              {workshop.participant_phone ||
+                                "-"}
                             </p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Email</p>
+                            <p className="text-sm text-gray-500">
+                              Email
+                            </p>
                             <p
                               className="font-medium"
                               style={{ color: "#3D3935" }}
                             >
-                              {workshop.participant_email || "-"}
+                              {workshop.participant_email ||
+                                "-"}
                             </p>
                           </div>
                           <div>
-                            <p className="text-sm text-gray-500">Booked On</p>
+                            <p className="text-sm text-gray-500">
+                              Booked On
+                            </p>
                             <p
                               className="font-medium"
                               style={{ color: "#3D3935" }}
                             >
-                              {formatDateLabel(workshop.created_at)}
+                              {formatDateLabel(
+                                workshop.created_at,
+                              )}
                             </p>
                           </div>
                         </div>
@@ -1072,8 +1272,12 @@ export function AdminUsers() {
                             style={{ borderColor: "#DCD4CD" }}
                           >
                             <p className="text-sm">
-                              <span className="text-gray-500">Notes: </span>
-                              <span style={{ color: "#3D3935" }}>
+                              <span className="text-gray-500">
+                                Notes:{" "}
+                              </span>
+                              <span
+                                style={{ color: "#3D3935" }}
+                              >
                                 {workshop.notes}
                               </span>
                             </p>
@@ -1083,7 +1287,8 @@ export function AdminUsers() {
                     );
                   })}
 
-                {(workshopsUser.workshops?.length ?? 0) === 0 && (
+                {(workshopsUser.workshops?.length ?? 0) ===
+                  0 && (
                   <p className="text-gray-500 text-center py-4">
                     No workshops found
                   </p>
@@ -1113,10 +1318,16 @@ export function AdminUsers() {
           <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <Card
               className="p-8 border-2"
-              style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+              style={{
+                borderColor: "#DCD4CD",
+                backgroundColor: "#FEFCFA",
+              }}
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="font-semibold" style={{ color: "#3D3935" }}>
+                <h2
+                  className="font-semibold"
+                  style={{ color: "#3D3935" }}
+                >
                   Notes - {notesUser.full_name}
                 </h2>
                 <button
@@ -1140,14 +1351,22 @@ export function AdminUsers() {
               {/* Compose New Note */}
               <div
                 className="mb-6 p-4 border-2"
-                style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
+                style={{
+                  borderColor: "#DCD4CD",
+                  backgroundColor: "#FAF7F5",
+                }}
               >
-                <h3 className="font-semibold mb-3" style={{ color: "#3D3935" }}>
+                <h3
+                  className="font-semibold mb-3"
+                  style={{ color: "#3D3935" }}
+                >
                   Compose New Note
                 </h3>
                 <textarea
                   value={newNoteContent}
-                  onChange={(e) => setNewNoteContent(e.target.value)}
+                  onChange={(e) =>
+                    setNewNoteContent(e.target.value)
+                  }
                   placeholder="Write your note here..."
                   rows={4}
                   className="w-full p-3 border-2 resize-none focus:outline-none focus:border-gray-400"
@@ -1176,17 +1395,25 @@ export function AdminUsers() {
               <div>
                 <h3
                   className="font-semibold mb-4 pb-2 border-b-2"
-                  style={{ color: "#3D3935", borderColor: "#DCD4CD" }}
+                  style={{
+                    color: "#3D3935",
+                    borderColor: "#DCD4CD",
+                  }}
                 >
-                  Previous Notes ({notesUser?.notes?.length || 0})
+                  Previous Notes (
+                  {notesUser?.notes?.length || 0})
                 </h3>
                 <div className="space-y-3">
                   {notesUser?.notes
                     ?.slice()
                     .sort(
                       (a, b) =>
-                        new Date(b.created_at as string).getTime() -
-                        new Date(a.created_at as string).getTime(),
+                        new Date(
+                          b.created_at as string,
+                        ).getTime() -
+                        new Date(
+                          a.created_at as string,
+                        ).getTime(),
                     )
                     .map((note) => (
                       <div
@@ -1219,7 +1446,9 @@ export function AdminUsers() {
                               </p>
                             </div>
                             <div>
-                              <p className="text-sm text-gray-500">Author</p>
+                              <p className="text-sm text-gray-500">
+                                Author
+                              </p>
                               <p
                                 className="font-medium"
                                 style={{ color: "#3D3935" }}
@@ -1233,7 +1462,9 @@ export function AdminUsers() {
                             {editingNoteId === note.id ? (
                               <>
                                 <button
-                                  onClick={() => handleUpdateNote(note.id)}
+                                  onClick={() =>
+                                    handleUpdateNote(note.id)
+                                  }
                                   className="text-xs px-3 py-1 border-2 transition-colors hover:opacity-80"
                                   style={{
                                     borderColor: "#3D3935",
@@ -1252,7 +1483,8 @@ export function AdminUsers() {
                                   style={{
                                     borderColor: "#DCD4CD",
                                     color: "#3D3935",
-                                    backgroundColor: "transparent",
+                                    backgroundColor:
+                                      "transparent",
                                   }}
                                 >
                                   Cancel
@@ -1263,25 +1495,31 @@ export function AdminUsers() {
                                 <button
                                   onClick={() => {
                                     setEditingNoteId(note.id);
-                                    setEditingNoteContent(note.content);
+                                    setEditingNoteContent(
+                                      note.content,
+                                    );
                                   }}
                                   className="flex items-center justify-center w-8 h-8 border-2 transition-colors hover:bg-gray-100"
                                   style={{
                                     borderColor: "#DCD4CD",
                                     color: "#3D3935",
-                                    backgroundColor: "transparent",
+                                    backgroundColor:
+                                      "transparent",
                                   }}
                                   title="Edit note"
                                 >
                                   <PenLine className="w-4 h-4" />
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteNote(note.id)}
+                                  onClick={() =>
+                                    handleDeleteNote(note.id)
+                                  }
                                   className="flex items-center justify-center w-8 h-8 border-2 transition-colors hover:bg-red-50"
                                   style={{
                                     borderColor: "#D0A096",
                                     color: "#D0A096",
-                                    backgroundColor: "transparent",
+                                    backgroundColor:
+                                      "transparent",
                                   }}
                                   title="Delete note"
                                 >
@@ -1299,7 +1537,9 @@ export function AdminUsers() {
                             <textarea
                               value={editingNoteContent}
                               onChange={(e) =>
-                                setEditingNoteContent(e.target.value)
+                                setEditingNoteContent(
+                                  e.target.value,
+                                )
                               }
                               rows={3}
                               className="w-full p-3 border-2 resize-none focus:outline-none focus:border-gray-400"
@@ -1310,7 +1550,9 @@ export function AdminUsers() {
                               }}
                             />
                           ) : (
-                            <p className="text-gray-700">{note.content}</p>
+                            <p className="text-gray-700">
+                              {note.content}
+                            </p>
                           )}
                         </div>
                       </div>
@@ -1340,10 +1582,16 @@ export function AdminUsers() {
           <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <Card
               className="p-8 border-2"
-              style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+              style={{
+                borderColor: "#DCD4CD",
+                backgroundColor: "#FEFCFA",
+              }}
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="font-semibold" style={{ color: "#3D3935" }}>
+                <h2
+                  className="font-semibold"
+                  style={{ color: "#3D3935" }}
+                >
                   Add New User
                 </h2>
                 <button
@@ -1428,7 +1676,10 @@ export function AdminUsers() {
                     placeholder="e.g. 020 7946 1234"
                     value={newUserData.phone}
                     onChange={(e) =>
-                      setNewUserData({ ...newUserData, phone: e.target.value })
+                      setNewUserData({
+                        ...newUserData,
+                        phone: e.target.value,
+                      })
                     }
                     className="w-full p-3 border-2 focus:outline-none focus:border-gray-400"
                     style={{
@@ -1455,7 +1706,10 @@ export function AdminUsers() {
                     <div className="col-span-1">
                       <label
                         className="block text-xs mb-2"
-                        style={{ color: "#3D3935", opacity: 0.7 }}
+                        style={{
+                          color: "#3D3935",
+                          opacity: 0.7,
+                        }}
                       >
                         Number
                       </label>
@@ -1480,7 +1734,10 @@ export function AdminUsers() {
                     <div className="col-span-2">
                       <label
                         className="block text-xs mb-2"
-                        style={{ color: "#3D3935", opacity: 0.7 }}
+                        style={{
+                          color: "#3D3935",
+                          opacity: 0.7,
+                        }}
                       >
                         Street Address
                       </label>
@@ -1508,7 +1765,10 @@ export function AdminUsers() {
                     <div>
                       <label
                         className="block text-xs mb-2"
-                        style={{ color: "#3D3935", opacity: 0.7 }}
+                        style={{
+                          color: "#3D3935",
+                          opacity: 0.7,
+                        }}
                       >
                         Postcode
                       </label>
@@ -1533,7 +1793,10 @@ export function AdminUsers() {
                     <div>
                       <label
                         className="block text-xs mb-2"
-                        style={{ color: "#3D3935", opacity: 0.7 }}
+                        style={{
+                          color: "#3D3935",
+                          opacity: 0.7,
+                        }}
                       >
                         District
                       </label>
@@ -1571,16 +1834,24 @@ export function AdminUsers() {
                     >
                       <p
                         className="text-xs mb-1"
-                        style={{ color: "#3D3935", opacity: 0.7 }}
+                        style={{
+                          color: "#3D3935",
+                          opacity: 0.7,
+                        }}
                       >
                         Address Preview:
                       </p>
-                      <p className="text-sm" style={{ color: "#3D3935" }}>
+                      <p
+                        className="text-sm"
+                        style={{ color: "#3D3935" }}
+                      >
                         {newUserData.houseNumber &&
                           `${newUserData.houseNumber} `}
                         {newUserData.street}
-                        {newUserData.postcode && `, ${newUserData.postcode}`}
-                        {newUserData.district && `, ${newUserData.district}`}
+                        {newUserData.postcode &&
+                          `, ${newUserData.postcode}`}
+                        {newUserData.district &&
+                          `, ${newUserData.district}`}
                       </p>
                     </div>
                   )}
@@ -1619,10 +1890,16 @@ export function AdminUsers() {
           <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <Card
               className="p-8 border-2"
-              style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+              style={{
+                borderColor: "#DCD4CD",
+                backgroundColor: "#FEFCFA",
+              }}
             >
               <div className="flex items-center justify-between mb-6">
-                <h2 className="font-semibold" style={{ color: "#3D3935" }}>
+                <h2
+                  className="font-semibold"
+                  style={{ color: "#3D3935" }}
+                >
                   Delete User - {userToDelete.full_name}
                 </h2>
                 <button
@@ -1641,12 +1918,20 @@ export function AdminUsers() {
               {/* Confirmation Message */}
               <div
                 className="mb-6 p-4 border-2"
-                style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
+                style={{
+                  borderColor: "#DCD4CD",
+                  backgroundColor: "#FAF7F5",
+                }}
               >
-                <h3 className="font-semibold mb-3" style={{ color: "#3D3935" }}>
+                <h3
+                  className="font-semibold mb-3"
+                  style={{ color: "#3D3935" }}
+                >
                   Are you sure you want to delete this user?
                 </h3>
-                <p className="text-gray-500">This action cannot be undone.</p>
+                <p className="text-gray-500">
+                  This action cannot be undone.
+                </p>
               </div>
 
               {/* Submit Button */}

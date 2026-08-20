@@ -34,7 +34,10 @@ export const getAllUsers = async (): Promise<User[]> => {
       throw error;
     }
 
-    console.log("📦 Raw users from Supabase:", data?.slice(0, 2)); // Show first 2 users
+    console.log(
+      "📦 Raw users from Supabase:",
+      data?.slice(0, 2),
+    ); // Show first 2 users
 
     const validatedUsers =
       data?.map((user) => {
@@ -97,7 +100,10 @@ export const findUserByNameOrEmailOrPhone = async (
       throw error;
     }
 
-    console.log("📦 Raw users from Supabase:", data?.slice(0, 2)); // Show first 2 users
+    console.log(
+      "📦 Raw users from Supabase:",
+      data?.slice(0, 2),
+    ); // Show first 2 users
 
     const validatedUsers =
       data?.map((user) => {
@@ -126,7 +132,9 @@ export const findUserByNameOrEmailOrPhone = async (
 /**
  * Get users by role
  */
-export const getUsersByRole = async (role: UserRole): Promise<User[]> => {
+export const getUsersByRole = async (
+  role: UserRole,
+): Promise<User[]> => {
   try {
     dbLogger.info("Fetching users by role", {
       table: "users",
@@ -147,7 +155,8 @@ export const getUsersByRole = async (role: UserRole): Promise<User[]> => {
       throw error;
     }
 
-    const validatedUsers = data?.map((user) => validateUser(user)) || [];
+    const validatedUsers =
+      data?.map((user) => validateUser(user)) || [];
 
     dbLogger.info("Successfully fetched users by role", {
       table: "users",
@@ -164,7 +173,9 @@ export const getUsersByRole = async (role: UserRole): Promise<User[]> => {
 /**
  * Get user by ID
  */
-export const getUserById = async (id: string): Promise<User | null> => {
+export const getUserById = async (
+  id: string,
+): Promise<User | null> => {
   try {
     dbLogger.info("Fetching user by ID", {
       table: "users",
@@ -210,7 +221,9 @@ export const getUserById = async (id: string): Promise<User | null> => {
 /**
  * Get user by email
  */
-export const getUserByEmail = async (email: string): Promise<User | null> => {
+export const getUserByEmail = async (
+  email: string,
+): Promise<User | null> => {
   try {
     dbLogger.info("Fetching user by email", {
       table: "users",
@@ -256,7 +269,9 @@ export const getUserByEmail = async (email: string): Promise<User | null> => {
 /**
  * Create a new user
  */
-export const createUser = async (userData: UserCreate): Promise<User> => {
+export const createUser = async (
+  userData: UserCreate,
+): Promise<User> => {
   try {
     const validatedData = validateUserCreate(userData);
 
@@ -293,13 +308,17 @@ export const createUser = async (userData: UserCreate): Promise<User> => {
 
       if (isConflict) {
         if (insertPayload.auth_id) {
-          const existingByAuth = await getUserByAuthId(insertPayload.auth_id);
+          const existingByAuth = await getUserByAuthId(
+            insertPayload.auth_id,
+          );
           if (existingByAuth) {
             return existingByAuth;
           }
         }
         if (insertPayload.phone) {
-          const existingByPhone = await getUserByPhone(insertPayload.phone);
+          const existingByPhone = await getUserByPhone(
+            insertPayload.phone,
+          );
           if (existingByPhone) {
             return existingByPhone;
           }
@@ -330,7 +349,9 @@ export const createUser = async (userData: UserCreate): Promise<User> => {
 /**
  * Update an existing user
  */
-export const updateUser = async (userData: UserUpdate): Promise<User> => {
+export const updateUser = async (
+  userData: UserUpdate,
+): Promise<User> => {
   try {
     const validatedData = validateUserUpdate(userData);
 
@@ -390,7 +411,10 @@ export const deleteUser = async (id: string): Promise<void> => {
       data: { id },
     });
 
-    const { error } = await supabase.from("users").delete().eq("id", id);
+    const { error } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", id);
 
     if (error) {
       dbLogger.error("Failed to delete user", {
@@ -413,7 +437,9 @@ export const deleteUser = async (id: string): Promise<void> => {
 /**
  * Get user by phone number
  */
-export const getUserByPhone = async (phone: string): Promise<User | null> => {
+export const getUserByPhone = async (
+  phone: string,
+): Promise<User | null> => {
   try {
     dbLogger.info("Fetching user by phone", {
       table: "users",
@@ -467,7 +493,9 @@ export const getUserByPhone = async (phone: string): Promise<User | null> => {
 /**
  * Get user by Supabase Auth ID
  */
-export const getUserByAuthId = async (authId: string): Promise<User | null> => {
+export const getUserByAuthId = async (
+  authId: string,
+): Promise<User | null> => {
   try {
     dbLogger.info("Fetching user by auth_id", {
       table: "users",
@@ -621,7 +649,9 @@ export const updateUserNote = async (
 /**
  * Delete a user note
  */
-export const deleteUserNote = async (noteId: string): Promise<void> => {
+export const deleteUserNote = async (
+  noteId: string,
+): Promise<void> => {
   try {
     dbLogger.info("Deleting user note", {
       table: "user_notes",

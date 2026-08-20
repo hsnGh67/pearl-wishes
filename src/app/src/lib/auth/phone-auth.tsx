@@ -1,14 +1,21 @@
 import { supabase } from "../../config/supabase";
 
-export async function sendPhoneOtp(phone: string): Promise<void> {
-  const { error } = await supabase.auth.signInWithOtp({ phone });
+export async function sendPhoneOtp(
+  phone: string,
+): Promise<void> {
+  const { error } = await supabase.auth.signInWithOtp({
+    phone,
+  });
 
   if (error) {
     throw error;
   }
 }
 
-export async function verifyPhoneOtp(phone: string, token: string) {
+export async function verifyPhoneOtp(
+  phone: string,
+  token: string,
+) {
   const { data, error } = await supabase.auth.verifyOtp({
     phone,
     token,

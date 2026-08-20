@@ -40,7 +40,11 @@ export const getAllBookings = async (): Promise<Booking[]> => {
       throw error;
     }
 
-    console.log("🔍 Raw bookings from DB:", data?.length, "records");
+    console.log(
+      "🔍 Raw bookings from DB:",
+      data?.length,
+      "records",
+    );
     console.log("🔍 Sample raw booking:", data?.[0]);
 
     const validatedBookings =
@@ -144,33 +148,36 @@ export const getBookedTimesForDate = async (
       .neq("bookings.status", BookingStatus.CANCELLED);
 
     if (!error && data) {
-      const grouped = data.reduce<Record<string, BookedTimeSlot>>(
-        (acc, row) => {
-          const booking = row.bookings;
-          if (!booking?.appointment_time) return acc;
+      const grouped = data.reduce<
+        Record<string, BookedTimeSlot>
+      >((acc, row) => {
+        const booking = row.bookings;
+        if (!booking?.appointment_time) return acc;
 
-          const bookingId = row.booking_id;
-          const duration = Number(row.duration) || 0;
+        const bookingId = row.booking_id;
+        const duration = Number(row.duration) || 0;
 
-          if (!acc[bookingId]) {
-            acc[bookingId] = {
-              appointment_time: booking.appointment_time,
-              duration,
-            };
-          } else {
-            acc[bookingId].duration += duration + GAP_MINUTES_PER_SERVICE;
-          }
+        if (!acc[bookingId]) {
+          acc[bookingId] = {
+            appointment_time: booking.appointment_time,
+            duration,
+          };
+        } else {
+          acc[bookingId].duration +=
+            duration + GAP_MINUTES_PER_SERVICE;
+        }
 
-          return acc;
-        },
-        {},
-      );
+        return acc;
+      }, {});
 
       const slots = Object.values(grouped);
-      dbLogger.info("Booked time slots loaded from treatments", {
-        table: "booking_treatments",
-        data: { date: dateString, count: slots.length },
-      });
+      dbLogger.info(
+        "Booked time slots loaded from treatments",
+        {
+          table: "booking_treatments",
+          data: { date: dateString, count: slots.length },
+        },
+      );
       return slots;
     }
 
@@ -209,10 +216,13 @@ export const getBookedTimesForDate = async (
       }))
       .filter(Boolean) as BookedTimeSlot[];
 
-    dbLogger.info("Booked time slots loaded from bookings fallback", {
-      table: "bookings",
-      data: { date: dateString, count: fallbackSlots.length },
-    });
+    dbLogger.info(
+      "Booked time slots loaded from bookings fallback",
+      {
+        table: "bookings",
+        data: { date: dateString, count: fallbackSlots.length },
+      },
+    );
     return fallbackSlots;
   } catch (error) {
     dbLogger.error("Error in getBookedTimesForDate", { error });
@@ -223,7 +233,9 @@ export const getBookedTimesForDate = async (
 /**
  * Get booking by ID
  */
-export const getBookingById = async (id: string): Promise<Booking | null> => {
+export const getBookingById = async (
+  id: string,
+): Promise<Booking | null> => {
   try {
     dbLogger.info("Fetching booking by ID", {
       table: "bookings",
@@ -376,14 +388,19 @@ export const updateBooking = async (
 /**
  * Delete a booking
  */
-export const deleteBooking = async (id: string): Promise<void> => {
+export const deleteBooking = async (
+  id: string,
+): Promise<void> => {
   try {
     dbLogger.info("Deleting booking", {
       table: "bookings",
       data: { id },
     });
 
-    const { error } = await supabase.from("bookings").delete().eq("id", id);
+    const { error } = await supabase
+      .from("bookings")
+      .delete()
+      .eq("id", id);
 
     if (error) {
       dbLogger.error("Failed to delete booking", {

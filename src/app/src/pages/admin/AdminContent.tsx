@@ -14,12 +14,7 @@ import {
 } from "lucide-react";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-import {
-  useState,
-  useRef,
-  useCallback,
-  useEffect,
-} from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import {
@@ -44,6 +39,13 @@ import {
   createDistrict,
   deleteDistrict,
 } from "../../lib/db/districts";
+import {
+  getContactAndHours,
+  saveContactAndHours,
+} from "../../lib/db/studio-contact";
+import { getWhyChooseUs, saveWhyChooseUs } from "../../lib/db/why-choose-us";
+import { mapBusinessHourToHourRow } from "../../schema/studio-contact.schema";
+import { DEFAULT_WHY_ITEMS, WhyCard } from "../../schema/why-choose-us.schema";
 import { getAllServices } from "../../lib/db/services";
 import { Service } from "../../schema/service.schema";
 import {
@@ -82,12 +84,7 @@ interface Testimonial {
 }
 
 const MB_IN_BYTES = 1024 * 1024;
-const HERO_MEDIA_IMAGE_FORMATS = [
-  "png",
-  "jpeg",
-  "jpg",
-  "webp",
-] as const;
+const HERO_MEDIA_IMAGE_FORMATS = ["png", "jpeg", "jpg", "webp"] as const;
 const HERO_MEDIA_VIDEO_FORMATS = ["mp4"] as const;
 const HERO_MEDIA_IMAGE_MAX_SIZE_MB = 5;
 const HERO_MEDIA_VIDEO_MAX_SIZE_MB = 10;
@@ -95,22 +92,14 @@ const HERO_MEDIA_ACCEPT = [
   ...HERO_MEDIA_IMAGE_FORMATS.map((format) => `.${format}`),
   ...HERO_MEDIA_VIDEO_FORMATS.map((format) => `.${format}`),
 ].join(",");
-const HERO_MEDIA_IMAGE_MAX_SIZE =
-  HERO_MEDIA_IMAGE_MAX_SIZE_MB * MB_IN_BYTES;
-const HERO_MEDIA_VIDEO_MAX_SIZE =
-  HERO_MEDIA_VIDEO_MAX_SIZE_MB * MB_IN_BYTES;
-const LOOKBOOK_IMAGE_FORMATS = [
-  "png",
-  "jpeg",
-  "jpg",
-  "webp",
-] as const;
+const HERO_MEDIA_IMAGE_MAX_SIZE = HERO_MEDIA_IMAGE_MAX_SIZE_MB * MB_IN_BYTES;
+const HERO_MEDIA_VIDEO_MAX_SIZE = HERO_MEDIA_VIDEO_MAX_SIZE_MB * MB_IN_BYTES;
+const LOOKBOOK_IMAGE_FORMATS = ["png", "jpeg", "jpg", "webp"] as const;
 const LOOKBOOK_IMAGE_MAX_SIZE_MB = 5;
 const LOOKBOOK_IMAGE_ACCEPT = LOOKBOOK_IMAGE_FORMATS.map(
   (format) => `.${format}`,
 ).join(",");
-const LOOKBOOK_IMAGE_MAX_SIZE =
-  LOOKBOOK_IMAGE_MAX_SIZE_MB * MB_IN_BYTES;
+const LOOKBOOK_IMAGE_MAX_SIZE = LOOKBOOK_IMAGE_MAX_SIZE_MB * MB_IN_BYTES;
 
 // Default content data for each homepage sub-section
 const defaultContentData: Record<string, SectionFields> = {
@@ -158,11 +147,28 @@ const DRAG_TYPE = "HERO_MEDIA";
 const LOOKBOOK_DRAG_TYPE = "LOOKBOOK_IMAGE";
 
 // ── About page types ──────────────────────────────────────────────────────────
-interface AboutMainFields { title: string; description: string; }
-interface WhyCard { id: string; icon: string; imageUrl: string; title: string; description: string; }
-interface HourRow { id: string; day: string; time: string; }
-interface AwardCard { id: string; imageUrl: string; name: string; year: string; issuer: string; }
-interface ContactFields { phone: string; email: string; address: string; }
+interface AboutMainFields {
+  title: string;
+  description: string;
+}
+interface HourRow {
+  id: string;
+  day: string;
+  time: string;
+}
+interface AwardCard {
+  id: string;
+  imageUrl: string;
+  name: string;
+  year: string;
+  issuer: string;
+}
+interface ContactFields {
+  id?: string;
+  phone: string;
+  email: string;
+  address: string;
+}
 
 interface DragItem {
   index: number;
@@ -212,11 +218,7 @@ function DraggableMediaThumb({
     },
   });
 
-  const [{ isOver }, drop] = useDrop<
-    DragItem,
-    void,
-    { isOver: boolean }
-  >({
+  const [{ isOver }, drop] = useDrop<DragItem, void, { isOver: boolean }>({
     accept: DRAG_TYPE,
     hover(item) {
       if (!ref.current) return;
@@ -238,11 +240,7 @@ function DraggableMediaThumb({
       ref={ref}
       className="relative group rounded-md overflow-hidden border-2 transition-all"
       style={{
-        borderColor: isOver
-          ? "#D0A096"
-          : index === 0
-            ? "#D0A096"
-            : "#DCD4CD",
+        borderColor: isOver ? "#D0A096" : index === 0 ? "#D0A096" : "#DCD4CD",
         aspectRatio: "16 / 9",
         opacity: isDragging ? 0.4 : 1,
         cursor: isEditing ? "grab" : "default",
@@ -253,10 +251,7 @@ function DraggableMediaThumb({
           className="w-full h-full flex items-center justify-center"
           style={{ backgroundColor: "#3D3935" }}
         >
-          <Film
-            className="w-8 h-8"
-            style={{ color: "#EADDD5" }}
-          />
+          <Film className="w-8 h-8" style={{ color: "#EADDD5" }} />
         </div>
       ) : (
         <img
@@ -272,10 +267,7 @@ function DraggableMediaThumb({
           className="absolute top-1.5 left-1.5 p-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity"
           style={{ backgroundColor: "rgba(61, 57, 53, 0.7)" }}
         >
-          <GripVertical
-            className="w-3.5 h-3.5"
-            style={{ color: "#FAF7F5" }}
-          />
+          <GripVertical className="w-3.5 h-3.5" style={{ color: "#FAF7F5" }} />
         </div>
       )}
 
@@ -284,8 +276,7 @@ function DraggableMediaThumb({
         <div
           className="absolute flex items-center gap-1 px-2 py-0.5 rounded-sm text-xs"
           style={{
-            background:
-              "linear-gradient(135deg, #FCEAE0, #EACAB8)",
+            background: "linear-gradient(135deg, #FCEAE0, #EACAB8)",
             color: "#3D3935",
             top: "6px",
             left: isEditing ? "30px" : "6px",
@@ -314,10 +305,7 @@ function DraggableMediaThumb({
           style={{ backgroundColor: "rgba(61, 57, 53, 0.7)" }}
           onClick={() => onRemove(file.id)}
         >
-          <Trash2
-            className="w-3.5 h-3.5"
-            style={{ color: "#FAF7F5" }}
-          />
+          <Trash2 className="w-3.5 h-3.5" style={{ color: "#FAF7F5" }} />
         </button>
       )}
     </div>
@@ -356,11 +344,7 @@ function DraggableLookbookImage({
     }),
   });
 
-  const [{ isOver }, drop] = useDrop<
-    DragItem,
-    void,
-    { isOver: boolean }
-  >({
+  const [{ isOver }, drop] = useDrop<DragItem, void, { isOver: boolean }>({
     accept: LOOKBOOK_DRAG_TYPE,
     hover(item) {
       if (!ref.current) return;
@@ -398,10 +382,7 @@ function DraggableLookbookImage({
         className="absolute top-1.5 left-1.5 p-1 rounded-sm opacity-0 group-hover:opacity-100 transition-opacity"
         style={{ backgroundColor: "rgba(61, 57, 53, 0.7)" }}
       >
-        <GripVertical
-          className="w-3.5 h-3.5"
-          style={{ color: "#FAF7F5" }}
-        />
+        <GripVertical className="w-3.5 h-3.5" style={{ color: "#FAF7F5" }} />
       </div>
 
       {/* Position badge */}
@@ -432,40 +413,25 @@ function DraggableLookbookImage({
         style={{ backgroundColor: "rgba(61, 57, 53, 0.9)" }}
         onClick={() => onRemove(image.id)}
       >
-        <Trash2
-          className="w-4 h-4"
-          style={{ color: "#FAF7F5" }}
-        />
+        <Trash2 className="w-4 h-4" style={{ color: "#FAF7F5" }} />
       </button>
     </div>
   );
 }
 
 export function AdminContent() {
-  const [expandedSection, setExpandedSection] = useState<
-    string | null
-  >("homepage");
-  const [editingCard, setEditingCard] = useState<string | null>(
-    null,
+  const [expandedSection, setExpandedSection] = useState<string | null>(
+    "homepage",
   );
-  const [contentData, setContentData] = useState<
-    Record<string, SectionFields>
-  >(defaultContentData);
+  const [editingCard, setEditingCard] = useState<string | null>(null);
+  const [contentData, setContentData] =
+    useState<Record<string, SectionFields>>(defaultContentData);
   const [editDraft, setEditDraft] = useState<SectionFields>({});
-  const [savedMessage, setSavedMessage] = useState<
-    string | null
-  >(null);
-  const [heroMedia, setHeroMedia] = useState<HeroMediaFile[]>(
-    [],
-  );
-  const [heroMediaDraft, setHeroMediaDraft] = useState<
-    HeroMediaFile[]
-  >([]);
-  const [heroMediaError, setHeroMediaError] = useState<
-    string | null
-  >(null);
-  const [isHeroMediaUploading, setIsHeroMediaUploading] =
-    useState(false);
+  const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const [heroMedia, setHeroMedia] = useState<HeroMediaFile[]>([]);
+  const [heroMediaDraft, setHeroMediaDraft] = useState<HeroMediaFile[]>([]);
+  const [heroMediaError, setHeroMediaError] = useState<string | null>(null);
+  const [isHeroMediaUploading, setIsHeroMediaUploading] = useState(false);
   const heroMediaDraftRef = useRef<HeroMediaFile[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [instagramData, setInstagramData] = useState({
@@ -482,26 +448,22 @@ export function AdminContent() {
   const [isEditingInsta, setIsEditingInsta] = useState(false);
 
   // Testimonials state
-  const [testimonials, setTestimonials] = useState<
-    Testimonial[]
-  >([]);
-  const [testimonialsDraft, setTestimonialsDraft] = useState<
-    Testimonial[]
-  >([]);
-  const [editingTestimonialId, setEditingTestimonialId] =
-    useState<string | null>(null);
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([]);
+  const [testimonialsDraft, setTestimonialsDraft] = useState<Testimonial[]>([]);
+  const [editingTestimonialId, setEditingTestimonialId] = useState<
+    string | null
+  >(null);
 
-  const [testimonialForm, setTestimonialForm] =
-    useState<Testimonial>({
-      id: "",
-      client_name: "",
-      initials: "",
-      rating: 5,
-      comment: "",
-      service_type: "",
-      is_featured: true,
-      is_published: true,
-    });
+  const [testimonialForm, setTestimonialForm] = useState<Testimonial>({
+    id: "",
+    client_name: "",
+    initials: "",
+    rating: 5,
+    comment: "",
+    service_type: "",
+    is_featured: true,
+    is_published: true,
+  });
 
   // Districts state
   const [districts, setDistricts] = useState<{
@@ -518,19 +480,12 @@ export function AdminContent() {
   >(null);
 
   // Lookbook state
-  const [lookbookImages, setLookbookImages] = useState<
-    LookbookImage[]
-  >([]);
-  const [lookbookDraft, setLookbookDraft] = useState<
-    LookbookImage[]
-  >([]);
+  const [lookbookImages, setLookbookImages] = useState<LookbookImage[]>([]);
+  const [lookbookDraft, setLookbookDraft] = useState<LookbookImage[]>([]);
   const lookbookDraftRef = useRef<LookbookImage[]>([]);
   const lookbookFileInputRef = useRef<HTMLInputElement>(null);
-  const [lookbookError, setLookbookError] = useState<
-    string | null
-  >(null);
-  const [isLookbookUploading, setIsLookbookUploading] =
-    useState(false);
+  const [lookbookError, setLookbookError] = useState<string | null>(null);
+  const [isLookbookUploading, setIsLookbookUploading] = useState(false);
 
   const [services, setServices] = useState<Service[]>([]);
 
@@ -540,39 +495,58 @@ export function AdminContent() {
 
   const [aboutMain, setAboutMain] = useState<AboutMainFields>({
     title: "About Pearl Wishes Studio",
-    description: "Pearl Wishes Studio is London's premier mobile nail care service, bringing luxury treatments directly to your door. Founded with a passion for exceptional nail artistry and client convenience, we combine professional-grade products with personalised care.",
+    description:
+      "Pearl Wishes Studio is London's premier mobile nail care service, bringing luxury treatments directly to your door. Founded with a passion for exceptional nail artistry and client convenience, we combine professional-grade products with personalised care.",
   });
-  const [aboutMainDraft, setAboutMainDraft] = useState<AboutMainFields>({ title: "", description: "" });
+  const [aboutMainDraft, setAboutMainDraft] = useState<AboutMainFields>({
+    title: "",
+    description: "",
+  });
 
-  const [whyItems, setWhyItems] = useState<WhyCard[]>([
-    { id: "w1", icon: "✨", imageUrl: "", title: "Mobile Convenience", description: "We come to you — at home, office, or any preferred location across London." },
-    { id: "w2", icon: "💅", imageUrl: "", title: "Premium Products", description: "Only the finest gel, BIAB, and shellac brands trusted by nail professionals." },
-    { id: "w3", icon: "🎓", imageUrl: "", title: "Certified Technicians", description: "All technicians hold industry certifications and undergo continuous training." },
-  ]);
+  const [whyItems, setWhyItems] = useState<WhyCard[]>(DEFAULT_WHY_ITEMS);
   const [whyDraft, setWhyDraft] = useState<WhyCard[]>([]);
   const whyFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const whyPendingFiles = useRef<Record<string, File>>({});
+  const [isSavingWhy, setIsSavingWhy] = useState(false);
 
   const [contactInfo, setContactInfo] = useState<ContactFields>({
     phone: "+44 20 7946 0958",
     email: "hello@pearlwishesstudio.co.uk",
     address: "London, United Kingdom",
   });
-  const [contactDraft, setContactDraft] = useState<ContactFields>({ phone: "", email: "", address: "" });
+  const [contactDraft, setContactDraft] = useState<ContactFields>({
+    phone: "",
+    email: "",
+    address: "",
+  });
 
   const [businessHoursData, setBusinessHoursData] = useState<HourRow[]>([
-    { id: "bh1", day: "Monday",    time: "9:00 AM – 7:00 PM" },
-    { id: "bh2", day: "Tuesday",   time: "9:00 AM – 7:00 PM" },
+    { id: "bh1", day: "Monday", time: "9:00 AM – 7:00 PM" },
+    { id: "bh2", day: "Tuesday", time: "9:00 AM – 7:00 PM" },
     { id: "bh3", day: "Wednesday", time: "9:00 AM – 7:00 PM" },
-    { id: "bh4", day: "Thursday",  time: "9:00 AM – 8:00 PM" },
-    { id: "bh5", day: "Friday",    time: "9:00 AM – 8:00 PM" },
-    { id: "bh6", day: "Saturday",  time: "10:00 AM – 6:00 PM" },
-    { id: "bh7", day: "Sunday",    time: "Closed" },
+    { id: "bh4", day: "Thursday", time: "9:00 AM – 8:00 PM" },
+    { id: "bh5", day: "Friday", time: "9:00 AM – 8:00 PM" },
+    { id: "bh6", day: "Saturday", time: "10:00 AM – 6:00 PM" },
+    { id: "bh7", day: "Sunday", time: "Closed" },
   ]);
   const [hoursDraft, setHoursDraft] = useState<HourRow[]>([]);
+  const [isSavingContact, setIsSavingContact] = useState(false);
 
   const [awardItems, setAwardItems] = useState<AwardCard[]>([
-    { id: "a1", imageUrl: "", name: "Best Mobile Beauty Service", year: "2023", issuer: "London Beauty Awards" },
-    { id: "a2", imageUrl: "", name: "Five Star Excellence",       year: "2024", issuer: "UK Nail Industry Association" },
+    {
+      id: "a1",
+      imageUrl: "",
+      name: "Best Mobile Beauty Service",
+      year: "2023",
+      issuer: "London Beauty Awards",
+    },
+    {
+      id: "a2",
+      imageUrl: "",
+      name: "Five Star Excellence",
+      year: "2024",
+      issuer: "UK Nail Industry Association",
+    },
   ]);
   const [awardsDraft, setAwardsDraft] = useState<AwardCard[]>([]);
   const awardFileRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -601,12 +575,9 @@ export function AdminContent() {
       setContentData((prev) => ({
         ...prev,
         hero: {
-          headline:
-            data[0]?.title ||
-            "Luxury nail care at your doorstep",
+          headline: data[0]?.title || "Luxury nail care at your doorstep",
           subheadline:
-            data[0]?.subtitle ||
-            "Premium mobile nail treatments in London",
+            data[0]?.subtitle || "Premium mobile nail treatments in London",
         },
       }));
       setHeroMedia(data || []);
@@ -620,9 +591,7 @@ export function AdminContent() {
       const data = await getContentSectionByName("instagram");
 
       if (!data) {
-        console.warn(
-          "No content section found for 'instagram'",
-        );
+        console.warn("No content section found for 'instagram'");
         return;
       }
 
@@ -696,6 +665,39 @@ export function AdminContent() {
     }
   };
 
+  const getWhyChooseUsSection = async () => {
+    try {
+      const data = await getWhyChooseUs();
+
+      if (data.length > 0) {
+        setWhyItems(data);
+      }
+    } catch (error) {
+      console.error("Error fetching why choose us cards:", error);
+    }
+  };
+
+  const getContactSection = async () => {
+    try {
+      const data = await getContactAndHours();
+
+      if (data.contact) {
+        setContactInfo({
+          id: data.contact.id,
+          phone: data.contact.phone,
+          email: data.contact.email,
+          address: data.contact.address,
+        });
+      }
+
+      if (data.hours.length > 0) {
+        setBusinessHoursData(data.hours.map(mapBusinessHourToHourRow));
+      }
+    } catch (error) {
+      console.error("Error fetching contact and business hours:", error);
+    }
+  };
+
   useEffect(() => {
     getTestimonialSection();
     getHeroSection();
@@ -703,6 +705,8 @@ export function AdminContent() {
     getInsta();
     getDistricts();
     getServices();
+    getContactSection();
+    getWhyChooseUsSection();
   }, []);
 
   useEffect(() => {
@@ -714,9 +718,7 @@ export function AdminContent() {
   }, [lookbookDraft]);
 
   const toggleSection = (section: string) => {
-    setExpandedSection(
-      expandedSection === section ? null : section,
-    );
+    setExpandedSection(expandedSection === section ? null : section);
   };
 
   const handleEdit = (sectionKey: string) => {
@@ -857,20 +859,13 @@ export function AdminContent() {
       !testimonialForm.comment ||
       !testimonialForm.service_type
     ) {
-      alert(
-        "Please fill in all required fields (Name, Text, Service)",
-      );
+      alert("Please fill in all required fields (Name, Text, Service)");
       return;
     }
 
     // Auto-generate initials if not provided
-    if (
-      !testimonialForm.initials &&
-      testimonialForm.client_name
-    ) {
-      const names = testimonialForm.client_name
-        .trim()
-        .split(" ");
+    if (!testimonialForm.initials && testimonialForm.client_name) {
+      const names = testimonialForm.client_name.trim().split(" ");
       const initials =
         names.length >= 2
           ? `${names[0][0]}${names[names.length - 1][0]}`.toUpperCase()
@@ -881,10 +876,7 @@ export function AdminContent() {
     const res = await createTestimonial({ ...testimonialForm });
     console.log("res ==> ", res);
     // Update existing testimonial in draft
-    setTestimonials((prev) => [
-      ...prev.filter((t) => t.id !== res.id),
-      res,
-    ]);
+    setTestimonials((prev) => [...prev.filter((t) => t.id !== res.id), res]);
     setTestimonialsDraft((prev) => [
       ...prev.filter((t) => t.id !== res.id),
       res,
@@ -929,20 +921,13 @@ export function AdminContent() {
   const handleDeleteTestimonial = async (id: string) => {
     const success = await deleteTestimonial(id);
     if (success) {
-      setTestimonials((prev) =>
-        prev.filter((t) => t.id !== id),
-      );
-      setTestimonialsDraft((prev) =>
-        prev.filter((t) => t.id !== id),
-      );
+      setTestimonials((prev) => prev.filter((t) => t.id !== id));
+      setTestimonialsDraft((prev) => prev.filter((t) => t.id !== id));
     }
   };
 
   // District handlers
-  const handleSaveNewDistrict = async (
-    name: string,
-    isComingSoon: boolean,
-  ) => {
+  const handleSaveNewDistrict = async (name: string, isComingSoon: boolean) => {
     try {
       const res = await createDistrict({
         name,
@@ -974,9 +959,7 @@ export function AdminContent() {
     } catch (error) {}
   };
 
-  const handleAddDistrict = (
-    category: "available" | "comingSoon",
-  ) => {
+  const handleAddDistrict = (category: "available" | "comingSoon") => {
     setAddingToCategory(category);
     setNewDistrictName("");
   };
@@ -994,23 +977,16 @@ export function AdminContent() {
       await deleteDistrict(districtId);
       setDistrictsDraft((prev) => ({
         ...prev,
-        [category]: prev[category].filter(
-          (d) => d.id !== districtId,
-        ),
+        [category]: prev[category].filter((d) => d.id !== districtId),
       }));
       setDistricts((prev) => ({
         ...prev,
-        [category]: prev[category].filter(
-          (d) => d.id !== districtId,
-        ),
+        [category]: prev[category].filter((d) => d.id !== districtId),
       }));
     } catch (error) {}
   };
 
-  const handleFieldChange = (
-    fieldKey: string,
-    value: string,
-  ) => {
+  const handleFieldChange = (fieldKey: string, value: string) => {
     setEditDraft((prev) => ({ ...prev, [fieldKey]: value }));
   };
 
@@ -1035,17 +1011,11 @@ export function AdminContent() {
       return `${file.name}: only PNG, JPEG, WebP images or MP4 videos are allowed.`;
     }
 
-    if (
-      isAllowedImage &&
-      file.size > HERO_MEDIA_IMAGE_MAX_SIZE
-    ) {
+    if (isAllowedImage && file.size > HERO_MEDIA_IMAGE_MAX_SIZE) {
       return `${file.name}: image size must be ${HERO_MEDIA_IMAGE_MAX_SIZE_MB} MB or less.`;
     }
 
-    if (
-      isAllowedVideo &&
-      file.size > HERO_MEDIA_VIDEO_MAX_SIZE
-    ) {
+    if (isAllowedVideo && file.size > HERO_MEDIA_VIDEO_MAX_SIZE) {
       return `${file.name}: video size must be ${HERO_MEDIA_VIDEO_MAX_SIZE_MB} MB or less.`;
     }
 
@@ -1104,9 +1074,7 @@ export function AdminContent() {
         description: editDraft.description || "description",
         position: 0,
         content_url: res,
-        content_type: files[0].type.startsWith("video/")
-          ? "video"
-          : "image",
+        content_type: files[0].type.startsWith("video/") ? "video" : "image",
         is_active: true,
       };
       const newContent = await createContentSection(content);
@@ -1122,32 +1090,27 @@ export function AdminContent() {
   };
 
   const handleRemoveMedia = (id: string) => {
-    setHeroMediaDraft((prev) =>
-      prev.filter((m) => m.id !== id),
-    );
+    setHeroMediaDraft((prev) => prev.filter((m) => m.id !== id));
     deleteHeroSectionImage(id);
   };
 
-  const moveHeroImage = useCallback(
-    (dragIndex: number, hoverIndex: number) => {
-      setHeroMediaDraft((prev) => {
-        const newImages = [...prev];
-        const [draggedItem] = newImages.splice(dragIndex, 1);
-        newImages.splice(hoverIndex, 0, draggedItem);
-        // Update positions after reordering
-        const newOrder = newImages.map((img, idx) => ({
-          ...img,
-          position: idx + 1,
-        }));
-        heroMediaDraftRef.current = newOrder;
-        console.log("dragIndex", dragIndex);
-        console.log("hoverIndex", hoverIndex);
-        console.log("newOrder", newOrder);
-        return newOrder;
-      });
-    },
-    [],
-  );
+  const moveHeroImage = useCallback((dragIndex: number, hoverIndex: number) => {
+    setHeroMediaDraft((prev) => {
+      const newImages = [...prev];
+      const [draggedItem] = newImages.splice(dragIndex, 1);
+      newImages.splice(hoverIndex, 0, draggedItem);
+      // Update positions after reordering
+      const newOrder = newImages.map((img, idx) => ({
+        ...img,
+        position: idx + 1,
+      }));
+      heroMediaDraftRef.current = newOrder;
+      console.log("dragIndex", dragIndex);
+      console.log("hoverIndex", hoverIndex);
+      console.log("newOrder", newOrder);
+      return newOrder;
+    });
+  }, []);
 
   const moveLookbookImage = useCallback(
     (dragIndex: number, hoverIndex: number) => {
@@ -1176,19 +1139,13 @@ export function AdminContent() {
         })),
       );
     } catch (error) {
-      console.error(
-        "Error updating lookbook positions:",
-        error,
-      );
+      console.error("Error updating lookbook positions:", error);
     }
   }, []);
 
   const handleHeroDropComplete = useCallback(async () => {
     try {
-      console.log(
-        "Updating hero media positions:",
-        heroMediaDraftRef.current,
-      );
+      console.log("Updating hero media positions:", heroMediaDraftRef.current);
       await updateHeroPosition(
         heroMediaDraftRef.current.map(({ id, position }) => ({
           id,
@@ -1196,10 +1153,7 @@ export function AdminContent() {
         })),
       );
     } catch (error) {
-      console.error(
-        "Error updating lookbook positions:",
-        error,
-      );
+      console.error("Error updating lookbook positions:", error);
     }
   }, []);
 
@@ -1209,16 +1163,10 @@ export function AdminContent() {
     const media = isEditing ? heroMediaDraft : heroMedia;
 
     return (
-      <div
-        className="mt-4 pt-4 border-t-2"
-        style={{ borderColor: "#DCD4CD" }}
-      >
+      <div className="mt-4 pt-4 border-t-2" style={{ borderColor: "#DCD4CD" }}>
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <label
-              className="font-medium text-sm"
-              style={{ color: "#3D3935" }}
-            >
+            <label className="font-medium text-sm" style={{ color: "#3D3935" }}>
               Hero Slides (Images / Videos)
             </label>
             <span
@@ -1257,9 +1205,7 @@ export function AdminContent() {
                 ) : (
                   <ImagePlus className="w-3.5 h-3.5" />
                 )}
-                {isHeroMediaUploading
-                  ? "Uploading..."
-                  : "Add File"}
+                {isHeroMediaUploading ? "Uploading..." : "Add File"}
               </Button>
             </>
           )}
@@ -1311,10 +1257,7 @@ export function AdminContent() {
         </div>
 
         {isEditing && heroMediaError && (
-          <p
-            className="text-xs mb-3"
-            style={{ color: "#B42318" }}
-          >
+          <p className="text-xs mb-3" style={{ color: "#B42318" }}>
             {heroMediaError}
           </p>
         )}
@@ -1340,15 +1283,9 @@ export function AdminContent() {
                 style={{ color: "#D0A096" }}
               />
             ) : (
-              <ImagePlus
-                className="w-8 h-8"
-                style={{ color: "#D0A096" }}
-              />
+              <ImagePlus className="w-8 h-8" style={{ color: "#D0A096" }} />
             )}
-            <span
-              className="text-sm"
-              style={{ color: "#3D3935" }}
-            >
+            <span className="text-sm" style={{ color: "#3D3935" }}>
               {isHeroMediaUploading
                 ? "Uploading media..."
                 : isEditing
@@ -1356,9 +1293,9 @@ export function AdminContent() {
                   : "No media uploaded"}
             </span>
             <span className="text-xs text-gray-400">
-              Up to 3 files · First file is the cover · 16:9
-              ratio · Max {HERO_MEDIA_IMAGE_MAX_SIZE_MB} MB /{" "}
-              {HERO_MEDIA_VIDEO_MAX_SIZE_MB} MB
+              Up to 3 files · First file is the cover · 16:9 ratio · Max{" "}
+              {HERO_MEDIA_IMAGE_MAX_SIZE_MB} MB / {HERO_MEDIA_VIDEO_MAX_SIZE_MB}{" "}
+              MB
             </span>
           </button>
         ) : (
@@ -1388,8 +1325,7 @@ export function AdminContent() {
                   aspectRatio: "16 / 9",
                 }}
                 onClick={() =>
-                  !isHeroMediaUploading &&
-                  fileInputRef.current?.click()
+                  !isHeroMediaUploading && fileInputRef.current?.click()
                 }
                 disabled={isHeroMediaUploading}
               >
@@ -1399,18 +1335,10 @@ export function AdminContent() {
                     style={{ color: "#D0A096" }}
                   />
                 ) : (
-                  <ImagePlus
-                    className="w-5 h-5"
-                    style={{ color: "#D0A096" }}
-                  />
+                  <ImagePlus className="w-5 h-5" style={{ color: "#D0A096" }} />
                 )}
-                <span
-                  className="text-xs"
-                  style={{ color: "#3D3935" }}
-                >
-                  {isHeroMediaUploading
-                    ? "Uploading..."
-                    : "Add"}
+                <span className="text-xs" style={{ color: "#3D3935" }}>
+                  {isHeroMediaUploading ? "Uploading..." : "Add"}
                 </span>
               </button>
             )}
@@ -1419,8 +1347,8 @@ export function AdminContent() {
 
         {!isEditing && media.length > 0 && (
           <p className="text-xs text-gray-400 mt-2">
-            Displayed as full-screen rotating banners (100vh ·
-            cover · auto-advances every 3s)
+            Displayed as full-screen rotating banners (100vh · cover ·
+            auto-advances every 3s)
           </p>
         )}
         {isEditing && media.length > 1 && (
@@ -1454,10 +1382,7 @@ export function AdminContent() {
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <h4
-              className="font-medium"
-              style={{ color: "#3D3935" }}
-            >
+            <h4 className="font-medium" style={{ color: "#3D3935" }}>
               {config.title}
             </h4>
             {justSaved && (
@@ -1501,8 +1426,7 @@ export function AdminContent() {
               <Button
                 className="px-3 py-1.5 text-xs text-white"
                 style={{
-                  background:
-                    "linear-gradient(135deg, #FCEAE0, #EACAB8)",
+                  background: "linear-gradient(135deg, #FCEAE0, #EACAB8)",
                   color: "#3D3935",
                 }}
                 onClick={() => handleSave(sectionKey)}
@@ -1517,19 +1441,14 @@ export function AdminContent() {
         <div className="space-y-3 text-sm">
           {config.fields.map((field) => (
             <div key={field.key}>
-              <label
-                className="font-medium"
-                style={{ color: "#3D3935" }}
-              >
+              <label className="font-medium" style={{ color: "#3D3935" }}>
                 {field.label}
               </label>
               {isEditing ? (
                 <input
                   type="text"
                   value={editDraft[field.key] || ""}
-                  onChange={(e) =>
-                    handleFieldChange(field.key, e.target.value)
-                  }
+                  onChange={(e) => handleFieldChange(field.key, e.target.value)}
                   className="mt-1 w-full px-3 py-2 border-2 rounded-md text-sm outline-none"
                   style={{
                     borderColor: "#DCD4CD",
@@ -1538,9 +1457,7 @@ export function AdminContent() {
                   }}
                 />
               ) : (
-                <p className="text-gray-600 mt-1">
-                  {data[field.key]}
-                </p>
+                <p className="text-gray-600 mt-1">{data[field.key]}</p>
               )}
             </div>
           ))}
@@ -1565,10 +1482,7 @@ export function AdminContent() {
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <h4
-              className="font-medium"
-              style={{ color: "#3D3935" }}
-            >
+            <h4 className="font-medium" style={{ color: "#3D3935" }}>
               Instagram Section
             </h4>
             {justSaved && (
@@ -1612,8 +1526,7 @@ export function AdminContent() {
               <Button
                 className="px-3 py-1.5 text-xs text-white"
                 style={{
-                  background:
-                    "linear-gradient(135deg, #FCEAE0, #EACAB8)",
+                  background: "linear-gradient(135deg, #FCEAE0, #EACAB8)",
                   color: "#3D3935",
                 }}
                 onClick={saveInstagramHandle}
@@ -1627,10 +1540,7 @@ export function AdminContent() {
 
         <div className="space-y-3 text-sm">
           <div>
-            <label
-              className="font-medium"
-              style={{ color: "#3D3935" }}
-            >
+            <label className="font-medium" style={{ color: "#3D3935" }}>
               Instagram Handle
             </label>
             {isEditingInsta ? (
@@ -1651,9 +1561,7 @@ export function AdminContent() {
                 }}
               />
             ) : (
-              <p className="text-gray-600 mt-1">
-                {instagramData.title || ""}
-              </p>
+              <p className="text-gray-600 mt-1">{instagramData.title || ""}</p>
             )}
           </div>
         </div>
@@ -1665,9 +1573,7 @@ export function AdminContent() {
   const renderTestimonialsCard = () => {
     const isEditing = editingCard === "testimonials";
     const justSaved = savedMessage === "testimonials";
-    const testimonialsData = isEditing
-      ? testimonialsDraft
-      : testimonials;
+    const testimonialsData = isEditing ? testimonialsDraft : testimonials;
 
     return (
       <div
@@ -1679,10 +1585,7 @@ export function AdminContent() {
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <h4
-              className="font-medium"
-              style={{ color: "#3D3935" }}
-            >
+            <h4 className="font-medium" style={{ color: "#3D3935" }}>
               Testimonials Section
             </h4>
             {justSaved && (
@@ -1700,9 +1603,7 @@ export function AdminContent() {
               className="text-xs px-2 py-0.5 rounded-sm"
               style={{
                 backgroundColor:
-                  testimonialsData.length % 3 === 0
-                    ? "#E9CFCA"
-                    : "#FAF7F5",
+                  testimonialsData.length % 3 === 0 ? "#E9CFCA" : "#FAF7F5",
                 color: "#3D3935",
                 border:
                   testimonialsData.length % 3 === 0
@@ -1742,8 +1643,7 @@ export function AdminContent() {
               <Button
                 className="px-3 py-1.5 text-xs text-white"
                 style={{
-                  background:
-                    "linear-gradient(135deg, #FCEAE0, #EACAB8)",
+                  background: "linear-gradient(135deg, #FCEAE0, #EACAB8)",
                   color: "#3D3935",
                 }}
                 onClick={() => handleSave("testimonials")}
@@ -1758,29 +1658,23 @@ export function AdminContent() {
         {!isEditing ? (
           // View mode
           <div className="space-y-2 text-sm">
-            {testimonialsData
-              .slice(0, 3)
-              .map((testimonial, index) => (
-                <div
-                  key={testimonial.id}
-                  className="p-2 border rounded"
-                  style={{
-                    borderColor: "#DCD4CD",
-                    backgroundColor: "#FAF7F5",
-                  }}
-                >
-                  <p
-                    className="font-medium"
-                    style={{ color: "#3D3935" }}
-                  >
-                    {testimonial.client_name} -{" "}
-                    {testimonial.service_type}
-                  </p>
-                  <p className="text-gray-600 text-xs italic line-clamp-2">
-                    "{testimonial.comment}"
-                  </p>
-                </div>
-              ))}
+            {testimonialsData.slice(0, 3).map((testimonial, index) => (
+              <div
+                key={testimonial.id}
+                className="p-2 border rounded"
+                style={{
+                  borderColor: "#DCD4CD",
+                  backgroundColor: "#FAF7F5",
+                }}
+              >
+                <p className="font-medium" style={{ color: "#3D3935" }}>
+                  {testimonial.client_name} - {testimonial.service_type}
+                </p>
+                <p className="text-gray-600 text-xs italic line-clamp-2">
+                  "{testimonial.comment}"
+                </p>
+              </div>
+            ))}
             {testimonialsData.length > 3 && (
               <p className="text-xs text-gray-500 text-center">
                 ... and {testimonialsData.length - 3} more
@@ -1799,9 +1693,8 @@ export function AdminContent() {
                   border: "1px solid #D0A096",
                 }}
               >
-                ⚠ Total testimonials must be divisible by 3
-                (currently {testimonialsData.length}). Add or
-                remove testimonials.
+                ⚠ Total testimonials must be divisible by 3 (currently{" "}
+                {testimonialsData.length}). Add or remove testimonials.
               </div>
             )}
 
@@ -1875,10 +1768,7 @@ export function AdminContent() {
                             </SelectTrigger>
                             <SelectContent>
                               {services.map((item) => (
-                                <SelectItem
-                                  key={item.id}
-                                  value={item.name}
-                                >
+                                <SelectItem key={item.id} value={item.name}>
                                   {item.name}
                                 </SelectItem>
                               ))}
@@ -1900,8 +1790,7 @@ export function AdminContent() {
                           onChange={(e) =>
                             setTestimonialForm({
                               ...testimonialForm,
-                              initials:
-                                e.target.value.toUpperCase(),
+                              initials: e.target.value.toUpperCase(),
                             })
                           }
                           className="mt-1 min-h-[36px] w-full px-2 py-1 border rounded text-xs"
@@ -1975,8 +1864,7 @@ export function AdminContent() {
                           className="font-medium text-xs"
                           style={{ color: "#3D3935" }}
                         >
-                          {testimonial.client_name} -{" "}
-                          {testimonial.service_type}
+                          {testimonial.client_name} - {testimonial.service_type}
                         </p>
                         <p className="text-gray-600 text-xs italic line-clamp-2">
                           "{testimonial.comment}"
@@ -1989,9 +1877,7 @@ export function AdminContent() {
                             borderColor: "#DCD4CD",
                             backgroundColor: "#FEFCFA",
                           }}
-                          onClick={() =>
-                            handleEditTestimonial(testimonial)
-                          }
+                          onClick={() => handleEditTestimonial(testimonial)}
                         >
                           <Edit
                             className="w-3 h-3"
@@ -2005,9 +1891,7 @@ export function AdminContent() {
                             backgroundColor: "#FEFCFA",
                           }}
                           onClick={() =>
-                            handleDeleteTestimonial(
-                              testimonial.id,
-                            )
+                            handleDeleteTestimonial(testimonial.id)
                           }
                         >
                           <Trash2
@@ -2031,14 +1915,8 @@ export function AdminContent() {
                   }}
                   onClick={handleAddTestimonial}
                 >
-                  <Plus
-                    className="w-4 h-4"
-                    style={{ color: "#D0A096" }}
-                  />
-                  <span
-                    className="text-sm"
-                    style={{ color: "#3D3935" }}
-                  >
+                  <Plus className="w-4 h-4" style={{ color: "#D0A096" }} />
+                  <span className="text-sm" style={{ color: "#3D3935" }}>
                     Add Testimonial
                   </span>
                 </button>
@@ -2046,8 +1924,8 @@ export function AdminContent() {
             </div>
 
             <p className="text-xs text-gray-500">
-              💡 Testimonials are displayed 3 per page. Ensure
-              total count is divisible by 3.
+              💡 Testimonials are displayed 3 per page. Ensure total count is
+              divisible by 3.
             </p>
           </div>
         )}
@@ -2059,9 +1937,7 @@ export function AdminContent() {
   const renderDistrictsCard = () => {
     const isEditing = editingCard === "districts";
     const justSaved = savedMessage === "districts";
-    const districtsData = isEditing
-      ? districtsDraft
-      : districts;
+    const districtsData = isEditing ? districtsDraft : districts;
 
     console.log("districtsData ==> ", districtsData);
     return (
@@ -2074,10 +1950,7 @@ export function AdminContent() {
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <h4
-              className="font-medium"
-              style={{ color: "#3D3935" }}
-            >
+            <h4 className="font-medium" style={{ color: "#3D3935" }}>
               Service Area Section
             </h4>
             {justSaved && (
@@ -2121,8 +1994,7 @@ export function AdminContent() {
               <Button
                 className="px-3 py-1.5 text-xs text-white"
                 style={{
-                  background:
-                    "linear-gradient(135deg, #FCEAE0, #EACAB8)",
+                  background: "linear-gradient(135deg, #FCEAE0, #EACAB8)",
                   color: "#3D3935",
                 }}
                 onClick={() => handleSave("districts")}
@@ -2138,52 +2010,41 @@ export function AdminContent() {
           // View mode
           <div className="space-y-4 text-sm">
             <div>
-              <p
-                className="font-medium mb-2"
-                style={{ color: "#3D3935" }}
-              >
-                Service Available (
-                {districtsData.available.length})
+              <p className="font-medium mb-2" style={{ color: "#3D3935" }}>
+                Service Available ({districtsData.available.length})
               </p>
               <div className="flex flex-wrap gap-2">
-                {districtsData.available.map(
-                  (district, index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 rounded text-xs"
-                      style={{
-                        backgroundColor: "#3D3935",
-                        color: "#EADDD5",
-                      }}
-                    >
-                      {district.name}
-                    </span>
-                  ),
-                )}
+                {districtsData.available.map((district, index) => (
+                  <span
+                    key={index}
+                    className="px-2 py-1 rounded text-xs"
+                    style={{
+                      backgroundColor: "#3D3935",
+                      color: "#EADDD5",
+                    }}
+                  >
+                    {district.name}
+                  </span>
+                ))}
               </div>
             </div>
             <div>
-              <p
-                className="font-medium mb-2"
-                style={{ color: "#3D3935" }}
-              >
+              <p className="font-medium mb-2" style={{ color: "#3D3935" }}>
                 Coming Soon ({districtsData.comingSoon.length})
               </p>
               <div className="flex flex-wrap gap-2">
-                {districtsData.comingSoon.map(
-                  (district, index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 rounded text-xs"
-                      style={{
-                        backgroundColor: "#EADDD5",
-                        color: "#3D3935",
-                      }}
-                    >
-                      {district.name}
-                    </span>
-                  ),
-                )}
+                {districtsData.comingSoon.map((district, index) => (
+                  <span
+                    key={index}
+                    className="px-2 py-1 rounded text-xs"
+                    style={{
+                      backgroundColor: "#EADDD5",
+                      color: "#3D3935",
+                    }}
+                  >
+                    {district.name}
+                  </span>
+                ))}
               </div>
             </div>
           </div>
@@ -2193,10 +2054,7 @@ export function AdminContent() {
             {/* Available Districts */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p
-                  className="font-medium text-sm"
-                  style={{ color: "#3D3935" }}
-                >
+                <p className="font-medium text-sm" style={{ color: "#3D3935" }}>
                   Service Available
                 </p>
                 {addingToCategory !== "available" && (
@@ -2206,9 +2064,7 @@ export function AdminContent() {
                       borderColor: "#DCD4CD",
                       color: "#3D3935",
                     }}
-                    onClick={() =>
-                      handleAddDistrict("available")
-                    }
+                    onClick={() => handleAddDistrict("available")}
                   >
                     <Plus className="w-3 h-3" />
                     Add
@@ -2216,43 +2072,35 @@ export function AdminContent() {
                 )}
               </div>
               <div className="space-y-2">
-                {districtsData.available.map(
-                  (district, index) => (
-                    <div
-                      key={index}
-                      className="p-2 border rounded flex items-center justify-between group"
+                {districtsData.available.map((district, index) => (
+                  <div
+                    key={index}
+                    className="p-2 border rounded flex items-center justify-between group"
+                    style={{
+                      borderColor: "#DCD4CD",
+                      backgroundColor: "#FAF7F5",
+                    }}
+                  >
+                    <span className="text-sm" style={{ color: "#3D3935" }}>
+                      {district.name}
+                    </span>
+                    <button
+                      className="p-1 border rounded opacity-0 group-hover:opacity-100 transition-opacity"
                       style={{
                         borderColor: "#DCD4CD",
-                        backgroundColor: "#FAF7F5",
+                        backgroundColor: "#FEFCFA",
                       }}
+                      onClick={() =>
+                        handleDeleteDistrict("available", district.id)
+                      }
                     >
-                      <span
-                        className="text-sm"
-                        style={{ color: "#3D3935" }}
-                      >
-                        {district.name}
-                      </span>
-                      <button
-                        className="p-1 border rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                        style={{
-                          borderColor: "#DCD4CD",
-                          backgroundColor: "#FEFCFA",
-                        }}
-                        onClick={() =>
-                          handleDeleteDistrict(
-                            "available",
-                            district.id,
-                          )
-                        }
-                      >
-                        <Trash2
-                          className="w-3 h-3"
-                          style={{ color: "#D0A096" }}
-                        />
-                      </button>
-                    </div>
-                  ),
-                )}
+                      <Trash2
+                        className="w-3 h-3"
+                        style={{ color: "#D0A096" }}
+                      />
+                    </button>
+                  </div>
+                ))}
                 {addingToCategory === "available" && (
                   <div
                     className="p-2 border-2 rounded flex gap-2"
@@ -2264,16 +2112,11 @@ export function AdminContent() {
                     <input
                       type="text"
                       value={newDistrictName}
-                      onChange={(e) =>
-                        setNewDistrictName(e.target.value)
-                      }
+                      onChange={(e) => setNewDistrictName(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
-                          handleSaveNewDistrict(
-                            newDistrictName,
-                            false,
-                          );
+                          handleSaveNewDistrict(newDistrictName, false);
                         }
                       }}
                       className="flex-1 px-2 py-1 border rounded text-sm outline-none"
@@ -2300,15 +2143,11 @@ export function AdminContent() {
                       type="button"
                       className="px-2 py-1 text-xs"
                       style={{
-                        background:
-                          "linear-gradient(135deg, #FCEAE0, #EACAB8)",
+                        background: "linear-gradient(135deg, #FCEAE0, #EACAB8)",
                         color: "#3D3935",
                       }}
                       onClick={() =>
-                        handleSaveNewDistrict(
-                          newDistrictName,
-                          false,
-                        )
+                        handleSaveNewDistrict(newDistrictName, false)
                       }
                     >
                       Add
@@ -2321,10 +2160,7 @@ export function AdminContent() {
             {/* Coming Soon Districts */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <p
-                  className="font-medium text-sm"
-                  style={{ color: "#3D3935" }}
-                >
+                <p className="font-medium text-sm" style={{ color: "#3D3935" }}>
                   Coming Soon
                 </p>
                 {addingToCategory !== "comingSoon" && (
@@ -2334,9 +2170,7 @@ export function AdminContent() {
                       borderColor: "#DCD4CD",
                       color: "#3D3935",
                     }}
-                    onClick={() =>
-                      handleAddDistrict("comingSoon")
-                    }
+                    onClick={() => handleAddDistrict("comingSoon")}
                   >
                     <Plus className="w-3 h-3" />
                     Add
@@ -2344,43 +2178,35 @@ export function AdminContent() {
                 )}
               </div>
               <div className="space-y-2">
-                {districtsData.comingSoon.map(
-                  (district, index) => (
-                    <div
-                      key={index}
-                      className="p-2 border rounded flex items-center justify-between group"
+                {districtsData.comingSoon.map((district, index) => (
+                  <div
+                    key={index}
+                    className="p-2 border rounded flex items-center justify-between group"
+                    style={{
+                      borderColor: "#DCD4CD",
+                      backgroundColor: "#FAF7F5",
+                    }}
+                  >
+                    <span className="text-sm" style={{ color: "#3D3935" }}>
+                      {district.name}
+                    </span>
+                    <button
+                      className="p-1 border rounded opacity-0 group-hover:opacity-100 transition-opacity"
                       style={{
                         borderColor: "#DCD4CD",
-                        backgroundColor: "#FAF7F5",
+                        backgroundColor: "#FEFCFA",
                       }}
+                      onClick={() =>
+                        handleDeleteDistrict("comingSoon", district.id)
+                      }
                     >
-                      <span
-                        className="text-sm"
-                        style={{ color: "#3D3935" }}
-                      >
-                        {district.name}
-                      </span>
-                      <button
-                        className="p-1 border rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                        style={{
-                          borderColor: "#DCD4CD",
-                          backgroundColor: "#FEFCFA",
-                        }}
-                        onClick={() =>
-                          handleDeleteDistrict(
-                            "comingSoon",
-                            district.id,
-                          )
-                        }
-                      >
-                        <Trash2
-                          className="w-3 h-3"
-                          style={{ color: "#D0A096" }}
-                        />
-                      </button>
-                    </div>
-                  ),
-                )}
+                      <Trash2
+                        className="w-3 h-3"
+                        style={{ color: "#D0A096" }}
+                      />
+                    </button>
+                  </div>
+                ))}
                 {addingToCategory === "comingSoon" && (
                   <div
                     className="p-2 border-2 rounded flex gap-2"
@@ -2392,16 +2218,11 @@ export function AdminContent() {
                     <input
                       type="text"
                       value={newDistrictName}
-                      onChange={(e) =>
-                        setNewDistrictName(e.target.value)
-                      }
+                      onChange={(e) => setNewDistrictName(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter") {
                           e.preventDefault();
-                          handleSaveNewDistrict(
-                            newDistrictName,
-                            true,
-                          );
+                          handleSaveNewDistrict(newDistrictName, true);
                         }
                       }}
                       className="flex-1 px-2 py-1 border rounded text-sm outline-none"
@@ -2428,15 +2249,11 @@ export function AdminContent() {
                       type="button"
                       className="px-2 py-1 text-xs"
                       style={{
-                        background:
-                          "linear-gradient(135deg, #FCEAE0, #EACAB8)",
+                        background: "linear-gradient(135deg, #FCEAE0, #EACAB8)",
                         color: "#3D3935",
                       }}
                       onClick={() =>
-                        handleSaveNewDistrict(
-                          newDistrictName,
-                          true,
-                        )
+                        handleSaveNewDistrict(newDistrictName, true)
                       }
                     >
                       Add
@@ -2455,9 +2272,7 @@ export function AdminContent() {
   const renderLookbookCard = () => {
     const isEditing = editingCard === "lookbook";
     const justSaved = savedMessage === "lookbook";
-    const lookbookData = isEditing
-      ? lookbookDraft
-      : lookbookImages;
+    const lookbookData = isEditing ? lookbookDraft : lookbookImages;
 
     const handleAddLookbookImage = async (
       e: React.ChangeEvent<HTMLInputElement>,
@@ -2483,10 +2298,7 @@ export function AdminContent() {
       setIsLookbookUploading(true);
 
       try {
-        const res = await uploadImageAndGetUrl(
-          files[0],
-          "lookbook",
-        );
+        const res = await uploadImageAndGetUrl(files[0], "lookbook");
         const lookbook = {
           title: files[0].name,
           description: "",
@@ -2498,14 +2310,12 @@ export function AdminContent() {
         await createLookbookSection(lookbook);
         const remaining = 10 - lookbookDraft.length;
         const toAdd = Array.from(files).slice(0, remaining);
-        const newImages: LookbookImage[] = toAdd.map(
-          (file) => ({
-            id: crypto.randomUUID(),
-            image_url: res,
-            title: files[0].name,
-            position: lookbookDraft.length + 1,
-          }),
-        );
+        const newImages: LookbookImage[] = toAdd.map((file) => ({
+          id: crypto.randomUUID(),
+          image_url: res,
+          title: files[0].name,
+          position: lookbookDraft.length + 1,
+        }));
         setLookbookDraft((prev) => [...prev, ...newImages]);
       } catch (error) {
         console.error("Error uploading lookbook image:", error);
@@ -2519,9 +2329,7 @@ export function AdminContent() {
     };
 
     const handleRemoveLookbookImage = (id: string) => {
-      setLookbookDraft((prev) =>
-        prev.filter((img) => img.id !== id),
-      );
+      setLookbookDraft((prev) => prev.filter((img) => img.id !== id));
       deleteLookbook(id);
     };
 
@@ -2535,10 +2343,7 @@ export function AdminContent() {
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <h4
-              className="font-medium"
-              style={{ color: "#3D3935" }}
-            >
+            <h4 className="font-medium" style={{ color: "#3D3935" }}>
               Lookbook Section
             </h4>
             {justSaved && (
@@ -2591,8 +2396,7 @@ export function AdminContent() {
               <Button
                 className="px-3 py-1.5 text-xs text-white"
                 style={{
-                  background:
-                    "linear-gradient(135deg, #FCEAE0, #EACAB8)",
+                  background: "linear-gradient(135deg, #FCEAE0, #EACAB8)",
                   color: "#3D3935",
                 }}
                 onClick={() => handleSave("lookbook")}
@@ -2647,10 +2451,7 @@ export function AdminContent() {
             />
 
             {lookbookError && (
-              <p
-                className="text-xs"
-                style={{ color: "#B42318" }}
-              >
+              <p className="text-xs" style={{ color: "#B42318" }}>
                 {lookbookError}
               </p>
             )}
@@ -2692,13 +2493,8 @@ export function AdminContent() {
                       style={{ color: "#D0A096" }}
                     />
                   )}
-                  <span
-                    className="text-xs"
-                    style={{ color: "#3D3935" }}
-                  >
-                    {isLookbookUploading
-                      ? "Uploading..."
-                      : "Add Image"}
+                  <span className="text-xs" style={{ color: "#3D3935" }}>
+                    {isLookbookUploading ? "Uploading..." : "Add Image"}
                   </span>
                 </button>
               )}
@@ -2719,30 +2515,67 @@ export function AdminContent() {
     key: string,
     title: string,
     onEdit: () => void,
-    onSave: () => void,
+    onSave: () => void | Promise<void>,
     badge?: React.ReactNode,
+    isSaving?: boolean,
   ) => (
     <div className="flex items-center justify-between mb-4">
       <div className="flex items-center gap-2">
-        <h4 className="font-medium" style={{ color: "#3D3935" }}>{title}</h4>
+        <h4 className="font-medium" style={{ color: "#3D3935" }}>
+          {title}
+        </h4>
         {aboutSaved === key && (
-          <span className="text-xs px-2 py-0.5 rounded-sm" style={{ backgroundColor: "#E9CFCA", color: "#3D3935" }}>Saved</span>
+          <span
+            className="text-xs px-2 py-0.5 rounded-sm"
+            style={{ backgroundColor: "#E9CFCA", color: "#3D3935" }}
+          >
+            Saved
+          </span>
         )}
         {badge}
       </div>
       {editingAboutCard !== key ? (
-        <Button className="border-2 p-2" style={{ borderColor: "#DCD4CD", backgroundColor: "transparent", color: "#3D3935" }} onClick={onEdit}>
+        <Button
+          className="border-2 p-2"
+          style={{
+            borderColor: "#DCD4CD",
+            backgroundColor: "transparent",
+            color: "#3D3935",
+          }}
+          onClick={onEdit}
+        >
           <Edit className="w-4 h-4" />
         </Button>
       ) : (
         <div className="flex items-center gap-2">
-          <Button className="border-2 px-3 py-1.5 text-xs" style={{ borderColor: "#DCD4CD", backgroundColor: "transparent", color: "#3D3935" }}
-            onClick={() => setEditingAboutCard(null)}>
-            <X className="w-3.5 h-3.5 mr-1" />Cancel
+          <Button
+            className="border-2 px-3 py-1.5 text-xs"
+            style={{
+              borderColor: "#DCD4CD",
+              backgroundColor: "transparent",
+              color: "#3D3935",
+            }}
+            onClick={() => setEditingAboutCard(null)}
+            disabled={isSaving}
+          >
+            <X className="w-3.5 h-3.5 mr-1" />
+            Cancel
           </Button>
-          <Button className="px-3 py-1.5 text-xs" style={{ background: "linear-gradient(135deg, #FCEAE0, #EACAB8)", color: "#3D3935" }}
-            onClick={onSave}>
-            <Save className="w-3.5 h-3.5 mr-1" />Save
+          <Button
+            className="px-3 py-1.5 text-xs"
+            style={{
+              background: "linear-gradient(135deg, #FCEAE0, #EACAB8)",
+              color: "#3D3935",
+            }}
+            onClick={onSave}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" />
+            ) : (
+              <Save className="w-3.5 h-3.5 mr-1" />
+            )}
+            {isSaving ? "Saving..." : "Save"}
           </Button>
         </div>
       )}
@@ -2752,35 +2585,87 @@ export function AdminContent() {
   // ── About page: 1 · Main About ─────────────────────────────────────────────
   const renderAboutMainCard = () => {
     const isEditing = editingAboutCard === "about-main";
-    const inputCls = "w-full px-3 py-2 border-2 rounded-md text-sm outline-none";
-    const inputStyle = { borderColor: "#DCD4CD", backgroundColor: "#FAF7F5", color: "#3D3935" };
+    const inputCls =
+      "w-full px-3 py-2 border-2 rounded-md text-sm outline-none";
+    const inputStyle = {
+      borderColor: "#DCD4CD",
+      backgroundColor: "#FAF7F5",
+      color: "#3D3935",
+    };
     return (
-      <div className="p-4 border-2 rounded-md" style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}>
+      <div
+        className="p-4 border-2 rounded-md"
+        style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+      >
         {aboutCardHeader(
-          "about-main", "Main About",
-          () => { setEditingAboutCard("about-main"); setAboutMainDraft({ ...aboutMain }); },
-          () => { setAboutMain({ ...aboutMainDraft }); setEditingAboutCard(null); flashAboutSaved("about-main"); },
+          "about-main",
+          "Main About",
+          () => {
+            setEditingAboutCard("about-main");
+            setAboutMainDraft({ ...aboutMain });
+          },
+          () => {
+            setAboutMain({ ...aboutMainDraft });
+            setEditingAboutCard(null);
+            flashAboutSaved("about-main");
+          },
         )}
         <div className="space-y-3 text-sm">
           <div>
-            <label className="font-medium block mb-1" style={{ color: "#3D3935" }}>Title</label>
+            <label
+              className="font-medium block mb-1"
+              style={{ color: "#3D3935" }}
+            >
+              Title
+            </label>
             {isEditing ? (
-              <input type="text" value={aboutMainDraft.title}
-                onChange={(e) => setAboutMainDraft((p) => ({ ...p, title: e.target.value }))}
-                className={inputCls} style={inputStyle} placeholder="e.g. About Pearl Wishes Studio" />
+              <input
+                type="text"
+                value={aboutMainDraft.title}
+                onChange={(e) =>
+                  setAboutMainDraft((p) => ({ ...p, title: e.target.value }))
+                }
+                className={inputCls}
+                style={inputStyle}
+                placeholder="e.g. About Pearl Wishes Studio"
+              />
             ) : (
-              <p className="text-gray-600 mt-1">{aboutMain.title || <span className="italic text-gray-400">No title set</span>}</p>
+              <p className="text-gray-600 mt-1">
+                {aboutMain.title || (
+                  <span className="italic text-gray-400">No title set</span>
+                )}
+              </p>
             )}
           </div>
           <div>
-            <label className="font-medium block mb-1" style={{ color: "#3D3935" }}>Description</label>
+            <label
+              className="font-medium block mb-1"
+              style={{ color: "#3D3935" }}
+            >
+              Description
+            </label>
             {isEditing ? (
-              <textarea value={aboutMainDraft.description} rows={5}
-                onChange={(e) => setAboutMainDraft((p) => ({ ...p, description: e.target.value }))}
-                className={inputCls + " resize-none"} style={inputStyle}
-                placeholder="Describe your studio, values, and mission..." />
+              <textarea
+                value={aboutMainDraft.description}
+                rows={5}
+                onChange={(e) =>
+                  setAboutMainDraft((p) => ({
+                    ...p,
+                    description: e.target.value,
+                  }))
+                }
+                className={inputCls + " resize-none"}
+                style={inputStyle}
+                placeholder="Describe your studio, values, and mission..."
+              />
             ) : (
-              <p className="text-gray-600 mt-1 leading-relaxed">{aboutMain.description || <span className="italic text-gray-400">No description set</span>}</p>
+              <p className="text-gray-600 mt-1 leading-relaxed">
+                {aboutMain.description || (
+                  <span className="italic text-gray-400">
+                    No description set
+                  </span>
+                )}
+              </p>
             )}
           </div>
         </div>
@@ -2794,95 +2679,242 @@ export function AdminContent() {
     const items = isEditing ? whyDraft : whyItems;
 
     const updateItem = (id: string, field: keyof WhyCard, value: string) =>
-      setWhyDraft((prev) => prev.map((i) => i.id === id ? { ...i, [field]: value } : i));
-    const removeItem = (id: string) => setWhyDraft((prev) => prev.filter((i) => i.id !== id));
+      setWhyDraft((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, [field]: value } : i)),
+      );
+    const removeItem = (id: string) => {
+      delete whyPendingFiles.current[id];
+      setWhyDraft((prev) => prev.filter((i) => i.id !== id));
+    };
     const addItem = () =>
-      setWhyDraft((prev) => [...prev, { id: crypto.randomUUID(), icon: "⭐", imageUrl: "", title: "", description: "" }]);
+      setWhyDraft((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          icon: "⭐",
+          imageUrl: "",
+          title: "",
+          description: "",
+        },
+      ]);
     const handleWhyImage = (id: string, file: File | null) => {
       if (!file) return;
+      whyPendingFiles.current[id] = file;
       updateItem(id, "imageUrl", URL.createObjectURL(file));
     };
 
     return (
-      <div className="p-4 border-2 rounded-md" style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}>
+      <div
+        className="p-4 border-2 rounded-md"
+        style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+      >
         {aboutCardHeader(
-          "about-why", "Why Choose Us",
-          () => { setEditingAboutCard("about-why"); setWhyDraft([...whyItems]); },
-          () => { setWhyItems([...whyDraft]); setEditingAboutCard(null); flashAboutSaved("about-why"); },
-          <span className="text-xs px-2 py-0.5 rounded-sm" style={{ backgroundColor: "#FAF7F5", color: "#3D3935" }}>
+          "about-why",
+          "Why Choose Us",
+          () => {
+            whyPendingFiles.current = {};
+            setEditingAboutCard("about-why");
+            setWhyDraft([...whyItems]);
+          },
+          async () => {
+            setIsSavingWhy(true);
+            try {
+              const itemsToSave = await Promise.all(
+                whyDraft.map(async (item) => {
+                  const pendingFile = whyPendingFiles.current[item.id];
+                  if (pendingFile) {
+                    const imageUrl = await uploadImageAndGetUrl(
+                      pendingFile,
+                      "why-choose-us",
+                    );
+                    return { ...item, imageUrl };
+                  }
+                  return {
+                    ...item,
+                    imageUrl: item.imageUrl.startsWith("blob:")
+                      ? ""
+                      : item.imageUrl,
+                  };
+                }),
+              );
+              const saved = await saveWhyChooseUs(itemsToSave);
+              setWhyItems(saved);
+              whyPendingFiles.current = {};
+              setEditingAboutCard(null);
+              flashAboutSaved("about-why");
+            } catch (error) {
+              console.error("Error saving why choose us cards:", error);
+              alert("Failed to save Why Choose Us. Please try again.");
+            } finally {
+              setIsSavingWhy(false);
+            }
+          },
+          <span
+            className="text-xs px-2 py-0.5 rounded-sm"
+            style={{ backgroundColor: "#FAF7F5", color: "#3D3935" }}
+          >
             {items.length} cards
           </span>,
+          isSavingWhy,
         )}
 
         {!isEditing ? (
           <div className="grid grid-cols-3 gap-3">
             {items.map((item) => (
-              <div key={item.id} className="p-3 border rounded-md" style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}>
+              <div
+                key={item.id}
+                className="p-3 border rounded-md"
+                style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
+              >
                 {item.imageUrl ? (
-                  <div className="w-10 h-10 mb-2 rounded overflow-hidden border" style={{ borderColor: "#DCD4CD" }}>
-                    <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+                  <div
+                    className="w-10 h-10 mb-2 rounded overflow-hidden border"
+                    style={{ borderColor: "#DCD4CD" }}
+                  >
+                    <img
+                      src={item.imageUrl}
+                      alt={item.title}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 ) : (
                   <span className="text-2xl block mb-2">{item.icon}</span>
                 )}
-                <p className="font-medium text-sm" style={{ color: "#3D3935" }}>{item.title || "—"}</p>
-                <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{item.description}</p>
+                <p className="font-medium text-sm" style={{ color: "#3D3935" }}>
+                  {item.title || "—"}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                  {item.description}
+                </p>
               </div>
             ))}
           </div>
         ) : (
           <div className="space-y-3">
             {items.map((item) => (
-              <div key={item.id} className="p-3 border-2 rounded-md" style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}>
+              <div
+                key={item.id}
+                className="p-3 border-2 rounded-md"
+                style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
+              >
                 <div className="flex items-start gap-3">
                   {/* Image / icon uploader */}
                   <div className="flex-shrink-0 space-y-1">
-                    <input ref={(el) => { whyFileRefs.current[item.id] = el; }}
-                      type="file" accept=".png,.jpg,.jpeg,.webp" className="hidden"
-                      onChange={(e) => handleWhyImage(item.id, e.target.files?.[0] ?? null)} />
+                    <input
+                      ref={(el) => {
+                        whyFileRefs.current[item.id] = el;
+                      }}
+                      type="file"
+                      accept=".png,.jpg,.jpeg,.webp"
+                      className="hidden"
+                      onChange={(e) =>
+                        handleWhyImage(item.id, e.target.files?.[0] ?? null)
+                      }
+                    />
                     <button
                       className="w-16 h-16 border-2 border-dashed rounded-md flex flex-col items-center justify-center gap-0.5 hover:border-[#D0A096] transition-colors overflow-hidden"
-                      style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+                      style={{
+                        borderColor: "#DCD4CD",
+                        backgroundColor: "#FEFCFA",
+                      }}
                       onClick={() => whyFileRefs.current[item.id]?.click()}
                     >
                       {item.imageUrl ? (
-                        <img src={item.imageUrl} alt="" className="w-full h-full object-cover" />
+                        <img
+                          src={item.imageUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <>
-                          <ImagePlus className="w-4 h-4" style={{ color: "#D0A096" }} />
-                          <span className="text-xs" style={{ color: "#D0A096" }}>Image</span>
+                          <ImagePlus
+                            className="w-4 h-4"
+                            style={{ color: "#D0A096" }}
+                          />
+                          <span
+                            className="text-xs"
+                            style={{ color: "#D0A096" }}
+                          >
+                            Image
+                          </span>
                         </>
                       )}
                     </button>
-                    <input type="text" value={item.icon} maxLength={2}
-                      onChange={(e) => updateItem(item.id, "icon", e.target.value)}
+                    <input
+                      type="text"
+                      value={item.icon}
+                      maxLength={2}
+                      onChange={(e) =>
+                        updateItem(item.id, "icon", e.target.value)
+                      }
                       className="w-16 text-center px-1 py-1 border rounded text-sm outline-none"
-                      style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA", color: "#3D3935" }}
-                      placeholder="Icon" />
+                      style={{
+                        borderColor: "#DCD4CD",
+                        backgroundColor: "#FEFCFA",
+                        color: "#3D3935",
+                      }}
+                      placeholder="Icon"
+                    />
                   </div>
                   {/* Text fields */}
                   <div className="flex-1 space-y-2">
                     <div>
-                      <label className="text-xs font-medium block mb-0.5" style={{ color: "#3D3935" }}>Title</label>
-                      <input type="text" value={item.title}
-                        onChange={(e) => updateItem(item.id, "title", e.target.value)}
+                      <label
+                        className="text-xs font-medium block mb-0.5"
+                        style={{ color: "#3D3935" }}
+                      >
+                        Title
+                      </label>
+                      <input
+                        type="text"
+                        value={item.title}
+                        onChange={(e) =>
+                          updateItem(item.id, "title", e.target.value)
+                        }
                         className="w-full px-2 py-1.5 border rounded text-sm outline-none"
-                        style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA", color: "#3D3935" }}
-                        placeholder="Feature title" />
+                        style={{
+                          borderColor: "#DCD4CD",
+                          backgroundColor: "#FEFCFA",
+                          color: "#3D3935",
+                        }}
+                        placeholder="Feature title"
+                      />
                     </div>
                     <div>
-                      <label className="text-xs font-medium block mb-0.5" style={{ color: "#3D3935" }}>Short Description</label>
-                      <input type="text" value={item.description}
-                        onChange={(e) => updateItem(item.id, "description", e.target.value)}
-                        className="w-full px-2 py-1.5 border rounded text-sm outline-none"
-                        style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA", color: "#3D3935" }}
-                        placeholder="Brief description..." />
+                      <label
+                        className="text-xs font-medium block mb-0.5"
+                        style={{ color: "#3D3935" }}
+                      >
+                        Description
+                      </label>
+                      <textarea
+                        value={item.description}
+                        onChange={(e) =>
+                          updateItem(item.id, "description", e.target.value)
+                        }
+                        rows={3}
+                        className="w-full px-2 py-1.5 border rounded text-sm outline-none resize-y"
+                        style={{
+                          borderColor: "#DCD4CD",
+                          backgroundColor: "#FEFCFA",
+                          color: "#3D3935",
+                        }}
+                        placeholder="Brief description..."
+                      />
                     </div>
                   </div>
-                  <button className="p-1 mt-0.5 border rounded flex-shrink-0"
-                    style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
-                    onClick={() => removeItem(item.id)}>
-                    <Trash2 className="w-3.5 h-3.5" style={{ color: "#D0A096" }} />
+                  <button
+                    className="p-1 mt-0.5 border rounded flex-shrink-0"
+                    style={{
+                      borderColor: "#DCD4CD",
+                      backgroundColor: "#FEFCFA",
+                    }}
+                    onClick={() => removeItem(item.id)}
+                  >
+                    <Trash2
+                      className="w-3.5 h-3.5"
+                      style={{ color: "#D0A096" }}
+                    />
                   </button>
                 </div>
               </div>
@@ -2893,7 +2925,9 @@ export function AdminContent() {
               onClick={addItem}
             >
               <Plus className="w-4 h-4" style={{ color: "#D0A096" }} />
-              <span className="text-sm" style={{ color: "#3D3935" }}>Add Card</span>
+              <span className="text-sm" style={{ color: "#3D3935" }}>
+                Add Card
+              </span>
             </button>
           </div>
         )}
@@ -2906,41 +2940,110 @@ export function AdminContent() {
     const isEditing = editingAboutCard === "about-contact";
     const contact = isEditing ? contactDraft : contactInfo;
     const hours = isEditing ? hoursDraft : businessHoursData;
-    const inputCls = "w-full px-3 py-2 border-2 rounded-md text-sm outline-none";
-    const inputStyle = { borderColor: "#DCD4CD", backgroundColor: "#FAF7F5", color: "#3D3935" };
+    const inputCls =
+      "w-full px-3 py-2 border-2 rounded-md text-sm outline-none";
+    const inputStyle = {
+      borderColor: "#DCD4CD",
+      backgroundColor: "#FAF7F5",
+      color: "#3D3935",
+    };
 
     const updateHour = (id: string, field: keyof HourRow, value: string) =>
-      setHoursDraft((prev) => prev.map((h) => h.id === id ? { ...h, [field]: value } : h));
-    const removeHour = (id: string) => setHoursDraft((prev) => prev.filter((h) => h.id !== id));
+      setHoursDraft((prev) =>
+        prev.map((h) => (h.id === id ? { ...h, [field]: value } : h)),
+      );
+    const removeHour = (id: string) =>
+      setHoursDraft((prev) => prev.filter((h) => h.id !== id));
     const addHour = () =>
-      setHoursDraft((prev) => [...prev, { id: crypto.randomUUID(), day: "Monday", time: "" }]);
+      setHoursDraft((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), day: "Monday", time: "" },
+      ]);
 
     return (
-      <div className="p-4 border-2 rounded-md" style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}>
+      <div
+        className="p-4 border-2 rounded-md"
+        style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+      >
         {aboutCardHeader(
-          "about-contact", "Contact & Business Hours",
-          () => { setEditingAboutCard("about-contact"); setContactDraft({ ...contactInfo }); setHoursDraft([...businessHoursData]); },
-          () => { setContactInfo({ ...contactDraft }); setBusinessHoursData([...hoursDraft]); setEditingAboutCard(null); flashAboutSaved("about-contact"); },
+          "about-contact",
+          "Contact & Business Hours",
+          () => {
+            setEditingAboutCard("about-contact");
+            setContactDraft({ ...contactInfo });
+            setHoursDraft([...businessHoursData]);
+          },
+          async () => {
+            setIsSavingContact(true);
+            try {
+              const saved = await saveContactAndHours({
+                contact: contactDraft,
+                hours: hoursDraft,
+              });
+              setContactInfo({
+                id: saved.contact.id,
+                phone: saved.contact.phone,
+                email: saved.contact.email,
+                address: saved.contact.address,
+              });
+              setBusinessHoursData(saved.hours);
+              setEditingAboutCard(null);
+              flashAboutSaved("about-contact");
+            } catch (error) {
+              console.error("Error saving contact and business hours:", error);
+              alert(
+                "Failed to save contact & business hours. Please try again.",
+              );
+            } finally {
+              setIsSavingContact(false);
+            }
+          },
+          undefined,
+          isSavingContact,
         )}
         <div className="space-y-4 text-sm">
           {/* Phone + Email grid */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="font-medium block mb-1" style={{ color: "#3D3935" }}>Phone</label>
+              <label
+                className="font-medium block mb-1"
+                style={{ color: "#3D3935" }}
+              >
+                Phone
+              </label>
               {isEditing ? (
-                <input type="text" value={contactDraft.phone}
-                  onChange={(e) => setContactDraft((p) => ({ ...p, phone: e.target.value }))}
-                  className={inputCls} style={inputStyle} placeholder="+44 20 7946 0958" />
+                <input
+                  type="text"
+                  value={contactDraft.phone}
+                  onChange={(e) =>
+                    setContactDraft((p) => ({ ...p, phone: e.target.value }))
+                  }
+                  className={inputCls}
+                  style={inputStyle}
+                  placeholder="+44 20 7946 0958"
+                />
               ) : (
                 <p className="text-gray-600 mt-1">{contact.phone || "—"}</p>
               )}
             </div>
             <div>
-              <label className="font-medium block mb-1" style={{ color: "#3D3935" }}>Email</label>
+              <label
+                className="font-medium block mb-1"
+                style={{ color: "#3D3935" }}
+              >
+                Email
+              </label>
               {isEditing ? (
-                <input type="text" value={contactDraft.email}
-                  onChange={(e) => setContactDraft((p) => ({ ...p, email: e.target.value }))}
-                  className={inputCls} style={inputStyle} placeholder="hello@studio.co.uk" />
+                <input
+                  type="text"
+                  value={contactDraft.email}
+                  onChange={(e) =>
+                    setContactDraft((p) => ({ ...p, email: e.target.value }))
+                  }
+                  className={inputCls}
+                  style={inputStyle}
+                  placeholder="hello@studio.co.uk"
+                />
               ) : (
                 <p className="text-gray-600 mt-1">{contact.email || "—"}</p>
               )}
@@ -2948,11 +3051,23 @@ export function AdminContent() {
           </div>
           {/* Address */}
           <div>
-            <label className="font-medium block mb-1" style={{ color: "#3D3935" }}>Address</label>
+            <label
+              className="font-medium block mb-1"
+              style={{ color: "#3D3935" }}
+            >
+              Address
+            </label>
             {isEditing ? (
-              <input type="text" value={contactDraft.address}
-                onChange={(e) => setContactDraft((p) => ({ ...p, address: e.target.value }))}
-                className={inputCls} style={inputStyle} placeholder="Street, City, Postcode" />
+              <input
+                type="text"
+                value={contactDraft.address}
+                onChange={(e) =>
+                  setContactDraft((p) => ({ ...p, address: e.target.value }))
+                }
+                className={inputCls}
+                style={inputStyle}
+                placeholder="Street, City, Postcode"
+              />
             ) : (
               <p className="text-gray-600 mt-1">{contact.address || "—"}</p>
             )}
@@ -2960,11 +3075,17 @@ export function AdminContent() {
           {/* Business hours */}
           <div className="pt-3 border-t-2" style={{ borderColor: "#DCD4CD" }}>
             <div className="flex items-center justify-between mb-3">
-              <label className="font-medium" style={{ color: "#3D3935" }}>Business Hours</label>
+              <label className="font-medium" style={{ color: "#3D3935" }}>
+                Business Hours
+              </label>
               {isEditing && (
-                <button className="text-xs px-2 py-1 border rounded flex items-center gap-1"
-                  style={{ borderColor: "#DCD4CD", color: "#3D3935" }} onClick={addHour}>
-                  <Plus className="w-3 h-3" />Add Row
+                <button
+                  className="text-xs px-2 py-1 border rounded flex items-center gap-1"
+                  style={{ borderColor: "#DCD4CD", color: "#3D3935" }}
+                  onClick={addHour}
+                >
+                  <Plus className="w-3 h-3" />
+                  Add Row
                 </button>
               )}
             </div>
@@ -2973,29 +3094,73 @@ export function AdminContent() {
                 <div key={hour.id} className="flex items-center gap-2">
                   {isEditing ? (
                     <>
-                      <select value={hour.day}
-                        onChange={(e) => updateHour(hour.id, "day", e.target.value)}
+                      <select
+                        value={hour.day}
+                        onChange={(e) =>
+                          updateHour(hour.id, "day", e.target.value)
+                        }
                         className="border-2 px-2 py-1.5 text-sm rounded outline-none flex-shrink-0"
-                        style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5", color: "#3D3935", width: "132px" }}>
-                        {["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"].map((d) => (
+                        style={{
+                          borderColor: "#DCD4CD",
+                          backgroundColor: "#FAF7F5",
+                          color: "#3D3935",
+                          width: "132px",
+                        }}
+                      >
+                        {[
+                          "Monday",
+                          "Tuesday",
+                          "Wednesday",
+                          "Thursday",
+                          "Friday",
+                          "Saturday",
+                          "Sunday",
+                        ].map((d) => (
                           <option key={d}>{d}</option>
                         ))}
                       </select>
-                      <input type="text" value={hour.time}
-                        onChange={(e) => updateHour(hour.id, "time", e.target.value)}
+                      <input
+                        type="text"
+                        value={hour.time}
+                        onChange={(e) =>
+                          updateHour(hour.id, "time", e.target.value)
+                        }
                         className="flex-1 px-2 py-1.5 border-2 rounded text-sm outline-none"
-                        style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5", color: "#3D3935" }}
-                        placeholder="e.g. 9:00 AM – 7:00 PM" />
-                      <button className="p-1 border rounded flex-shrink-0"
-                        style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
-                        onClick={() => removeHour(hour.id)}>
-                        <Trash2 className="w-3.5 h-3.5" style={{ color: "#D0A096" }} />
+                        style={{
+                          borderColor: "#DCD4CD",
+                          backgroundColor: "#FAF7F5",
+                          color: "#3D3935",
+                        }}
+                        placeholder="e.g. 9:00 AM – 7:00 PM"
+                      />
+                      <button
+                        className="p-1 border rounded flex-shrink-0"
+                        style={{
+                          borderColor: "#DCD4CD",
+                          backgroundColor: "#FEFCFA",
+                        }}
+                        onClick={() => removeHour(hour.id)}
+                      >
+                        <Trash2
+                          className="w-3.5 h-3.5"
+                          style={{ color: "#D0A096" }}
+                        />
                       </button>
                     </>
                   ) : (
-                    <div className="flex items-center gap-3 w-full px-3 py-2 rounded"
-                      style={{ backgroundColor: "#FAF7F5", border: "1px solid #DCD4CD" }}>
-                      <span className="w-24 text-xs font-medium flex-shrink-0" style={{ color: "#3D3935" }}>{hour.day}</span>
+                    <div
+                      className="flex items-center gap-3 w-full px-3 py-2 rounded"
+                      style={{
+                        backgroundColor: "#FAF7F5",
+                        border: "1px solid #DCD4CD",
+                      }}
+                    >
+                      <span
+                        className="w-24 text-xs font-medium flex-shrink-0"
+                        style={{ color: "#3D3935" }}
+                      >
+                        {hour.day}
+                      </span>
                       <span className="text-xs text-gray-600">{hour.time}</span>
                     </div>
                   )}
@@ -3014,22 +3179,48 @@ export function AdminContent() {
     const items = isEditing ? awardsDraft : awardItems;
 
     const updateAward = (id: string, field: keyof AwardCard, value: string) =>
-      setAwardsDraft((prev) => prev.map((a) => a.id === id ? { ...a, [field]: value } : a));
-    const removeAward = (id: string) => setAwardsDraft((prev) => prev.filter((a) => a.id !== id));
+      setAwardsDraft((prev) =>
+        prev.map((a) => (a.id === id ? { ...a, [field]: value } : a)),
+      );
+    const removeAward = (id: string) =>
+      setAwardsDraft((prev) => prev.filter((a) => a.id !== id));
     const addAward = () =>
-      setAwardsDraft((prev) => [...prev, { id: crypto.randomUUID(), imageUrl: "", name: "", year: String(new Date().getFullYear()), issuer: "" }]);
+      setAwardsDraft((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          imageUrl: "",
+          name: "",
+          year: String(new Date().getFullYear()),
+          issuer: "",
+        },
+      ]);
     const handleAwardImage = (id: string, file: File | null) => {
       if (!file) return;
       updateAward(id, "imageUrl", URL.createObjectURL(file));
     };
 
     return (
-      <div className="p-4 border-2 rounded-md" style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}>
+      <div
+        className="p-4 border-2 rounded-md"
+        style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+      >
         {aboutCardHeader(
-          "about-awards", "Awards & Certifications",
-          () => { setEditingAboutCard("about-awards"); setAwardsDraft([...awardItems]); },
-          () => { setAwardItems([...awardsDraft]); setEditingAboutCard(null); flashAboutSaved("about-awards"); },
-          <span className="text-xs px-2 py-0.5 rounded-sm" style={{ backgroundColor: "#FAF7F5", color: "#3D3935" }}>
+          "about-awards",
+          "Awards & Certifications",
+          () => {
+            setEditingAboutCard("about-awards");
+            setAwardsDraft([...awardItems]);
+          },
+          () => {
+            setAwardItems([...awardsDraft]);
+            setEditingAboutCard(null);
+            flashAboutSaved("about-awards");
+          },
+          <span
+            className="text-xs px-2 py-0.5 rounded-sm"
+            style={{ backgroundColor: "#FAF7F5", color: "#3D3935" }}
+          >
             {items.length} {items.length === 1 ? "badge" : "badges"}
           </span>,
         )}
@@ -3037,48 +3228,104 @@ export function AdminContent() {
         {!isEditing ? (
           <div className="grid grid-cols-3 gap-3">
             {items.map((award) => (
-              <div key={award.id} className="p-3 border rounded-md text-center" style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}>
+              <div
+                key={award.id}
+                className="p-3 border rounded-md text-center"
+                style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
+              >
                 {award.imageUrl ? (
-                  <div className="w-12 h-12 mx-auto mb-2 rounded overflow-hidden border" style={{ borderColor: "#DCD4CD" }}>
-                    <img src={award.imageUrl} alt={award.name} className="w-full h-full object-cover" />
+                  <div
+                    className="w-12 h-12 mx-auto mb-2 rounded overflow-hidden border"
+                    style={{ borderColor: "#DCD4CD" }}
+                  >
+                    <img
+                      src={award.imageUrl}
+                      alt={award.name}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 ) : (
-                  <div className="w-12 h-12 mx-auto mb-2 rounded-full flex items-center justify-center" style={{ backgroundColor: "#E9CFCA" }}>
+                  <div
+                    className="w-12 h-12 mx-auto mb-2 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: "#E9CFCA" }}
+                  >
                     <Star className="w-5 h-5" style={{ color: "#3D3935" }} />
                   </div>
                 )}
-                <p className="text-sm font-medium leading-tight" style={{ color: "#3D3935" }}>{award.name || "—"}</p>
+                <p
+                  className="text-sm font-medium leading-tight"
+                  style={{ color: "#3D3935" }}
+                >
+                  {award.name || "—"}
+                </p>
                 <p className="text-xs text-gray-500 mt-0.5">{award.issuer}</p>
-                <p className="text-xs font-medium mt-0.5" style={{ color: "#D0A096" }}>{award.year}</p>
+                <p
+                  className="text-xs font-medium mt-0.5"
+                  style={{ color: "#D0A096" }}
+                >
+                  {award.year}
+                </p>
               </div>
             ))}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
             {items.map((award) => (
-              <div key={award.id} className="p-3 border-2 rounded-md relative" style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}>
-                <button className="absolute top-2 right-2 p-1 border rounded"
+              <div
+                key={award.id}
+                className="p-3 border-2 rounded-md relative"
+                style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
+              >
+                <button
+                  className="absolute top-2 right-2 p-1 border rounded"
                   style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
-                  onClick={() => removeAward(award.id)}>
-                  <Trash2 className="w-3.5 h-3.5" style={{ color: "#D0A096" }} />
+                  onClick={() => removeAward(award.id)}
+                >
+                  <Trash2
+                    className="w-3.5 h-3.5"
+                    style={{ color: "#D0A096" }}
+                  />
                 </button>
                 <div className="flex items-start gap-3 pr-7">
                   {/* Badge image uploader */}
                   <div className="flex-shrink-0">
-                    <input ref={(el) => { awardFileRefs.current[award.id] = el; }}
-                      type="file" accept=".png,.jpg,.jpeg,.webp" className="hidden"
-                      onChange={(e) => handleAwardImage(award.id, e.target.files?.[0] ?? null)} />
+                    <input
+                      ref={(el) => {
+                        awardFileRefs.current[award.id] = el;
+                      }}
+                      type="file"
+                      accept=".png,.jpg,.jpeg,.webp"
+                      className="hidden"
+                      onChange={(e) =>
+                        handleAwardImage(award.id, e.target.files?.[0] ?? null)
+                      }
+                    />
                     <button
                       className="w-16 h-16 border-2 border-dashed rounded-md flex flex-col items-center justify-center gap-0.5 hover:border-[#D0A096] transition-colors overflow-hidden"
-                      style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+                      style={{
+                        borderColor: "#DCD4CD",
+                        backgroundColor: "#FEFCFA",
+                      }}
                       onClick={() => awardFileRefs.current[award.id]?.click()}
                     >
                       {award.imageUrl ? (
-                        <img src={award.imageUrl} alt="" className="w-full h-full object-cover" />
+                        <img
+                          src={award.imageUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                        />
                       ) : (
                         <>
-                          <ImagePlus className="w-4 h-4" style={{ color: "#D0A096" }} />
-                          <span className="text-xs" style={{ color: "#D0A096" }}>Badge</span>
+                          <ImagePlus
+                            className="w-4 h-4"
+                            style={{ color: "#D0A096" }}
+                          />
+                          <span
+                            className="text-xs"
+                            style={{ color: "#D0A096" }}
+                          >
+                            Badge
+                          </span>
                         </>
                       )}
                     </button>
@@ -3086,29 +3333,72 @@ export function AdminContent() {
                   {/* Award fields */}
                   <div className="flex-1 space-y-2">
                     <div>
-                      <label className="text-xs font-medium block mb-0.5" style={{ color: "#3D3935" }}>Award Name</label>
-                      <input type="text" value={award.name}
-                        onChange={(e) => updateAward(award.id, "name", e.target.value)}
+                      <label
+                        className="text-xs font-medium block mb-0.5"
+                        style={{ color: "#3D3935" }}
+                      >
+                        Award Name
+                      </label>
+                      <input
+                        type="text"
+                        value={award.name}
+                        onChange={(e) =>
+                          updateAward(award.id, "name", e.target.value)
+                        }
                         className="w-full px-2 py-1.5 border rounded text-sm outline-none"
-                        style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA", color: "#3D3935" }}
-                        placeholder="Award or certification name" />
+                        style={{
+                          borderColor: "#DCD4CD",
+                          backgroundColor: "#FEFCFA",
+                          color: "#3D3935",
+                        }}
+                        placeholder="Award or certification name"
+                      />
                     </div>
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <label className="text-xs font-medium block mb-0.5" style={{ color: "#3D3935" }}>Year</label>
-                        <input type="text" value={award.year} maxLength={4}
-                          onChange={(e) => updateAward(award.id, "year", e.target.value)}
+                        <label
+                          className="text-xs font-medium block mb-0.5"
+                          style={{ color: "#3D3935" }}
+                        >
+                          Year
+                        </label>
+                        <input
+                          type="text"
+                          value={award.year}
+                          maxLength={4}
+                          onChange={(e) =>
+                            updateAward(award.id, "year", e.target.value)
+                          }
                           className="w-full px-2 py-1.5 border rounded text-sm outline-none"
-                          style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA", color: "#3D3935" }}
-                          placeholder="2024" />
+                          style={{
+                            borderColor: "#DCD4CD",
+                            backgroundColor: "#FEFCFA",
+                            color: "#3D3935",
+                          }}
+                          placeholder="2024"
+                        />
                       </div>
                       <div>
-                        <label className="text-xs font-medium block mb-0.5" style={{ color: "#3D3935" }}>Issuer</label>
-                        <input type="text" value={award.issuer}
-                          onChange={(e) => updateAward(award.id, "issuer", e.target.value)}
+                        <label
+                          className="text-xs font-medium block mb-0.5"
+                          style={{ color: "#3D3935" }}
+                        >
+                          Issuer
+                        </label>
+                        <input
+                          type="text"
+                          value={award.issuer}
+                          onChange={(e) =>
+                            updateAward(award.id, "issuer", e.target.value)
+                          }
                           className="w-full px-2 py-1.5 border rounded text-sm outline-none"
-                          style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA", color: "#3D3935" }}
-                          placeholder="Issuing body" />
+                          style={{
+                            borderColor: "#DCD4CD",
+                            backgroundColor: "#FEFCFA",
+                            color: "#3D3935",
+                          }}
+                          placeholder="Issuing body"
+                        />
                       </div>
                     </div>
                   </div>
@@ -3122,7 +3412,9 @@ export function AdminContent() {
               onClick={addAward}
             >
               <Plus className="w-5 h-5" style={{ color: "#D0A096" }} />
-              <span className="text-sm" style={{ color: "#3D3935" }}>Add Badge</span>
+              <span className="text-sm" style={{ color: "#3D3935" }}>
+                Add Badge
+              </span>
             </button>
           </div>
         )}
@@ -3135,9 +3427,7 @@ export function AdminContent() {
       <div className="p-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-gray-800 mb-2">
-            Website Content Management
-          </h1>
+          <h1 className="text-gray-800 mb-2">Website Content Management</h1>
           <p className="text-gray-600">
             Manage all sections of your website from here
           </p>
@@ -3167,15 +3457,9 @@ export function AdminContent() {
                 </span>
               </div>
               {expandedSection === "homepage" ? (
-                <ChevronUp
-                  className="w-5 h-5"
-                  style={{ color: "#3D3935" }}
-                />
+                <ChevronUp className="w-5 h-5" style={{ color: "#3D3935" }} />
               ) : (
-                <ChevronDown
-                  className="w-5 h-5"
-                  style={{ color: "#3D3935" }}
-                />
+                <ChevronDown className="w-5 h-5" style={{ color: "#3D3935" }} />
               )}
             </button>
 
@@ -3217,15 +3501,9 @@ export function AdminContent() {
                 </span>
               </div>
               {expandedSection === "about" ? (
-                <ChevronUp
-                  className="w-5 h-5"
-                  style={{ color: "#3D3935" }}
-                />
+                <ChevronUp className="w-5 h-5" style={{ color: "#3D3935" }} />
               ) : (
-                <ChevronDown
-                  className="w-5 h-5"
-                  style={{ color: "#3D3935" }}
-                />
+                <ChevronDown className="w-5 h-5" style={{ color: "#3D3935" }} />
               )}
             </button>
 
@@ -3254,9 +3532,7 @@ export function AdminContent() {
               onClick={() => toggleSection("workshops")}
             >
               <div className="flex items-center gap-3">
-                <h3 style={{ color: "#3D3935" }}>
-                  Workshops Page
-                </h3>
+                <h3 style={{ color: "#3D3935" }}>Workshops Page</h3>
                 <span
                   className="text-sm px-3 py-1"
                   style={{
@@ -3268,15 +3544,9 @@ export function AdminContent() {
                 </span>
               </div>
               {expandedSection === "workshops" ? (
-                <ChevronUp
-                  className="w-5 h-5"
-                  style={{ color: "#3D3935" }}
-                />
+                <ChevronUp className="w-5 h-5" style={{ color: "#3D3935" }} />
               ) : (
-                <ChevronDown
-                  className="w-5 h-5"
-                  style={{ color: "#3D3935" }}
-                />
+                <ChevronDown className="w-5 h-5" style={{ color: "#3D3935" }} />
               )}
             </button>
 
@@ -3286,8 +3556,7 @@ export function AdminContent() {
                 style={{ borderColor: "#DCD4CD" }}
               >
                 <p className="text-gray-600 text-center py-8">
-                  Workshops page content management coming
-                  soon...
+                  Workshops page content management coming soon...
                 </p>
               </div>
             )}

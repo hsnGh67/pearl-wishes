@@ -28,7 +28,8 @@ const services = [
   },
   {
     title: "Biab Fresh Set",
-    description: "Builder gel strengthens and protects nails before colour.",
+    description:
+      "Builder gel strengthens and protects nails before colour.",
     image: image_a83f5cb32c2f19e665063ce30e70b3476e2a64e4,
     alt: "Biab Fresh Set",
   },
@@ -87,9 +88,12 @@ export function Features() {
           >
             Our Treatments
           </h2>
-          <p className="max-w-2xl mx-auto px-4" style={{ color: "#3D3935" }}>
-            Discover our range of premium nail care services designed to make
-            you look and feel your best
+          <p
+            className="max-w-2xl mx-auto px-4"
+            style={{ color: "#3D3935" }}
+          >
+            Discover our range of premium nail care services
+            designed to make you look and feel your best
           </p>
         </div>
 
@@ -135,7 +139,8 @@ export function Features() {
                 <Button
                   className="w-full transition-colors min-h-[48px] md:min-h-[44px] text-base md:text-sm"
                   style={{
-                    background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                    background:
+                      "linear-gradient(to right, #FCEAE0, #EACAB8)",
                     color: "#3D3935",
                   }}
                   onMouseEnter={(e) => {

@@ -1,12 +1,17 @@
-import { supabase } from '../../config/supabase';
-import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import { dbLogger } from './logger';
+import { supabase } from "../../config/supabase";
+import {
+  RealtimeChannel,
+  RealtimePostgresChangesPayload,
+} from "@supabase/supabase-js";
+import { dbLogger } from "./logger";
 
 /**
  * Realtime subscription manager for syncing data between Public and Admin
  */
 
-type ChangeCallback<T> = (payload: RealtimePostgresChangesPayload<T>) => void;
+type ChangeCallback<T> = (
+  payload: RealtimePostgresChangesPayload<T>,
+) => void;
 
 export class RealtimeSync {
   private channels: Map<string, RealtimeChannel> = new Map();
@@ -20,54 +25,69 @@ export class RealtimeSync {
       onInsert?: ChangeCallback<T>;
       onUpdate?: ChangeCallback<T>;
       onDelete?: ChangeCallback<T>;
-    }
+    },
   ): () => void {
     const channelName = `${table}_changes`;
 
     if (this.channels.has(channelName)) {
-      dbLogger.warn('Already subscribed to table', { table });
+      dbLogger.warn("Already subscribed to table", { table });
       return () => this.unsubscribe(channelName);
     }
 
-    dbLogger.info('Subscribing to realtime changes', { table });
+    dbLogger.info("Subscribing to realtime changes", { table });
 
     const channel = supabase
       .channel(channelName)
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'INSERT',
-          schema: 'public',
+          event: "INSERT",
+          schema: "public",
           table,
         },
         (payload) => {
-          dbLogger.info('Realtime INSERT event', { table, data: payload });
-          options.onInsert?.(payload as RealtimePostgresChangesPayload<T>);
-        }
+          dbLogger.info("Realtime INSERT event", {
+            table,
+            data: payload,
+          });
+          options.onInsert?.(
+            payload as RealtimePostgresChangesPayload<T>,
+          );
+        },
       )
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'UPDATE',
-          schema: 'public',
+          event: "UPDATE",
+          schema: "public",
           table,
         },
         (payload) => {
-          dbLogger.info('Realtime UPDATE event', { table, data: payload });
-          options.onUpdate?.(payload as RealtimePostgresChangesPayload<T>);
-        }
+          dbLogger.info("Realtime UPDATE event", {
+            table,
+            data: payload,
+          });
+          options.onUpdate?.(
+            payload as RealtimePostgresChangesPayload<T>,
+          );
+        },
       )
       .on(
-        'postgres_changes',
+        "postgres_changes",
         {
-          event: 'DELETE',
-          schema: 'public',
+          event: "DELETE",
+          schema: "public",
           table,
         },
         (payload) => {
-          dbLogger.info('Realtime DELETE event', { table, data: payload });
-          options.onDelete?.(payload as RealtimePostgresChangesPayload<T>);
-        }
+          dbLogger.info("Realtime DELETE event", {
+            table,
+            data: payload,
+          });
+          options.onDelete?.(
+            payload as RealtimePostgresChangesPayload<T>,
+          );
+        },
       )
       .subscribe();
 
@@ -83,7 +103,9 @@ export class RealtimeSync {
   unsubscribe(channelName: string): void {
     const channel = this.channels.get(channelName);
     if (channel) {
-      dbLogger.info('Unsubscribing from realtime changes', { channel: channelName });
+      dbLogger.info("Unsubscribing from realtime changes", {
+        channel: channelName,
+      });
       supabase.removeChannel(channel);
       this.channels.delete(channelName);
     }
@@ -93,7 +115,7 @@ export class RealtimeSync {
    * Unsubscribe from all channels
    */
   unsubscribeAll(): void {
-    dbLogger.info('Unsubscribing from all realtime channels');
+    dbLogger.info("Unsubscribing from all realtime channels");
     this.channels.forEach((channel, channelName) => {
       supabase.removeChannel(channel);
       this.channels.delete(channelName);
@@ -127,7 +149,7 @@ export const subscribeToServices = (callbacks: {
   onUpdate?: ChangeCallback<any>;
   onDelete?: ChangeCallback<any>;
 }) => {
-  return realtimeSync.subscribe('services', callbacks);
+  return realtimeSync.subscribe("services", callbacks);
 };
 
 export const subscribeToCategories = (callbacks: {
@@ -135,7 +157,7 @@ export const subscribeToCategories = (callbacks: {
   onUpdate?: ChangeCallback<any>;
   onDelete?: ChangeCallback<any>;
 }) => {
-  return realtimeSync.subscribe('categories', callbacks);
+  return realtimeSync.subscribe("categories", callbacks);
 };
 
 export const subscribeToTestimonials = (callbacks: {
@@ -143,7 +165,7 @@ export const subscribeToTestimonials = (callbacks: {
   onUpdate?: ChangeCallback<any>;
   onDelete?: ChangeCallback<any>;
 }) => {
-  return realtimeSync.subscribe('testimonials', callbacks);
+  return realtimeSync.subscribe("testimonials", callbacks);
 };
 
 export const subscribeToBookings = (callbacks: {
@@ -151,7 +173,7 @@ export const subscribeToBookings = (callbacks: {
   onUpdate?: ChangeCallback<any>;
   onDelete?: ChangeCallback<any>;
 }) => {
-  return realtimeSync.subscribe('bookings', callbacks);
+  return realtimeSync.subscribe("bookings", callbacks);
 };
 
 export const subscribeToUsers = (callbacks: {
@@ -159,7 +181,7 @@ export const subscribeToUsers = (callbacks: {
   onUpdate?: ChangeCallback<any>;
   onDelete?: ChangeCallback<any>;
 }) => {
-  return realtimeSync.subscribe('users', callbacks);
+  return realtimeSync.subscribe("users", callbacks);
 };
 
 export const subscribeToContent = (callbacks: {
@@ -167,7 +189,7 @@ export const subscribeToContent = (callbacks: {
   onUpdate?: ChangeCallback<any>;
   onDelete?: ChangeCallback<any>;
 }) => {
-  return realtimeSync.subscribe('content_sections', callbacks);
+  return realtimeSync.subscribe("content_sections", callbacks);
 };
 
 export const subscribeToWorkshops = (callbacks: {
@@ -175,5 +197,5 @@ export const subscribeToWorkshops = (callbacks: {
   onUpdate?: ChangeCallback<any>;
   onDelete?: ChangeCallback<any>;
 }) => {
-  return realtimeSync.subscribe('workshops', callbacks);
+  return realtimeSync.subscribe("workshops", callbacks);
 };

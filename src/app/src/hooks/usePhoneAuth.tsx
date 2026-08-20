@@ -1,5 +1,8 @@
 import { useCallback, useState } from "react";
-import { sendPhoneOtp, verifyPhoneOtp } from "../lib/auth/phone-auth";
+import {
+  sendPhoneOtp,
+  verifyPhoneOtp,
+} from "../lib/auth/phone-auth";
 import { syncProfile } from "../lib/auth/profile-sync";
 import {
   DEFAULT_COUNTRY_CODE_ID,
@@ -23,14 +26,18 @@ interface UsePhoneAuthOptions {
   onSuccess?: (profile: User) => void;
 }
 
-export function usePhoneAuth(options: UsePhoneAuthOptions = {}) {
+export function usePhoneAuth(
+  options: UsePhoneAuthOptions = {},
+) {
   const { onSuccess } = options;
   const [step, setStep] = useState<PhoneAuthStep>("phone");
   const [status, setStatus] = useState<PhoneAuthStatus>("idle");
   const [countryCodeId, setCountryCodeId] = useState(
     options.defaultCountryCode ?? DEFAULT_COUNTRY_CODE_ID,
   );
-  const [phoneNumber, setPhoneNumber] = useState(options.defaultPhone ?? "");
+  const [phoneNumber, setPhoneNumber] = useState(
+    options.defaultPhone ?? "",
+  );
   const [otpCode, setOtpCode] = useState("");
   const [e164Phone, setE164Phone] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +68,9 @@ export function usePhoneAuth(options: UsePhoneAuthOptions = {}) {
     } catch (err) {
       setStatus("error");
       setError(
-        err instanceof Error ? err.message : "Failed to send verification code.",
+        err instanceof Error
+          ? err.message
+          : "Failed to send verification code.",
       );
     }
   }, [countryCodeId, phoneNumber]);
@@ -76,10 +85,15 @@ export function usePhoneAuth(options: UsePhoneAuthOptions = {}) {
     setStatus("verifying");
 
     try {
-      const { session } = await verifyPhoneOtp(e164Phone, otpCode);
+      const { session } = await verifyPhoneOtp(
+        e164Phone,
+        otpCode,
+      );
 
       if (!session?.user) {
-        throw new Error("Verification succeeded but no session was created.");
+        throw new Error(
+          "Verification succeeded but no session was created.",
+        );
       }
 
       const profile = await syncProfile(session.user);
@@ -89,7 +103,9 @@ export function usePhoneAuth(options: UsePhoneAuthOptions = {}) {
     } catch (err) {
       setStatus("error");
       setError(
-        err instanceof Error ? err.message : "Invalid verification code.",
+        err instanceof Error
+          ? err.message
+          : "Invalid verification code.",
       );
       return null;
     }

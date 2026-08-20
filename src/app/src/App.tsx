@@ -1,6 +1,6 @@
-import { RouterProvider } from 'react-router';
-import { router } from './routes';
-import { WorkshopTabProvider } from './contexts/WorkshopTabContext';
+import { RouterProvider } from "react-router";
+import { router } from "./routes";
+import { WorkshopTabProvider } from "./contexts/WorkshopTabContext";
 
 export default function App() {
   return (
