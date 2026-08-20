@@ -22,7 +22,10 @@ import {
   createCategory,
   getActiveCategories,
 } from "../../lib/db/services";
-import { subscribeToServices } from "../../lib/db/realtime";
+import {
+  subscribeToServices,
+  subscribeToCategories,
+} from "../../lib/db/realtime";
 
 export function AdminServices() {
   const [isUpdatingService, setIsUpdatingService] = useState(false);
@@ -40,8 +43,6 @@ export function AdminServices() {
   const [categoryFormData, setCategoryFormData] = useState({
     name: "",
     is_active: true,
-    description: "",
-    image_url: "",
   });
   const [serviceFormData, setServiceFormData] = useState({
     name: "",
@@ -53,25 +54,9 @@ export function AdminServices() {
     image_url: "",
     display_order: 0,
   });
-  const [categoryImageFile, setCategoryImageFile] = useState<File | null>(null);
   const [serviceImageFile, setServiceImageFile] = useState<File | null>(null);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [isCreatingService, setIsCreatingService] = useState(false);
-
-  // Load services from database
-  useEffect(() => {
-    loadServices();
-    loadCategories();
-
-    // Subscribe to realtime changes
-    const unsubscribe = subscribeToServices({
-      onInsert: () => loadServices(),
-      onUpdate: () => loadServices(),
-      onDelete: () => loadServices(),
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   const loadServices = async () => {
     try {
@@ -85,6 +70,56 @@ export function AdminServices() {
       setIsLoading(false);
     }
   };
+
+  const loadCategories = async () => {
+    try {
+      setIsCategoriesLoading(true);
+      const data = await getActiveCategories();
+      setCategories(data);
+    } catch (error) {
+      console.error("Failed to load categories:", error);
+    } finally {
+      setIsCategoriesLoading(false);
+    }
+  };
+
+  const refreshDashboardData = async () => {
+    await Promise.all([loadServices(), loadCategories()]);
+  };
+
+  // Load services and categories, then keep stats in sync with changes
+  useEffect(() => {
+    void refreshDashboardData();
+
+    const unsubscribeServices = subscribeToServices({
+      onInsert: () => {
+        void refreshDashboardData();
+      },
+      onUpdate: () => {
+        void refreshDashboardData();
+      },
+      onDelete: () => {
+        void refreshDashboardData();
+      },
+    });
+
+    const unsubscribeCategories = subscribeToCategories({
+      onInsert: () => {
+        void loadCategories();
+      },
+      onUpdate: () => {
+        void loadCategories();
+      },
+      onDelete: () => {
+        void loadCategories();
+      },
+    });
+
+    return () => {
+      unsubscribeServices();
+      unsubscribeCategories();
+    };
+  }, []);
 
   const uploadImageAndGetUrl = async (file: File | null, folder: string) => {
     if (!file) {
@@ -118,29 +153,18 @@ export function AdminServices() {
   const handleCreateCategory = async () => {
     setIsCreatingCategory(true);
     try {
-      const image_url = await uploadImageAndGetUrl(
-        categoryImageFile,
-        "categories",
-      );
-
       const newCategory = {
         name: categoryFormData.name,
         is_active: categoryFormData.is_active,
-        description: categoryFormData.description,
-        image_url: image_url || "",
       };
 
       await createCategory(newCategory);
+      await refreshDashboardData();
       setIsCategoryAddDialogOpen(false);
-      setCategoryImageFile(null);
       setCategoryFormData({
         name: "",
         is_active: true,
-        description: "",
-        image_url: "",
       });
-      await loadCategories();
-      await loadServices();
     } catch (error) {
       console.error("Failed to create category:", error);
     } finally {
@@ -168,6 +192,7 @@ export function AdminServices() {
       };
 
       await createService(newService);
+      await refreshDashboardData();
       setIsServiceAddDialogOpen(false);
       setServiceImageFile(null);
       setServiceFormData({
@@ -180,7 +205,6 @@ export function AdminServices() {
         image_url: "",
         display_order: 0,
       });
-      await loadServices();
     } catch (error) {
       console.error("Failed to create service:", error);
     } finally {
@@ -209,10 +233,7 @@ export function AdminServices() {
     setCategoryFormData({
       name: "",
       is_active: true,
-      description: "",
-      image_url: "",
     });
-    setCategoryImageFile(null);
     setIsCategoryAddDialogOpen(true);
   };
 
@@ -232,18 +253,6 @@ export function AdminServices() {
 
     // Load categories when dialog opens
     await loadCategories();
-  };
-
-  const loadCategories = async () => {
-    try {
-      setIsCategoriesLoading(true);
-      const data = await getActiveCategories();
-      setCategories(data);
-    } catch (error) {
-      console.error("Failed to load categories:", error);
-    } finally {
-      setIsCategoriesLoading(false);
-    }
   };
 
   const getCategoryName = (categoryId?: string) => {
@@ -285,7 +294,7 @@ export function AdminServices() {
         await updateService(updatedService, serviceImageFile);
         setServiceImageFile(null);
       }
-      await loadServices();
+      await refreshDashboardData();
       setIsEditDialogOpen(false);
       setIsUpdatingService(false);
     } catch (error) {
@@ -300,25 +309,30 @@ export function AdminServices() {
     setIsDeleteDialogOpen(true);
   };
 
+  const totalServices = services.length;
+  const activeServices = services.filter((service) => service.is_active).length;
+  const averagePrice =
+    totalServices > 0
+      ? services.reduce((sum, service) => sum + Number(service.price || 0), 0) /
+        totalServices
+      : 0;
+
   const stats = [
     {
       label: "Total Services",
-      value: services.length.toString(),
+      value: totalServices.toString(),
     },
     {
       label: "Active Services",
-      value: services.filter((s) => s.is_active).length.toString(),
+      value: activeServices.toString(),
     },
     {
       label: "Avg. Price",
-      value:
-        services.length > 0
-          ? `£${(services.reduce((sum, s) => sum + s.price, 0) / services.length).toFixed(2)}`
-          : "£0.00",
+      value: `£${averagePrice.toFixed(2)}`,
     },
     {
       label: "Categories",
-      value: new Set(services.map((s) => s.category_id)).size.toString(),
+      value: categories.length.toString(),
     },
   ];
 
@@ -517,57 +531,6 @@ export function AdminServices() {
                   })
                 }
               />
-            </div>
-            <div className="grid gap-2">
-              <label
-                className="text-sm font-medium"
-                style={{ color: "#3D3935" }}
-              >
-                Short Description
-              </label>
-              <textarea
-                className="flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm"
-                style={{
-                  borderColor: "#DCD4CD",
-                  backgroundColor: "#FEFCFA",
-                }}
-                placeholder="Brief description shown on service card"
-                value={categoryFormData.description}
-                onChange={(e) =>
-                  setCategoryFormData({
-                    ...categoryFormData,
-                    description: e.target.value,
-                  })
-                }
-              />
-              <p className="text-xs text-gray-500">
-                This appears on the service card on the homepage
-              </p>
-            </div>
-            <div className="grid gap-2">
-              <label
-                className="text-sm font-medium"
-                style={{ color: "#3D3935" }}
-              >
-                Cover Image
-              </label>
-              <input
-                type="file"
-                accept=".jpeg,.jpg,.png,.webp,image/*"
-                className="flex h-10 w-full rounded-md border px-3 py-2 text-sm"
-                style={{
-                  borderColor: "#DCD4CD",
-                  backgroundColor: "#FEFCFA",
-                }}
-                onChange={(e) =>
-                  setCategoryImageFile(e.target.files?.[0] ?? null)
-                }
-              />
-              <p className="text-xs text-gray-500">
-                {categoryImageFile
-                  ? `Selected file: ${categoryImageFile.name}`
-                  : "Upload an image for the category cover."}
-              </p>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -1148,15 +1111,17 @@ export function AdminServices() {
                 color: "#3D3935",
               }}
               onClick={async () => {
-                // Delete service logic here
-                if (selectedService) {
-                  deleteService(selectedService.id);
+                if (!selectedService?.id) {
+                  return;
                 }
-                const newService = services.filter(
-                  (s) => s.id !== selectedService?.id,
-                );
-                setServices(newService);
-                setIsDeleteDialogOpen(false);
+
+                try {
+                  await deleteService(selectedService.id);
+                  await refreshDashboardData();
+                  setIsDeleteDialogOpen(false);
+                } catch (error) {
+                  console.error("Failed to delete service:", error);
+                }
               }}
             >
               <Trash2 className="w-4 h-4" />

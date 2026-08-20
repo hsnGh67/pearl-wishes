@@ -220,9 +220,10 @@ export function AdminWorkshops() {
       await createWorkshop(newWorkshop);
       setIsAddDialogOpen(false);
       setWorkshopImageFile(null);
-      setIsAddingWorkshop(false);
+      await loadWorkshops();
     } catch (e) {
       console.error("Failed to create workshop:", e);
+    } finally {
       setIsAddingWorkshop(false);
     }
   };
@@ -1408,6 +1409,7 @@ export function AdminWorkshops() {
                     );
                     setWorkshopImageFile(null);
                     setIsEditDialogOpen(false);
+                    await loadWorkshops();
                   } catch (error) {
                     console.error(
                       "Failed to update workshop:",
@@ -1482,9 +1484,17 @@ export function AdminWorkshops() {
                 borderColor: "#3D3935",
                 color: "#3D3935",
               }}
-              onClick={() => {
+              onClick={async () => {
                 if (selectedWorkshop) {
-                  deleteWorkshop(selectedWorkshop.id);
+                  try {
+                    await deleteWorkshop(selectedWorkshop.id);
+                    await loadWorkshops();
+                  } catch (error) {
+                    console.error(
+                      "Failed to delete workshop:",
+                      error,
+                    );
+                  }
                 }
                 setIsDeleteDialogOpen(false);
               }}

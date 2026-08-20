@@ -72,18 +72,7 @@ export const CategorySchema = z.object({
     .string()
     .min(3, "Service name must be at least 3 characters")
     .max(100),
-  description: z
-    .string()
-    .max(500)
-    .nullable()
-    .optional()
-    .transform((val) => val || ""),
   is_active: z.boolean().default(true),
-  image_url: z
-    .union([z.string().url(), z.literal("")])
-    .nullable()
-    .optional()
-    .transform((val) => val || ""),
   created_at: z.string().or(z.date()).optional(),
   updated_at: z.string().or(z.date()).optional(),
 });

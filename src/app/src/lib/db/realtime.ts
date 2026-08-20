@@ -130,6 +130,14 @@ export const subscribeToServices = (callbacks: {
   return realtimeSync.subscribe('services', callbacks);
 };
 
+export const subscribeToCategories = (callbacks: {
+  onInsert?: ChangeCallback<any>;
+  onUpdate?: ChangeCallback<any>;
+  onDelete?: ChangeCallback<any>;
+}) => {
+  return realtimeSync.subscribe('categories', callbacks);
+};
+
 export const subscribeToTestimonials = (callbacks: {
   onInsert?: ChangeCallback<any>;
   onUpdate?: ChangeCallback<any>;

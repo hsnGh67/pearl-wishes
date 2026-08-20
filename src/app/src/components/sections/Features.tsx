@@ -47,7 +47,12 @@ export function Features() {
     loadServices();
   }, []);
 
-  const servicesToShow = showAll ? services : services.slice(0, 6);
+  const showableServices = services.filter(
+    (service) => service.is_active && !service.is_add_on,
+  );
+  const servicesToShow = showAll
+    ? showableServices
+    : showableServices.slice(0, 6);
   return (
     <section
       id="features"
@@ -136,7 +141,7 @@ export function Features() {
             ))
           )}
         </div>
-        {services.length > 6 && (
+        {showableServices.length > 6 && (
           <div className="flex justify-center items-center w-full mt-4">
             <Button
               onClick={() => setShowAll(!showAll)}
