@@ -21,7 +21,8 @@ export interface ValidationResult<T> {
  * Convert Zod errors to friendly format
  */
 export const formatZodErrors = (error: ZodError): ValidationError[] => {
-  return error.errors.map((err) => ({
+  // Zod v4 uses `.issues` (`.errors` was removed)
+  return error.issues.map((err) => ({
     field: err.path.join('.'),
     message: err.message,
   }));

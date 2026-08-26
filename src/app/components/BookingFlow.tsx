@@ -1678,8 +1678,7 @@ export function BookingFlow({
               )}
 
               {/* Add-Ons Selection for Selected Service */}
-              {selectedServiceForAddOns &&
-                availableAddons.length > 0 && (
+              {selectedServiceForAddOns && (
                   <div className="pt-3 border-t">
                     <Card
                       style={{
@@ -1696,84 +1695,95 @@ export function BookingFlow({
                             </span>
                           </p>
                           <p className="text-xs text-gray-600 mt-0.5">
-                            Select optional add-ons for this
-                            service:
+                            {availableAddons.length > 0
+                              ? "Select optional add-ons for this service:"
+                              : "No add-ons available for this service."}
                           </p>
                         </div>
 
                         <Separator className="my-3" />
 
-                        <div className="space-y-2 mb-3">
-                          {availableAddons.map((addOn) => {
-                            const isSelected = tempAddOns.some(
-                              (a) => a.name === addOn.name,
-                            );
+                        {availableAddons.length > 0 ? (
+                          <div className="space-y-2 mb-3">
+                            {availableAddons.map((addOn) => {
+                              const isSelected = tempAddOns.some(
+                                (a) => a.name === addOn.name,
+                              );
 
-                            return (
-                              <div
-                                key={addOn.name}
-                                className={`border rounded p-3 cursor-pointer transition-all ${
-                                  isSelected
-                                    ? "border-[#E9CFCA]"
-                                    : "hover:border-[#E9CFCA] border-[#DCD4CD]"
-                                }`}
-                                style={
-                                  isSelected
-                                    ? {
-                                        backgroundColor:
-                                          "#FAF7F5",
-                                        boxShadow:
-                                          "0 2px 4px rgba(0, 0, 0, 0.1)",
-                                      }
-                                    : {
-                                        backgroundColor:
-                                          "#FEFCFA",
-                                      }
-                                }
-                                onClick={() =>
-                                  handleAddOnToggle(
-                                    addOn.id,
-                                    addOn.name,
-                                    addOn.price,
-                                    addOn.duration,
-                                  )
-                                }
-                              >
-                                <div className="flex justify-between items-center gap-4">
-                                  <div className="flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className="text-sm"
-                                        style={{
-                                          color: "#3D3935",
-                                        }}
-                                      >
-                                        {addOn.name}
-                                      </span>
-                                      {isSelected && (
-                                        <Check
-                                          className="h-4 w-4"
+                              return (
+                                <div
+                                  key={addOn.name}
+                                  className={`border rounded p-3 cursor-pointer transition-all ${
+                                    isSelected
+                                      ? "border-[#E9CFCA]"
+                                      : "hover:border-[#E9CFCA] border-[#DCD4CD]"
+                                  }`}
+                                  style={
+                                    isSelected
+                                      ? {
+                                          backgroundColor:
+                                            "#FAF7F5",
+                                          boxShadow:
+                                            "0 2px 4px rgba(0, 0, 0, 0.1)",
+                                        }
+                                      : {
+                                          backgroundColor:
+                                            "#FEFCFA",
+                                        }
+                                  }
+                                  onClick={() =>
+                                    handleAddOnToggle(
+                                      addOn.id,
+                                      addOn.name,
+                                      addOn.price,
+                                      addOn.duration,
+                                    )
+                                  }
+                                >
+                                  <div className="flex justify-between items-center gap-4">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-2">
+                                        <span
+                                          className="text-sm"
                                           style={{
                                             color: "#3D3935",
                                           }}
-                                        />
-                                      )}
+                                        >
+                                          {addOn.name}
+                                        </span>
+                                        {isSelected && (
+                                          <Check
+                                            className="h-4 w-4"
+                                            style={{
+                                              color: "#3D3935",
+                                            }}
+                                          />
+                                        )}
+                                      </div>
+                                      <p className="text-xs text-gray-500 mt-0.5">
+                                        {addOn.duration} min
+                                      </p>
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-0.5">
-                                      {addOn.duration} min
-                                    </p>
-                                  </div>
-                                  <div
-                                    className="text-sm flex-shrink-0"
-                                    style={{ color: "#3D3935" }}
-                                  >
-                                    £{addOn.price}
+                                    <div
+                                      className="text-sm flex-shrink-0"
+                                      style={{ color: "#3D3935" }}
+                                    >
+                                      £{addOn.price}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <p
+                            className="text-sm mb-3"
+                            style={{ color: "#3D3935" }}
+                          >
+                            You can add this service without
+                            add-ons.
+                          </p>
+                        )}
 
                         <div className="flex gap-2">
                           <Button

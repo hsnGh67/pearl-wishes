@@ -15,7 +15,6 @@ import {
   formatServiceForDisplay,
   ServiceDisplay,
 } from "../../schema/service.schema";
-import { formatZodErrors } from "../../schema/validation";
 import {
   getAllServices,
   createService,
@@ -34,7 +33,7 @@ const getServiceFormErrorMessage = (
   fallback: string,
 ): string => {
   if (error instanceof ZodError) {
-    const messages = formatZodErrors(error).map((e) => e.message);
+    const messages = error.issues.map((issue) => issue.message).filter(Boolean);
     if (messages.length > 0) {
       return messages.join("\n");
     }
@@ -46,25 +45,18 @@ const getServiceFormErrorMessage = (
 };
 
 export function AdminServices() {
-  const [isUpdatingService, setIsUpdatingService] =
-    useState(false);
-  const [isCategoryAddDialogOpen, setIsCategoryAddDialogOpen] =
-    useState(false);
-  const [isServiceAddDialogOpen, setIsServiceAddDialogOpen] =
-    useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] =
-    useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] =
-    useState(false);
-  const [selectedService, setSelectedService] =
-    useState<ServiceDisplay | null>(null);
-  const [services, setServices] = useState<ServiceDisplay[]>(
-    [],
+  const [isUpdatingService, setIsUpdatingService] = useState(false);
+  const [isCategoryAddDialogOpen, setIsCategoryAddDialogOpen] = useState(false);
+  const [isServiceAddDialogOpen, setIsServiceAddDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedService, setSelectedService] = useState<ServiceDisplay | null>(
+    null,
   );
+  const [services, setServices] = useState<ServiceDisplay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [categories, setCategories] = useState<any[]>([]);
-  const [isCategoriesLoading, setIsCategoriesLoading] =
-    useState(false);
+  const [isCategoriesLoading, setIsCategoriesLoading] = useState(false);
   const [categoryFormData, setCategoryFormData] = useState({
     name: "",
     is_active: true,
@@ -79,12 +71,23 @@ export function AdminServices() {
     image_url: "",
     display_order: 0,
   });
-  const [serviceImageFile, setServiceImageFile] =
-    useState<File | null>(null);
-  const [isCreatingCategory, setIsCreatingCategory] =
-    useState(false);
-  const [isCreatingService, setIsCreatingService] =
-    useState(false);
+  const [serviceImageFile, setServiceImageFile] = useState<File | null>(null);
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [isCreatingService, setIsCreatingService] = useState(false);
+  const [serviceFormError, setServiceFormError] = useState<string | null>(
+    null,
+  );
+
+  const emptyServiceForm = {
+    name: "",
+    categoryId: "" as "manicure" | "extensions" | "add_on" | "",
+    duration: "",
+    price: "",
+    is_active: true,
+    description: "",
+    image_url: "",
+    display_order: 0,
+  };
 
   const loadServices = async () => {
     try {
@@ -149,18 +152,12 @@ export function AdminServices() {
     };
   }, []);
 
-  const uploadImageAndGetUrl = async (
-    file: File | null,
-    folder: string,
-  ) => {
+  const uploadImageAndGetUrl = async (file: File | null, folder: string) => {
     if (!file) {
       return "";
     }
 
-    const sanitizedFilename = file.name.replace(
-      /[^a-zA-Z0-9_.-]/g,
-      "-",
-    );
+    const sanitizedFilename = file.name.replace(/[^a-zA-Z0-9_.-]/g, "-");
     const filePath = `${folder}/${Date.now()}-${sanitizedFilename}`;
 
     const { error: uploadError } = await supabase.storage
@@ -172,14 +169,12 @@ export function AdminServices() {
       throw uploadError;
     }
 
-    const { data: publicUrlData, error: publicUrlError } =
-      supabase.storage.from("images").getPublicUrl(filePath);
+    const { data: publicUrlData, error: publicUrlError } = supabase.storage
+      .from("images")
+      .getPublicUrl(filePath);
 
     if (publicUrlError) {
-      console.error(
-        "Generating image public URL failed:",
-        publicUrlError,
-      );
+      console.error("Generating image public URL failed:", publicUrlError);
       throw publicUrlError;
     }
 
@@ -209,6 +204,7 @@ export function AdminServices() {
   };
 
   const handleCreateService = async () => {
+    setServiceFormError(null);
     setIsCreatingService(true);
     try {
       const image_url = await uploadImageAndGetUrl(
@@ -231,24 +227,12 @@ export function AdminServices() {
       await refreshDashboardData();
       setIsServiceAddDialogOpen(false);
       setServiceImageFile(null);
-      setServiceFormData({
-        name: "",
-        category: "" as
-          "manicure" | "extensions" | "add_on" | "",
-        duration: "",
-        price: "",
-        is_active: true,
-        description: "",
-        image_url: "",
-        display_order: 0,
-      });
+      setServiceFormData(emptyServiceForm);
+      setServiceFormError(null);
     } catch (error) {
       console.error("Failed to create service:", error);
-      alert(
-        getServiceFormErrorMessage(
-          error,
-          "Failed to create service",
-        ),
+      setServiceFormError(
+        getServiceFormErrorMessage(error, "Failed to create service"),
       );
     } finally {
       setIsCreatingService(false);
@@ -258,9 +242,10 @@ export function AdminServices() {
   const handleEdit = async (service: ServiceDisplay) => {
     setSelectedService(service);
     setServiceImageFile(null);
+    setServiceFormError(null);
     setServiceFormData({
       name: service.name,
-      category: service.category,
+      categoryId: service.category_id || "",
       duration: service.duration.toString(),
       price: service.price.toString(),
       is_active: service.is_active,
@@ -281,17 +266,9 @@ export function AdminServices() {
   };
 
   const handleAddNewService = async () => {
-    setServiceFormData({
-      name: "",
-      category: "" as "manicure" | "extensions" | "add_on" | "",
-      duration: "",
-      price: "",
-      is_active: true,
-      description: "",
-      image_url: "",
-      display_order: 0,
-    });
+    setServiceFormData(emptyServiceForm);
     setServiceImageFile(null);
+    setServiceFormError(null);
     setIsServiceAddDialogOpen(true);
 
     // Load categories when dialog opens
@@ -304,18 +281,17 @@ export function AdminServices() {
     }
 
     return (
-      categories.find((category) => category.id === categoryId)
-        ?.name || "—"
+      categories.find((category) => category.id === categoryId)?.name || "—"
     );
   };
 
   const handleUpdateService = async () => {
+    setServiceFormError(null);
     try {
       if (selectedService) {
         setIsUpdatingService(true);
         const form = serviceFormData as {
           name: string;
-          category?: string;
           categoryId?: string;
           duration: string;
           price: string;
@@ -324,30 +300,42 @@ export function AdminServices() {
           image_url: string;
           display_order: number;
         };
+
+        // Upload new image first (same pattern as create flow)
+        let resolvedImageUrl: string | undefined;
+        if (serviceImageFile) {
+          const uploaded = await uploadImageAndGetUrl(
+            serviceImageFile,
+            "services",
+          );
+          resolvedImageUrl = uploaded || undefined;
+          setServiceImageFile(null);
+        } else {
+          resolvedImageUrl = form.image_url || undefined;
+        }
+
         const updatedService = {
           id: selectedService.id,
           name: form.name,
-          category_id: form.categoryId || form.category,
+          category_id: form.categoryId || selectedService.category_id,
           duration: parseInt(form.duration),
           price: parseFloat(form.price),
           is_active: form.is_active,
           description: form.description,
-          image_url: form.image_url,
+          image_url: resolvedImageUrl,
           display_order: form.display_order,
         };
-        await updateService(updatedService, serviceImageFile);
-        setServiceImageFile(null);
+        // imageFile is null — we already resolved the URL above
+        await updateService(updatedService, null);
       }
       await refreshDashboardData();
       setIsEditDialogOpen(false);
       setIsUpdatingService(false);
+      setServiceFormError(null);
     } catch (error) {
       console.error("Failed to update service:", error);
-      alert(
-        getServiceFormErrorMessage(
-          error,
-          "Failed to update service",
-        ),
+      setServiceFormError(
+        getServiceFormErrorMessage(error, "Failed to update service"),
       );
       setIsUpdatingService(false);
     }
@@ -359,15 +347,11 @@ export function AdminServices() {
   };
 
   const totalServices = services.length;
-  const activeServices = services.filter(
-    (service) => service.is_active,
-  ).length;
+  const activeServices = services.filter((service) => service.is_active).length;
   const averagePrice =
     totalServices > 0
-      ? services.reduce(
-          (sum, service) => sum + Number(service.price || 0),
-          0,
-        ) / totalServices
+      ? services.reduce((sum, service) => sum + Number(service.price || 0), 0) /
+        totalServices
       : 0;
 
   const stats = [
@@ -395,9 +379,7 @@ export function AdminServices() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-gray-800 mb-2">Services</h1>
-          <p className="text-gray-600">
-            Manage your service offerings
-          </p>
+          <p className="text-gray-600">Manage your service offerings</p>
         </div>
         <Button
           className="flex items-center gap-2 border-2"
@@ -433,13 +415,8 @@ export function AdminServices() {
             className="p-6 border-2"
             style={{ borderColor: "#DCD4CD" }}
           >
-            <p className="text-gray-600 text-sm mb-1">
-              {stat.label}
-            </p>
-            <p
-              className="text-2xl font-semibold"
-              style={{ color: "#3D3935" }}
-            >
+            <p className="text-gray-600 text-sm mb-1">{stat.label}</p>
+            <p className="text-2xl font-semibold" style={{ color: "#3D3935" }}>
               {stat.value}
             </p>
           </Card>
@@ -451,59 +428,32 @@ export function AdminServices() {
         className="border-2 overflow-hidden"
         style={{ borderColor: "#DCD4CD" }}
       >
-        <div
-          className="p-6 border-b-2"
-          style={{ borderColor: "#DCD4CD" }}
-        >
+        <div className="p-6 border-b-2" style={{ borderColor: "#DCD4CD" }}>
           <h3 style={{ color: "#3D3935" }}>All Services</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead style={{ backgroundColor: "#FAF7F5" }}>
-              <tr
-                className="border-b-2"
-                style={{ borderColor: "#DCD4CD" }}
-              >
-                <th
-                  className="text-left p-4"
-                  style={{ color: "#3D3935" }}
-                >
+              <tr className="border-b-2" style={{ borderColor: "#DCD4CD" }}>
+                <th className="text-left p-4" style={{ color: "#3D3935" }}>
                   #
                 </th>
-                <th
-                  className="text-left p-4"
-                  style={{ color: "#3D3935" }}
-                >
+                <th className="text-left p-4" style={{ color: "#3D3935" }}>
                   Service Name
                 </th>
-                <th
-                  className="text-left p-4"
-                  style={{ color: "#3D3935" }}
-                >
+                <th className="text-left p-4" style={{ color: "#3D3935" }}>
                   Category
                 </th>
-                <th
-                  className="text-left p-4"
-                  style={{ color: "#3D3935" }}
-                >
+                <th className="text-left p-4" style={{ color: "#3D3935" }}>
                   Duration
                 </th>
-                <th
-                  className="text-left p-4"
-                  style={{ color: "#3D3935" }}
-                >
+                <th className="text-left p-4" style={{ color: "#3D3935" }}>
                   Price
                 </th>
-                <th
-                  className="text-left p-4"
-                  style={{ color: "#3D3935" }}
-                >
+                <th className="text-left p-4" style={{ color: "#3D3935" }}>
                   Status
                 </th>
-                <th
-                  className="text-left p-4"
-                  style={{ color: "#3D3935" }}
-                >
+                <th className="text-left p-4" style={{ color: "#3D3935" }}>
                   Actions
                 </th>
               </tr>
@@ -515,9 +465,7 @@ export function AdminServices() {
                   className="border-b hover:bg-gray-50"
                   style={{ borderColor: "#DCD4CD" }}
                 >
-                  <td className="p-4 text-gray-600">
-                    {index + 1}
-                  </td>
+                  <td className="p-4 text-gray-600">{index + 1}</td>
                   <td className="p-4">
                     <span
                       className="font-semibold"
@@ -529,9 +477,7 @@ export function AdminServices() {
                   <td className="p-4 text-gray-600">
                     {getCategoryName(service.category_id)}
                   </td>
-                  <td className="p-4 text-gray-600">
-                    {service.duration}
-                  </td>
+                  <td className="p-4 text-gray-600">{service.duration}</td>
                   <td className="p-4">
                     <span
                       className="font-semibold"
@@ -550,9 +496,7 @@ export function AdminServices() {
                         color: "#3D3935",
                       }}
                     >
-                      {service.is_active
-                        ? "Active"
-                        : "Inactive"}
+                      {service.is_active ? "Active" : "Inactive"}
                     </span>
                   </td>
                   <td className="p-4">
@@ -671,9 +615,7 @@ export function AdminServices() {
               onClick={handleCreateCategory}
               disabled={isCreatingCategory}
             >
-              {isCreatingCategory
-                ? "Adding..."
-                : "Add Category"}
+              {isCreatingCategory ? "Adding..." : "Add Category"}
             </Button>
           </div>
         </DialogContent>
@@ -758,9 +700,7 @@ export function AdminServices() {
                       </option>
                     ))
                   ) : (
-                    <option disabled>
-                      No categories available
-                    </option>
+                    <option disabled>No categories available</option>
                   )}
                 </select>
               )}
@@ -856,9 +796,7 @@ export function AdminServices() {
                   backgroundColor: "#FEFCFA",
                 }}
                 onChange={(e) =>
-                  setServiceImageFile(
-                    e.target.files?.[0] ?? null,
-                  )
+                  setServiceImageFile(e.target.files?.[0] ?? null)
                 }
               />
               <p className="text-xs text-gray-500">
@@ -890,6 +828,11 @@ export function AdminServices() {
               </label>
             </div>
           </div>
+          {serviceFormError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2 whitespace-pre-line">
+              {serviceFormError}
+            </p>
+          )}
           <div className="flex items-center justify-end gap-4">
             <Button
               className="flex items-center gap-2 border-2"
@@ -926,10 +869,7 @@ export function AdminServices() {
       </Dialog>
 
       {/* Edit Service Dialog */}
-      <Dialog
-        open={isEditDialogOpen}
-        onOpenChange={setIsEditDialogOpen}
-      >
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Service</DialogTitle>
@@ -988,12 +928,14 @@ export function AdminServices() {
                     borderColor: "#DCD4CD",
                     backgroundColor: "#FEFCFA",
                   }}
-                  value={serviceFormData.category}
+                  value={serviceFormData.categoryId || ""}
                   onChange={(e) =>
                     setServiceFormData({
                       ...serviceFormData,
-                      category: e.target.value as
-                        "manicure" | "extensions" | "add_on",
+                      categoryId: e.target.value as
+                        | "manicure"
+                        | "extensions"
+                        | "add_on",
                     })
                   }
                 >
@@ -1005,9 +947,7 @@ export function AdminServices() {
                       </option>
                     ))
                   ) : (
-                    <option disabled>
-                      No categories available
-                    </option>
+                    <option disabled>No categories available</option>
                   )}
                 </select>
               )}
@@ -1103,14 +1043,12 @@ export function AdminServices() {
                   backgroundColor: "#FEFCFA",
                 }}
                 onChange={(e) =>
-                  setServiceImageFile(
-                    e.target.files?.[0] ?? null,
-                  )
+                  setServiceImageFile(e.target.files?.[0] ?? null)
                 }
               />
               <p className="text-xs text-gray-500">
-                {setServiceImageFile
-                  ? `Selected file: ${setServiceImageFile.name}`
+                {serviceImageFile
+                  ? `Selected file: ${serviceImageFile.name}`
                   : "Image with 4:3 aspect ratio for homepage display"}
               </p>
             </div>
@@ -1137,6 +1075,11 @@ export function AdminServices() {
               </label>
             </div>
           </div>
+          {serviceFormError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-md px-3 py-2 whitespace-pre-line">
+              {serviceFormError}
+            </p>
+          )}
           <div className="flex items-center justify-end gap-4">
             <Button
               className="flex items-center gap-2 border-2"
@@ -1159,25 +1102,20 @@ export function AdminServices() {
               onClick={handleUpdateService}
               disabled={isUpdatingService}
             >
-              {isUpdatingService
-                ? "Updating..."
-                : "Update Service"}
+              {isUpdatingService ? "Updating..." : "Update Service"}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
 
       {/* Delete Service Dialog */}
-      <Dialog
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-      >
+      <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Delete Service</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this service? This
-              action cannot be undone.
+              Are you sure you want to delete this service? This action cannot
+              be undone.
             </DialogDescription>
           </DialogHeader>
           {selectedService && (
@@ -1188,16 +1126,11 @@ export function AdminServices() {
                 backgroundColor: "#FAF7F5",
               }}
             >
-              <p
-                className="font-semibold mb-2"
-                style={{ color: "#3D3935" }}
-              >
+              <p className="font-semibold mb-2" style={{ color: "#3D3935" }}>
                 {selectedService.name}
               </p>
               <div className="flex gap-4 text-sm text-gray-600">
-                <span>
-                  {getCategoryName(selectedService.category_id)}
-                </span>
+                <span>{getCategoryName(selectedService.category_id)}</span>
                 <span>•</span>
                 <span>{selectedService.duration}</span>
                 <span>•</span>
@@ -1234,10 +1167,7 @@ export function AdminServices() {
                   await refreshDashboardData();
                   setIsDeleteDialogOpen(false);
                 } catch (error) {
-                  console.error(
-                    "Failed to delete service:",
-                    error,
-                  );
+                  console.error("Failed to delete service:", error);
                 }
               }}
             >
