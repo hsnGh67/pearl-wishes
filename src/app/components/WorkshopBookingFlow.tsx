@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -10,17 +10,15 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Card, CardContent } from "./ui/card";
-import {
-  Check,
-  Clock,
-  Calendar as CalendarIcon,
-} from "lucide-react";
+import { Check, Clock, Calendar as CalendarIcon } from "lucide-react";
 import { Separator } from "./ui/separator";
 import { VisuallyHidden } from "./ui/visually-hidden";
 import { Textarea } from "./ui/textarea";
 import { PhoneAuthForm } from "../src/components/auth/PhoneAuthForm";
 import { useAuth } from "../src/hooks/useAuth";
+import { useBookingDraft } from "../src/hooks/useBookingDraft";
 import { createWorkshopBooking } from "../src/lib/db/workshop-bookings";
+import { BookingDraftKeys } from "../src/lib/booking-draft";
 import {
   WorkshopBookingCreate,
   WorkshopBookingStatus,
@@ -49,15 +47,33 @@ type BookingStep =
   | "stripe"
   | "success";
 
+type WorkshopBookingDraft = {
+  step: BookingStep;
+  bookingData: WorkshopBookingCreate;
+};
+
+const emptyWorkshopBookingData = (
+  workshopId: string,
+): WorkshopBookingCreate => ({
+  workshop_id: workshopId,
+  user_id: "",
+  preferred_month: "",
+  participant_name: "",
+  participant_phone: "",
+  participant_email: "",
+  payment_status: WorkshopPaymentStatus.PENDING,
+  payment_intent_id: "",
+  receipt_number: "",
+  notes: "",
+});
+
 type AvailableMonth = {
   id: string;
   label: string;
   year: string;
 };
 
-export const getAvailableMonths = (
-  count: number = 4,
-): AvailableMonth[] => {
+export const getAvailableMonths = (count: number = 4): AvailableMonth[] => {
   const months: AvailableMonth[] = [];
 
   const formatter = new Intl.DateTimeFormat("en-US", {
@@ -67,11 +83,7 @@ export const getAvailableMonths = (
   const now = new Date();
 
   for (let i = 0; i < count; i++) {
-    const date = new Date(
-      now.getFullYear(),
-      now.getMonth() + i,
-      1,
-    );
+    const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
 
     const monthName = formatter.format(date);
 
@@ -94,22 +106,11 @@ export function WorkshopBookingFlow({
 }: WorkshopBookingFlowProps) {
   const [step, setStep] = useState<BookingStep>("overview");
   const { isAuthenticated, profile } = useAuth();
-  const [bookingData, setBookingData] =
-    useState<WorkshopBookingCreate>({
-      workshop_id: workshop.id,
-      user_id: "",
-      preferred_month: "",
-      participant_name: "",
-      participant_phone: "",
-      participant_email: "",
-      payment_status: WorkshopPaymentStatus.PENDING,
-      payment_intent_id: "",
-      receipt_number: "",
-      notes: "",
-    });
+  const [bookingData, setBookingData] = useState<WorkshopBookingCreate>(() =>
+    emptyWorkshopBookingData(workshop.id),
+  );
   const [receiptNumber, setReceiptNumber] = useState("");
-  const [isSavingParticipant, setIsSavingParticipant] =
-    useState(false);
+  const [isSavingParticipant, setIsSavingParticipant] = useState(false);
 
   const prefillFromProfile = useCallback(
     (userProfile: AppUser) => {
@@ -118,52 +119,74 @@ export function WorkshopBookingFlow({
         userProfile.phone,
       )
         ? ""
-        : userProfile.full_name;
+        : userProfile.full_name || "";
       setBookingData((prev) => ({
         ...prev,
+        workshop_id: workshop.id,
         user_id: userProfile.id ?? "",
-        participant_phone:
-          userProfile.phone?.replaceAll(" ", "") ?? "",
         participant_name: prev.participant_name || profileName,
-        participant_email:
-          prev.participant_email || userProfile.email || "",
+        participant_phone: userProfile.phone?.replaceAll(" ", "") ?? "",
+        participant_email: prev.participant_email || userProfile.email || "",
       }));
     },
-    [],
+    [workshop.id],
   );
+
+  const workshopDraftSnapshot = useMemo<WorkshopBookingDraft>(
+    () => ({
+      step,
+      bookingData: {
+        ...bookingData,
+        workshop_id: workshop.id,
+      },
+    }),
+    [step, bookingData, workshop.id],
+  );
+
+  const { clear: clearWorkshopDraft, ready: draftReady } =
+    useBookingDraft<WorkshopBookingDraft>({
+      storageKey: BookingDraftKeys.workshop(workshop.id),
+      enabled: open,
+      snapshot: workshopDraftSnapshot,
+      shouldPersist: (s) => s.step !== "success",
+      onHydrate: (draft) => {
+        if (draft.step === "success") return false;
+        setStep(draft.step);
+        setBookingData({
+          ...emptyWorkshopBookingData(workshop.id),
+          ...draft.bookingData,
+          workshop_id: workshop.id,
+        });
+        return true;
+      },
+    });
 
   useEffect(() => {
     if (
       open &&
+      draftReady &&
       isAuthenticated &&
       profile &&
       step === "participant"
     ) {
       prefillFromProfile(profile);
     }
-  }, [
-    open,
-    isAuthenticated,
-    profile,
-    step,
-    prefillFromProfile,
-  ]);
+  }, [open, draftReady, isAuthenticated, profile, step, prefillFromProfile]);
 
-  const handleClose = () => {
+  const softClose = () => {
+    onOpenChange(false);
+  };
+
+  const resetWorkshopState = () => {
     setStep("overview");
-    setBookingData({
-      workshop_id: "",
-      user_id: "",
-      preferred_month: "",
-      participant_name: "",
-      participant_phone: "",
-      participant_email: "",
-      payment_status: WorkshopPaymentStatus.PENDING,
-      payment_intent_id: "",
-      notes: "",
-    });
+    setBookingData(emptyWorkshopBookingData(workshop.id));
     setIsSavingParticipant(false);
     setReceiptNumber("");
+  };
+
+  const hardResetAndClose = () => {
+    clearWorkshopDraft();
+    resetWorkshopState();
     onOpenChange(false);
   };
 
@@ -185,10 +208,7 @@ export function WorkshopBookingFlow({
       });
       setStep("review");
     } catch (error) {
-      console.error(
-        "Failed to update participant profile:",
-        error,
-      );
+      console.error("Failed to update participant profile:", error);
       alert("Failed to save your details. Please try again.");
     } finally {
       setIsSavingParticipant(false);
@@ -230,19 +250,22 @@ export function WorkshopBookingFlow({
 
       await createWorkshopBooking(bookingPayload);
 
+      clearWorkshopDraft();
       setReceiptNumber(receipt);
       setStep("success");
     } catch (error) {
-      console.error(
-        "Failed to create workshop booking:",
-        error,
-      );
+      console.error("Failed to create workshop booking:", error);
       alert("Failed to complete booking. Please try again.");
     }
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) softClose();
+      }}
+    >
       <DialogContent
         className="max-h-[90vh] overflow-y-auto max-w-2xl"
         style={{ backgroundColor: "#FEFCFA" }}
@@ -276,10 +299,7 @@ export function WorkshopBookingFlow({
                 <CardContent className="p-6">
                   <div className="space-y-4">
                     <div>
-                      <h3
-                        className="text-lg mb-1"
-                        style={{ color: "#3D3935" }}
-                      >
+                      <h3 className="text-lg mb-1" style={{ color: "#3D3935" }}>
                         {workshop.title}
                       </h3>
                       <p
@@ -293,9 +313,7 @@ export function WorkshopBookingFlow({
                       </p>
                     </div>
 
-                    <Separator
-                      style={{ backgroundColor: "#DCD4CD" }}
-                    />
+                    <Separator style={{ backgroundColor: "#DCD4CD" }} />
 
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -327,9 +345,7 @@ export function WorkshopBookingFlow({
                       </span>
                     </div>
 
-                    <Separator
-                      style={{ backgroundColor: "#DCD4CD" }}
-                    />
+                    <Separator style={{ backgroundColor: "#DCD4CD" }} />
 
                     <div className="flex items-center justify-between">
                       <span
@@ -359,14 +375,10 @@ export function WorkshopBookingFlow({
                   borderColor: "#DCD4CD",
                 }}
               >
-                <p
-                  className="text-sm"
-                  style={{ color: "#3D3935" }}
-                >
-                  <span className="font-medium">Note:</span>{" "}
-                  This reservation fee secures your spot. Final
-                  scheduling and any additional costs will be
-                  coordinated via WhatsApp.
+                <p className="text-sm" style={{ color: "#3D3935" }}>
+                  <span className="font-medium">Note:</span> This reservation
+                  fee secures your spot. Final scheduling and any additional
+                  costs will be coordinated via WhatsApp.
                 </p>
               </div>
 
@@ -378,25 +390,18 @@ export function WorkshopBookingFlow({
                   background: "#3D3935",
                   color: "transparent",
                 }}
-                onMouseEnter={(
-                  e: React.MouseEvent<HTMLButtonElement>,
-                ) => {
-                  e.currentTarget.style.backgroundColor =
-                    "#1F1F1F";
+                onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.currentTarget.style.backgroundColor = "#1F1F1F";
                   e.currentTarget.style.background = "#1F1F1F";
                 }}
-                onMouseLeave={(
-                  e: React.MouseEvent<HTMLButtonElement>,
-                ) => {
-                  e.currentTarget.style.backgroundColor =
-                    "#3D3935";
+                onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.currentTarget.style.backgroundColor = "#3D3935";
                   e.currentTarget.style.background = "#3D3935";
                 }}
               >
                 <span
                   style={{
-                    background:
-                      "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                    background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
                     WebkitBackgroundClip: "text",
                     backgroundClip: "text",
                     WebkitTextFillColor: "transparent",
@@ -427,9 +432,7 @@ export function WorkshopBookingFlow({
                     <button
                       key={month.id}
                       type="button"
-                      onClick={() =>
-                        handleMonthSelect(month.id)
-                      }
+                      onClick={() => handleMonthSelect(month.id)}
                       className="p-4 border-2 transition-all text-center"
                       style={
                         bookingData.preferred_month === month.id
@@ -444,33 +447,22 @@ export function WorkshopBookingFlow({
                             }
                       }
                       onMouseEnter={(e) => {
-                        if (
-                          bookingData.preferred_month !==
-                          month.id
-                        ) {
-                          e.currentTarget.style.backgroundColor =
-                            "#1F1F1F";
-                          e.currentTarget.style.borderColor =
-                            "#1F1F1F";
+                        if (bookingData.preferred_month !== month.id) {
+                          e.currentTarget.style.backgroundColor = "#1F1F1F";
+                          e.currentTarget.style.borderColor = "#1F1F1F";
                         }
                       }}
                       onMouseLeave={(e) => {
-                        if (
-                          bookingData.preferred_month !==
-                          month.id
-                        ) {
-                          e.currentTarget.style.backgroundColor =
-                            "#3D3935";
-                          e.currentTarget.style.borderColor =
-                            "#3D3935";
+                        if (bookingData.preferred_month !== month.id) {
+                          e.currentTarget.style.backgroundColor = "#3D3935";
+                          e.currentTarget.style.borderColor = "#3D3935";
                         }
                       }}
                     >
                       <span
                         className="block mb-1"
                         style={
-                          bookingData.preferred_month ===
-                          month.id
+                          bookingData.preferred_month === month.id
                             ? {
                                 color: "#3D3935",
                                 fontWeight: 500,
@@ -480,8 +472,7 @@ export function WorkshopBookingFlow({
                                   "linear-gradient(to right, #FCEAE0, #EACAB8)",
                                 WebkitBackgroundClip: "text",
                                 backgroundClip: "text",
-                                WebkitTextFillColor:
-                                  "transparent",
+                                WebkitTextFillColor: "transparent",
                                 color: "transparent",
                                 fontWeight: 500,
                               }
@@ -492,16 +483,14 @@ export function WorkshopBookingFlow({
                       <span
                         className="text-xs"
                         style={
-                          bookingData.preferred_month ===
-                          month.id
+                          bookingData.preferred_month === month.id
                             ? { color: "#3D3935", opacity: 0.7 }
                             : {
                                 background:
                                   "linear-gradient(to right, #FCEAE0, #EACAB8)",
                                 WebkitBackgroundClip: "text",
                                 backgroundClip: "text",
-                                WebkitTextFillColor:
-                                  "transparent",
+                                WebkitTextFillColor: "transparent",
                                 color: "transparent",
                               }
                         }
@@ -525,13 +514,9 @@ export function WorkshopBookingFlow({
                     className="w-4 h-4 mt-0.5 flex-shrink-0"
                     style={{ color: "#3D3935", opacity: 0.7 }}
                   />
-                  <p
-                    className="text-sm"
-                    style={{ color: "#3D3935" }}
-                  >
-                    Workshop dates are finalized later. Our team
-                    will contact participants via WhatsApp once
-                    scheduling is confirmed.
+                  <p className="text-sm" style={{ color: "#3D3935" }}>
+                    Workshop dates are finalized later. Our team will contact
+                    participants via WhatsApp once scheduling is confirmed.
                   </p>
                 </div>
               </div>
@@ -558,24 +543,16 @@ export function WorkshopBookingFlow({
                       ? "pointer"
                       : "not-allowed",
                   }}
-                  onMouseEnter={(
-                    e: React.MouseEvent<HTMLButtonElement>,
-                  ) => {
+                  onMouseEnter={(e: React.MouseEvent<HTMLButtonElement>) => {
                     if (bookingData.preferred_month) {
-                      e.currentTarget.style.backgroundColor =
-                        "#1F1F1F";
-                      e.currentTarget.style.background =
-                        "#1F1F1F";
+                      e.currentTarget.style.backgroundColor = "#1F1F1F";
+                      e.currentTarget.style.background = "#1F1F1F";
                     }
                   }}
-                  onMouseLeave={(
-                    e: React.MouseEvent<HTMLButtonElement>,
-                  ) => {
+                  onMouseLeave={(e: React.MouseEvent<HTMLButtonElement>) => {
                     if (bookingData.preferred_month) {
-                      e.currentTarget.style.backgroundColor =
-                        "#3D3935";
-                      e.currentTarget.style.background =
-                        "#3D3935";
+                      e.currentTarget.style.backgroundColor = "#3D3935";
+                      e.currentTarget.style.background = "#3D3935";
                     }
                   }}
                   disabled={!bookingData.preferred_month}
@@ -608,8 +585,8 @@ export function WorkshopBookingFlow({
             <DialogHeader>
               <DialogTitle>Participant Information</DialogTitle>
               <DialogDescription>
-                Verify your phone and enter your contact details
-                for workshop coordination
+                Verify your phone and enter your contact details for workshop
+                coordination
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-6">
@@ -659,9 +636,7 @@ export function WorkshopBookingFlow({
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="notes">
-                    Additional Notes (Optional)
-                  </Label>
+                  <Label htmlFor="notes">Additional Notes (Optional)</Label>
                   <Textarea
                     id="notes"
                     placeholder="Any questions or special requirements..."
@@ -723,9 +698,7 @@ export function WorkshopBookingFlow({
                     isSavingParticipant
                   }
                 >
-                  {isSavingParticipant
-                    ? "Saving..."
-                    : "Continue"}
+                  {isSavingParticipant ? "Saving..." : "Continue"}
                 </Button>
               </div>
             </div>
@@ -769,9 +742,7 @@ export function WorkshopBookingFlow({
                         {bookingData.participant_name}
                       </span>
                     </div>
-                    <Separator
-                      style={{ backgroundColor: "#DCD4CD" }}
-                    />
+                    <Separator style={{ backgroundColor: "#DCD4CD" }} />
                     <div className="flex justify-between items-center">
                       <span
                         className="text-sm"
@@ -789,9 +760,7 @@ export function WorkshopBookingFlow({
                         {bookingData.participant_phone}
                       </span>
                     </div>
-                    <Separator
-                      style={{ backgroundColor: "#DCD4CD" }}
-                    />
+                    <Separator style={{ backgroundColor: "#DCD4CD" }} />
                     <div className="flex justify-between items-center">
                       <span
                         className="text-sm"
@@ -840,9 +809,7 @@ export function WorkshopBookingFlow({
                         {workshop.title}
                       </span>
                     </div>
-                    <Separator
-                      style={{ backgroundColor: "#DCD4CD" }}
-                    />
+                    <Separator style={{ backgroundColor: "#DCD4CD" }} />
                     <div className="flex justify-between items-center">
                       <span
                         className="text-sm"
@@ -863,9 +830,7 @@ export function WorkshopBookingFlow({
                         )}
                       </span>
                     </div>
-                    <Separator
-                      style={{ backgroundColor: "#DCD4CD" }}
-                    />
+                    <Separator style={{ backgroundColor: "#DCD4CD" }} />
                     <div className="flex justify-between items-center">
                       <span
                         className="text-sm"
@@ -882,16 +847,12 @@ export function WorkshopBookingFlow({
                       >
                         {
                           availableMonths.find(
-                            (m) =>
-                              m.id ===
-                              bookingData.preferred_month,
+                            (m) => m.id === bookingData.preferred_month,
                           )?.label
                         }{" "}
                         {
                           availableMonths.find(
-                            (m) =>
-                              m.id ===
-                              bookingData.preferred_month,
+                            (m) => m.id === bookingData.preferred_month,
                           )?.year
                         }
                       </span>
@@ -938,17 +899,11 @@ export function WorkshopBookingFlow({
                   borderColor: "#E9CFCA",
                 }}
               >
-                <p
-                  className="text-sm"
-                  style={{ color: "#3D3935" }}
-                >
-                  <span className="font-medium block mb-1">
-                    Important:
-                  </span>
-                  This payment covers the workshop base
-                  reservation fee only. Remaining details and
-                  any additional costs will be communicated via
-                  WhatsApp.
+                <p className="text-sm" style={{ color: "#3D3935" }}>
+                  <span className="font-medium block mb-1">Important:</span>
+                  This payment covers the workshop base reservation fee only.
+                  Remaining details and any additional costs will be
+                  communicated via WhatsApp.
                 </p>
               </div>
 
@@ -969,22 +924,17 @@ export function WorkshopBookingFlow({
                     color: "transparent",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      "#1F1F1F";
-                    e.currentTarget.style.background =
-                      "#1F1F1F";
+                    e.currentTarget.style.backgroundColor = "#1F1F1F";
+                    e.currentTarget.style.background = "#1F1F1F";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      "#3D3935";
-                    e.currentTarget.style.background =
-                      "#3D3935";
+                    e.currentTarget.style.backgroundColor = "#3D3935";
+                    e.currentTarget.style.background = "#3D3935";
                   }}
                 >
                   <span
                     style={{
-                      background:
-                        "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                      background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
                       WebkitBackgroundClip: "text",
                       backgroundClip: "text",
                       WebkitTextFillColor: "transparent",
@@ -1005,17 +955,14 @@ export function WorkshopBookingFlow({
             <DialogHeader>
               <DialogTitle>Secure Payment</DialogTitle>
               <DialogDescription>
-                Complete your payment to confirm your workshop
-                reservation
+                Complete your payment to confirm your workshop reservation
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-6">
               <Card className="bg-gray-50">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
-                    <span className="text-gray-800">
-                      Amount to Pay
-                    </span>
+                    <span className="text-gray-800">Amount to Pay</span>
                     <span className="text-2xl font-semibold text-gray-900">
                       £{workshop.price || ""}
                     </span>
@@ -1045,8 +992,8 @@ export function WorkshopBookingFlow({
                   Stripe Checkout Integration
                 </p>
                 <p className="text-xs text-gray-500 mb-4">
-                  In production, this would redirect to Stripe's
-                  secure checkout page
+                  In production, this would redirect to Stripe's secure checkout
+                  page
                 </p>
                 <Button
                   onClick={handleStripeCheckout}
@@ -1057,22 +1004,17 @@ export function WorkshopBookingFlow({
                     color: "transparent",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      "#1F1F1F";
-                    e.currentTarget.style.background =
-                      "#1F1F1F";
+                    e.currentTarget.style.backgroundColor = "#1F1F1F";
+                    e.currentTarget.style.background = "#1F1F1F";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      "#3D3935";
-                    e.currentTarget.style.background =
-                      "#3D3935";
+                    e.currentTarget.style.backgroundColor = "#3D3935";
+                    e.currentTarget.style.background = "#3D3935";
                   }}
                 >
                   <span
                     style={{
-                      background:
-                        "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                      background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
                       WebkitBackgroundClip: "text",
                       backgroundClip: "text",
                       WebkitTextFillColor: "transparent",
@@ -1101,8 +1043,7 @@ export function WorkshopBookingFlow({
             <DialogHeader>
               <DialogTitle>Reservation Confirmed!</DialogTitle>
               <DialogDescription>
-                Your workshop spot has been successfully
-                reserved
+                Your workshop spot has been successfully reserved
               </DialogDescription>
             </DialogHeader>
             <div className="py-4 space-y-6">
@@ -1111,78 +1052,57 @@ export function WorkshopBookingFlow({
                   className="w-16 h-16 rounded-full flex items-center justify-center"
                   style={{ backgroundColor: "#EADDD5" }}
                 >
-                  <Check
-                    style={{ color: "#3D3935" }}
-                    size={32}
-                  />
+                  <Check style={{ color: "#3D3935" }} size={32} />
                 </div>
               </div>
 
               <Card>
                 <CardContent className="p-6 space-y-4">
                   <div className="text-center pb-3 border-b">
-                    <h3 className="text-gray-800 mb-1">
-                      Reservation Receipt
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      #{receiptNumber}
-                    </p>
+                    <h3 className="text-gray-800 mb-1">Reservation Receipt</h3>
+                    <p className="text-sm text-gray-600">#{receiptNumber}</p>
                   </div>
 
                   <div className="space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-gray-600">
-                        Participant
-                      </span>
+                      <span className="text-gray-600">Participant</span>
                       <span className="text-gray-800 font-medium">
                         {bookingData.participant_name}
                       </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between">
-                      <span className="text-gray-600">
-                        Workshop
-                      </span>
+                      <span className="text-gray-600">Workshop</span>
                       <span className="text-gray-800 font-medium text-right max-w-[200px]">
                         {workshop.title}
                       </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between">
-                      <span className="text-gray-600">
-                        Preferred Month
-                      </span>
+                      <span className="text-gray-600">Preferred Month</span>
                       <span className="text-gray-800 font-medium capitalize">
                         {
                           availableMonths.find(
-                            (m) =>
-                              m.id ===
-                              bookingData.preferred_month,
+                            (m) => m.id === bookingData.preferred_month,
                           )?.label
                         }{" "}
                         {
                           availableMonths.find(
-                            (m) =>
-                              m.id ===
-                              bookingData.preferred_month,
+                            (m) => m.id === bookingData.preferred_month,
                           )?.year
                         }
                       </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between">
-                      <span className="text-gray-600">
-                        WhatsApp
-                      </span>
+                      <span className="text-gray-600">WhatsApp</span>
                       <span className="text-gray-800 font-medium">
                         {bookingData.participant_phone}
                       </span>
                     </div>
                     <Separator />
                     <div className="flex justify-between">
-                      <span className="text-gray-600">
-                        Email
-                      </span>
+                      <span className="text-gray-600">Email</span>
                       <span className="text-gray-800 font-medium">
                         {bookingData.participant_email}
                       </span>
@@ -1204,36 +1124,28 @@ export function WorkshopBookingFlow({
                 className="p-5 rounded-lg"
                 style={{ backgroundColor: "#EADDD5" }}
               >
-                <h4
-                  className="font-medium mb-2"
-                  style={{ color: "#3D3935" }}
-                >
+                <h4 className="font-medium mb-2" style={{ color: "#3D3935" }}>
                   What happens next?
                 </h4>
-                <ul
-                  className="space-y-2 text-sm"
-                  style={{ color: "#3D3935" }}
-                >
+                <ul className="space-y-2 text-sm" style={{ color: "#3D3935" }}>
                   <li className="flex items-start gap-2">
                     <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <span>
-                      Booking request received and base payment
-                      confirmed
+                      Booking request received and base payment confirmed
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <span>
-                      Our team will contact you via WhatsApp
-                      with the final workshop schedule
+                      Our team will contact you via WhatsApp with the final
+                      workshop schedule
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
                     <Check className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <span>
-                      Additional coordination and remaining
-                      payment details (if applicable) will be
-                      shared through WhatsApp
+                      Additional coordination and remaining payment details (if
+                      applicable) will be shared through WhatsApp
                     </span>
                   </li>
                   <li className="flex items-start gap-2">
@@ -1249,13 +1161,13 @@ export function WorkshopBookingFlow({
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  onClick={handleClose}
+                  onClick={hardResetAndClose}
                   className="flex-1 hover:bg-[#DCD4CD]"
                 >
                   Close
                 </Button>
                 <Button
-                  onClick={handleClose}
+                  onClick={hardResetAndClose}
                   className="flex-1 transition-all"
                   style={{
                     backgroundColor: "#3D3935",
@@ -1263,22 +1175,17 @@ export function WorkshopBookingFlow({
                     color: "transparent",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      "#1F1F1F";
-                    e.currentTarget.style.background =
-                      "#1F1F1F";
+                    e.currentTarget.style.backgroundColor = "#1F1F1F";
+                    e.currentTarget.style.background = "#1F1F1F";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.backgroundColor =
-                      "#3D3935";
-                    e.currentTarget.style.background =
-                      "#3D3935";
+                    e.currentTarget.style.backgroundColor = "#3D3935";
+                    e.currentTarget.style.background = "#3D3935";
                   }}
                 >
                   <span
                     style={{
-                      background:
-                        "linear-gradient(to right, #FCEAE0, #EACAB8)",
+                      background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
                       WebkitBackgroundClip: "text",
                       backgroundClip: "text",
                       WebkitTextFillColor: "transparent",

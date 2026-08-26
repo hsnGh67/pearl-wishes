@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -29,6 +29,7 @@ import { VisuallyHidden } from "./ui/visually-hidden";
 import { Separator } from "./ui/separator";
 import { PhoneAuthForm } from "../src/components/auth/PhoneAuthForm";
 import { useAuth } from "../src/hooks/useAuth";
+import { useBookingDraft } from "../src/hooks/useBookingDraft";
 import {
   isPlaceholderFullName,
   parseAddressFromProfile,
@@ -37,6 +38,7 @@ import {
   COUNTRY_CODES,
   parsePhoneParts,
 } from "../src/lib/constants/country-codes";
+import { BookingDraftKeys } from "../src/lib/booking-draft";
 import { User as AppUser } from "../src/schema/user.schema";
 import {
   getBookedTimesForDate,
@@ -120,6 +122,32 @@ interface BookingData {
   finalPrice: number;
 }
 
+type AppointmentBookingDraft = {
+  step: BookingStep;
+  bookingData: BookingData;
+  appliedVoucherCode: string;
+  currentPersonIndex: number;
+};
+
+const EMPTY_BOOKING_DATA: BookingData = {
+  user_id: "",
+  name: "",
+  countryCode: "uk-44",
+  phoneNumber: "",
+  district: "",
+  street: "",
+  houseNumber: "",
+  numberOfPeople: 1,
+  services: [],
+  servicePrice: 0,
+  totalDuration: 0,
+  date: undefined,
+  timeSlot: "",
+  voucherCode: "",
+  discount: 0,
+  finalPrice: 0,
+};
+
 const generateTimeSlots = (
   totalDurationMinutes: number,
   selectedDate?: Date,
@@ -177,24 +205,8 @@ export function BookingFlow({
     PromoCode[]
   >([]);
   const [step, setStep] = useState<BookingStep>("phone");
-  const [bookingData, setBookingData] = useState<BookingData>({
-    user_id: "",
-    name: "",
-    countryCode: "uk-44",
-    phoneNumber: "",
-    district: "",
-    street: "",
-    houseNumber: "",
-    numberOfPeople: 1,
-    services: [],
-    servicePrice: 0,
-    totalDuration: 0,
-    date: undefined,
-    timeSlot: "",
-    voucherCode: "",
-    discount: 0,
-    finalPrice: 0,
-  });
+  const [bookingData, setBookingData] =
+    useState<BookingData>(EMPTY_BOOKING_DATA);
   const [districts, setDistricts] = useState([]);
   const [isLoadingDistricts, setIsLoadingDistricts] =
     useState(false);
@@ -263,9 +275,53 @@ export function BookingFlow({
     [],
   );
 
+  // Payment & Booking Saving State
+  const [paymentState, setPaymentState] = useState({
+    isSaving: false,
+    error: null as string | null,
+  });
+
+  const appointmentDraftSnapshot = useMemo<AppointmentBookingDraft>(
+    () => ({
+      step,
+      bookingData,
+      appliedVoucherCode,
+      currentPersonIndex,
+    }),
+    [step, bookingData, appliedVoucherCode, currentPersonIndex],
+  );
+
+  const { clear: clearAppointmentDraft, ready: draftReady } =
+    useBookingDraft<AppointmentBookingDraft>({
+      storageKey: BookingDraftKeys.appointment,
+      enabled: open,
+      snapshot: appointmentDraftSnapshot,
+      shouldPersist: (s) => s.step !== "receipt",
+      onHydrate: (draft) => {
+        if (draft.step === "receipt") return false;
+        setStep(draft.step);
+        setBookingData({
+          ...EMPTY_BOOKING_DATA,
+          ...draft.bookingData,
+          date:
+            draft.bookingData?.date instanceof Date
+              ? draft.bookingData.date
+              : draft.bookingData?.date
+                ? new Date(
+                    draft.bookingData.date as unknown as string,
+                  )
+                : undefined,
+        });
+        setAppliedVoucherCode(draft.appliedVoucherCode || "");
+        setCurrentPersonIndex(draft.currentPersonIndex || 0);
+        return true;
+      },
+    });
+
   useEffect(() => {
     if (
       open &&
+      draftReady &&
       isAuthenticated &&
       profile &&
       step === "phone"
@@ -275,17 +331,12 @@ export function BookingFlow({
     }
   }, [
     open,
+    draftReady,
     isAuthenticated,
     profile,
     step,
     prefillFromProfile,
   ]);
-
-  // Payment & Booking Saving State
-  const [paymentState, setPaymentState] = useState({
-    isSaving: false,
-    error: null as string | null,
-  });
 
   const timeSlots = generateTimeSlots(
     bookingData.totalDuration || 60,
@@ -872,6 +923,7 @@ export function BookingFlow({
 
       // Step 3: Generate receipt and show success
       const receipt = `REC-${booking.id.slice(0, 8).toUpperCase()}`;
+      clearAppointmentDraft();
       setReceiptNumber(receipt);
       setPaymentState({ isSaving: false, error: null });
       setStep("receipt");
@@ -888,36 +940,37 @@ export function BookingFlow({
     }
   };
 
-  const handleClose = () => {
+  const softClose = () => {
+    onOpenChange(false);
+  };
+
+  const resetBookingState = () => {
     setStep("phone");
-    setBookingData({
-      name: "",
-      countryCode: "uk-44",
-      phoneNumber: "",
-      district: "",
-      street: "",
-      houseNumber: "",
-      numberOfPeople: 1,
-      services: [],
-      servicePrice: 0,
-      totalDuration: 0,
-      date: undefined,
-      timeSlot: "",
-      voucherCode: "",
-      discount: 0,
-      finalPrice: 0,
-    });
+    setBookingData(EMPTY_BOOKING_DATA);
     setCurrentPersonIndex(0);
     setReceiptNumber("");
     setVoucherError("");
     setVoucherSuccess("");
     setAppliedVoucherCode("");
+    setSelectedServiceForAddOns(null);
+    setTempAddOns([]);
+    setPaymentState({ isSaving: false, error: null });
+  };
+
+  const hardResetAndClose = () => {
+    clearAppointmentDraft();
+    resetBookingState();
     onOpenChange(false);
   };
 
   console.log("bookingData ===>", bookingData);
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) softClose();
+      }}
+    >
       <DialogContent
         className={`max-h-[90vh] overflow-y-auto ${step === "date" ? "max-w-4xl" : "max-w-2xl"}`}
         style={{ backgroundColor: "#FEFCFA" }}
@@ -3160,7 +3213,7 @@ export function BookingFlow({
               </div>
 
               <Button
-                onClick={handleClose}
+                onClick={hardResetAndClose}
                 className="w-full transition-all"
                 style={{
                   backgroundColor: "#3D3935",
