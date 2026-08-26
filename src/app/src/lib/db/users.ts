@@ -15,16 +15,27 @@ import { dbLogger } from "./logger";
 /**
  * Get all users
  */
-export const getAllUsers = async (): Promise<User[]> => {
+export const getAllUsers = async (
+  options?: { page?: number; limit?: number },
+): Promise<User[]> => {
+  const limit = options?.limit ?? 50;
+  const page = options?.page ?? 1;
+  const from = (page - 1) * limit;
+  const to = page * limit - 1;
+
   try {
-    dbLogger.info("Fetching all users", { table: "users" });
+    dbLogger.info("Fetching all users", {
+      table: "users",
+      data: { page, limit },
+    });
 
     const { data, error } = await supabase
       .from("users")
       .select(
         "*, user_notes(*), bookings!bookings_user_id_fkey(*), workshop_bookings(*, workshops(title, price))",
       )
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
     if (error) {
       dbLogger.error("Failed to fetch users", {
@@ -85,11 +96,19 @@ export const findUserByNameOrEmailOrPhone = async (
       table: "users",
     });
 
+    const sanitizedQuery = searchQuery
+      .replace(/[,()'"% \\]/g, "")
+      .trim();
+
+    if (!sanitizedQuery) {
+      return [];
+    }
+
     const { data, error } = await supabase
       .from("users")
       .select("*")
       .or(
-        `full_name.ilike.%${searchQuery}%,phone.ilike.%${searchQuery}%,email.ilike.%${searchQuery}%`,
+        `full_name.ilike.%${sanitizedQuery}%,phone.ilike.%${sanitizedQuery}%,email.ilike.%${sanitizedQuery}%`,
       );
 
     if (error) {

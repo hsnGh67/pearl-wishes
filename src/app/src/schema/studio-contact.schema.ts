@@ -14,19 +14,25 @@ export const StudioContactSchema = z.object({
 
 export type StudioContact = z.infer<typeof StudioContactSchema>;
 
-export const StudioContactCreateSchema = StudioContactSchema.omit({
-  id: true,
-  created_at: true,
-  updated_at: true,
-});
+export const StudioContactCreateSchema =
+  StudioContactSchema.omit({
+    id: true,
+    created_at: true,
+    updated_at: true,
+  });
 
-export type StudioContactCreate = z.infer<typeof StudioContactCreateSchema>;
+export type StudioContactCreate = z.infer<
+  typeof StudioContactCreateSchema
+>;
 
-export const StudioContactUpdateSchema = StudioContactSchema.partial().required({
-  id: true,
-});
+export const StudioContactUpdateSchema =
+  StudioContactSchema.partial().required({
+    id: true,
+  });
 
-export type StudioContactUpdate = z.infer<typeof StudioContactUpdateSchema>;
+export type StudioContactUpdate = z.infer<
+  typeof StudioContactUpdateSchema
+>;
 
 /**
  * Zod Schema for a business-hours display row
@@ -42,12 +48,16 @@ export const BusinessHourSchema = z.object({
 
 export type BusinessHour = z.infer<typeof BusinessHourSchema>;
 
-export const BusinessHourCreateSchema = BusinessHourSchema.omit({
-  created_at: true,
-  updated_at: true,
-});
+export const BusinessHourCreateSchema = BusinessHourSchema.omit(
+  {
+    created_at: true,
+    updated_at: true,
+  },
+);
 
-export type BusinessHourCreate = z.infer<typeof BusinessHourCreateSchema>;
+export type BusinessHourCreate = z.infer<
+  typeof BusinessHourCreateSchema
+>;
 
 export interface HourRow {
   id: string;

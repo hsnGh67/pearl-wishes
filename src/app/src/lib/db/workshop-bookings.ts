@@ -7,6 +7,8 @@ import { supabase } from "../../config/supabase";
 import {
   WorkshopBooking,
   WorkshopBookingCreate,
+  WorkshopBookingCreateSchema,
+  WorkshopBookingUpdateSchema,
   WorkshopBookingStatus,
   WorkshopBookingWithUser,
   WorkshopPaymentStatus,
@@ -24,18 +26,25 @@ import { durationMinutes } from "../../utils/timeOverlap";
 /**
  * Get all workshop bookings
  */
-export async function getAllWorkshopBookings(): Promise<
-  WorkshopBooking[]
-> {
+export async function getAllWorkshopBookings(
+  options?: { page?: number; limit?: number },
+): Promise<WorkshopBooking[]> {
+  const limit = options?.limit ?? 50;
+  const page = options?.page ?? 1;
+  const from = (page - 1) * limit;
+  const to = page * limit - 1;
+
   try {
     dbLogger.info("Fetching all workshop bookings", {
       table: "workshop_bookings",
+      data: { page, limit },
     });
 
     const { data, error } = await supabase
       .from("workshop_bookings")
       .select("*")
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
     if (error) {
       dbLogger.error("Failed to fetch workshop bookings", {
@@ -76,7 +85,8 @@ export async function getAllPendingBookedCandidates(
       )`,
       )
       .eq("status", WorkshopBookingStatus.PENDING)
-      .eq("workshop_id", workshopId);
+      .eq("workshop_id", workshopId)
+      .limit(50);
     if (error) {
       dbLogger.error(
         "Failed to fetch all pending booked candidates",
@@ -124,7 +134,8 @@ export async function getBookedCandidatesByMonth(
       )
       .eq("status", WorkshopBookingStatus.PENDING)
       .eq("workshop_id", workshopId)
-      .eq("preferred_month", month);
+      .eq("preferred_month", month)
+      .limit(50);
     console.log("DATA", data);
     if (error) {
       dbLogger.error(
@@ -297,6 +308,8 @@ export async function createWorkshopBooking(
       data: bookingData,
     });
 
+    WorkshopBookingCreateSchema.parse(bookingData);
+
     const { data, error } = await supabase
       .from("workshop_bookings")
       .insert([bookingData])
@@ -334,6 +347,8 @@ export async function updateWorkshopBooking(
       table: "workshop_bookings",
       data: { id: bookingData.id },
     });
+
+    WorkshopBookingUpdateSchema.parse(bookingData);
 
     const { id, ...updateFields } = bookingData;
 
@@ -824,7 +839,8 @@ export async function getClassStudents(
     const { data, error } = await supabase
       .from("workshop_session_participants")
       .select("*")
-      .eq("workshop_class_id", classId);
+      .eq("workshop_class_id", classId)
+      .limit(50);
 
     if (error) {
       dbLogger.error("Failed to fetch class students", {

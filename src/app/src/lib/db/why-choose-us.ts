@@ -36,7 +36,9 @@ export const getWhyChooseUs = async (): Promise<WhyCard[]> => {
 
     const items =
       data?.map((row) =>
-        mapWhyChooseUsItemToWhyCard(validateWhyChooseUsItem(row)),
+        mapWhyChooseUsItemToWhyCard(
+          validateWhyChooseUsItem(row),
+        ),
       ) || [];
 
     dbLogger.info("Successfully fetched why choose us cards", {
@@ -64,9 +66,8 @@ export const saveWhyChooseUs = async (
       data: { count: items.length },
     });
 
-    const { data: existingRows, error: existingError } = await supabase
-      .from("why_choose_us")
-      .select("id");
+    const { data: existingRows, error: existingError } =
+      await supabase.from("why_choose_us").select("id");
 
     if (existingError) throw existingError;
 
@@ -99,7 +100,9 @@ export const saveWhyChooseUs = async (
       validateWhyChooseUsItemCreate({
         id: isUuid(item.id) ? item.id : crypto.randomUUID(),
         icon: item.icon,
-        image_url: item.imageUrl.startsWith("blob:") ? "" : item.imageUrl,
+        image_url: item.imageUrl.startsWith("blob:")
+          ? ""
+          : item.imageUrl,
         title: item.title,
         description: item.description,
         sort_order: index,
@@ -116,7 +119,9 @@ export const saveWhyChooseUs = async (
 
     const saved =
       data?.map((row) =>
-        mapWhyChooseUsItemToWhyCard(validateWhyChooseUsItem(row)),
+        mapWhyChooseUsItemToWhyCard(
+          validateWhyChooseUsItem(row),
+        ),
       ) || [];
 
     dbLogger.info("Successfully saved why choose us cards", {

@@ -20,8 +20,11 @@ const FALLBACK_CONTACT: StudioContactFields = {
 };
 
 export function useStudioContact() {
-  const [contact, setContact] = useState<StudioContactFields>(FALLBACK_CONTACT);
-  const [hours, setHours] = useState<HourRow[]>(DEFAULT_HOUR_ROWS);
+  const [contact, setContact] =
+    useState<StudioContactFields>(FALLBACK_CONTACT);
+  const [hours, setHours] = useState<HourRow[]>(
+    DEFAULT_HOUR_ROWS,
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -44,7 +47,10 @@ export function useStudioContact() {
           setHours(data.hours.map(mapBusinessHourToHourRow));
         }
       } catch (error) {
-        console.error("Error fetching studio contact and hours:", error);
+        console.error(
+          "Error fetching studio contact and hours:",
+          error,
+        );
       } finally {
         if (!isCancelled) {
           setIsLoading(false);

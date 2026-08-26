@@ -21,16 +21,25 @@ import { GAP_MINUTES_PER_SERVICE } from "../../components/admin/AdminBookingForm
 /**
  * Get all bookings
  */
-export const getAllBookings = async (): Promise<Booking[]> => {
+export const getAllBookings = async (
+  options?: { page?: number; limit?: number },
+): Promise<Booking[]> => {
+  const limit = options?.limit ?? 50;
+  const page = options?.page ?? 1;
+  const from = (page - 1) * limit;
+  const to = page * limit - 1;
+
   try {
     dbLogger.info("Fetching all bookings", {
       table: "bookings",
+      data: { page, limit },
     });
 
     const { data, error } = await supabase
       .from("bookings")
       .select("*,   services:booking_treatments (*)")
-      .order("appointment_date", { ascending: false });
+      .order("appointment_date", { ascending: false })
+      .range(from, to);
 
     if (error) {
       dbLogger.error("Failed to fetch bookings", {

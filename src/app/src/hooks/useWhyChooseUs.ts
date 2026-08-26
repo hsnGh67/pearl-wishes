@@ -6,7 +6,9 @@ import {
 } from "../schema/why-choose-us.schema";
 
 export function useWhyChooseUs() {
-  const [items, setItems] = useState<WhyCard[]>(DEFAULT_WHY_ITEMS);
+  const [items, setItems] = useState<WhyCard[]>(
+    DEFAULT_WHY_ITEMS,
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -21,7 +23,10 @@ export function useWhyChooseUs() {
           setItems(data);
         }
       } catch (error) {
-        console.error("Error fetching why choose us cards:", error);
+        console.error(
+          "Error fetching why choose us cards:",
+          error,
+        );
       } finally {
         if (!isCancelled) {
           setIsLoading(false);

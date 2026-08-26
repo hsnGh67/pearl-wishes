@@ -1,0 +1,242 @@
+# TypeScript (React, Vite, React Router) - Best Practices and Guidelines
+
+## Response Constraints
+
+- **Do not remove any existing code unless necessary.**
+- **Do not remove my comments or commented-out code unless necessary.**
+- **Do not change the formatting of my imports.**
+- **Do not change the formatting of my code unless required for correctness, performance, or new functionality.**
+- **Reuse existing components, hooks, and utilities whenever possible instead of creating duplicates.**
+- **When adding new features, split them into small, reusable, maintainable components.**
+
+---
+
+# Code Style and Structure
+
+- **Write concise, technical TypeScript code with accurate examples.**
+- **Use functional and declarative programming patterns; avoid classes.**
+- **Prefer composition over inheritance.**
+- **Prefer modularization over code duplication.**
+- **Keep components focused on a single responsibility.**
+- **Extract reusable logic into custom hooks.**
+- **Structure files in the following order:**
+  1. Imports
+  2. Constants
+  3. Interfaces
+  4. Component
+  5. Subcomponents
+  6. Hooks
+  7. Helper functions
+  8. Types
+
+---
+
+# Naming Conventions
+
+- **Use lowercase with dashes for directories (e.g. `components/auth-wizard`).**
+- **Use PascalCase for React components.**
+- **Use camelCase for variables, functions, hooks, and props.**
+- **Prefix hooks with `use`.**
+- **Favor named exports over default exports.**
+- **Use descriptive variable names with auxiliary verbs (e.g. `isLoading`, `hasError`, `canEdit`, `shouldFetch`).**
+
+---
+
+# TypeScript
+
+- **Use TypeScript for all code.**
+- **Prefer interfaces for object shapes that may be extended.**
+- **Use type aliases for unions, utility types, and mapped types.**
+- **Avoid enums; prefer const objects with `as const`.**
+- **Avoid `any`; use `unknown` when appropriate.**
+- **Use strict typing everywhere.**
+- **Always type component props.**
+
+---
+
+# React
+
+- **Use functional components only.**
+- **Prefer composition over prop drilling.**
+- **Keep components small and reusable.**
+- **Avoid unnecessary state. Compute derived values instead.**
+- **Move business logic into hooks or utility functions.**
+- **Memoize expensive calculations with `useMemo` only when beneficial.**
+- **Memoize callbacks with `useCallback` only when necessary.**
+- **Avoid premature optimization.**
+- **Use Suspense and lazy loading for large routes when appropriate.**
+
+---
+
+# React Router
+
+- **Use React Router v7+ APIs.**
+- **Organize routes by feature instead of page type.**
+- **Lazy-load route components using `React.lazy`.**
+- **Use nested routes instead of deeply nested conditional rendering.**
+- **Keep route definitions centralized.**
+- **Protect authenticated routes with route guards or wrapper components.**
+- **Use loaders/actions when available instead of fetching inside components.**
+- **Use route params instead of global state when possible.**
+- **Avoid navigation inside render logic.**
+- **Use `<Navigate>` or `useNavigate()` appropriately.**
+
+---
+
+# Vite
+
+- **Use Vite's path aliases instead of long relative imports.**
+- **Use `import.meta.env` for environment variables.**
+- **Never access `process.env`.**
+- **Split large features using dynamic imports.**
+- **Avoid importing entire libraries when tree-shaking is available.**
+- **Keep dependencies optimized for fast startup.**
+- **Configure aliases in both `vite.config.ts` and `tsconfig.json`.**
+
+---
+
+# State Management
+
+- **Prefer local component state whenever possible.**
+- **Use Context only for truly shared application state.**
+- **Use Zustand or Redux Toolkit only for complex global state.**
+- **Use TanStack Query for server state instead of storing API data in global state.**
+- **Keep client state and server state separate.**
+
+---
+
+# Data Fetching
+
+- **Use TanStack Query for asynchronous server state.**
+- **Centralize API calls into reusable service modules.**
+- **Avoid duplicate requests.**
+- **Cache responses appropriately.**
+- **Handle loading, empty, and error states consistently.**
+- **Use request cancellation when applicable.**
+
+---
+
+# UI and Styling
+
+- **Use Tailwind CSS for styling.**
+- **Use shadcn/ui as the default component library.**
+- **Extract reusable UI primitives.**
+- **Prefer utility classes over custom CSS.**
+- **Avoid inline styles unless dynamic values require them.**
+- **Support responsive layouts by default.**
+- **Support keyboard accessibility and ARIA attributes.**
+
+---
+
+# Performance
+
+Always consider performance improvements:
+
+- **Minimize unnecessary re-renders.**
+- **Split large components.**
+- **Lazy-load routes and heavy components.**
+- **Virtualize long lists when appropriate.**
+- **Optimize images and assets.**
+- **Use efficient algorithms and data structures.**
+- **Avoid unnecessary effects.**
+- **Avoid unnecessary state updates.**
+- **Use React DevTools Profiler when optimizing.**
+
+---
+
+# Error Handling
+
+- **Handle asynchronous operations with try/catch.**
+- **Implement a global Error Boundary.**
+- **Provide user-friendly error messages.**
+- **Handle unexpected API responses gracefully.**
+- **Never silently ignore errors.**
+
+---
+
+# Testing
+
+- **Use Vitest for unit testing.**
+- **Use React Testing Library for component testing.**
+- **Focus on behavior rather than implementation details.**
+- **Test custom hooks.**
+- **Mock network requests appropriately.**
+- **Aim for meaningful test coverage instead of arbitrary percentages.**
+
+---
+
+# Documentation
+
+- **Document exported utilities with JSDoc when the behavior is not obvious.**
+- **Each major feature should contain a README when appropriate.**
+- **Keep documentation synchronized with implementation.**
+
+---
+
+# Project Structure
+
+```
+src/
+├── api/
+├── assets/
+├── components/
+├── features/
+├── hooks/
+├── layouts/
+├── lib/
+├── pages/
+├── providers/
+├── routes/
+├── services/
+├── store/
+├── styles/
+├── types/
+├── utils/
+└── main.tsx
+```
+
+---
+
+# Preferred Libraries
+
+- **React 19**
+- **Vite**
+- **React Router**
+- **TypeScript**
+- **Tailwind CSS**
+- **shadcn/ui**
+- **TanStack Query**
+- **React Hook Form**
+- **Zod**
+- **Axios or Fetch API**
+- **Zustand** (if global state is required)
+- **Vitest**
+- **React Testing Library**
+
+---
+
+# Internationalization
+
+- **Support multiple languages.**
+- **Keep translations separated from components.**
+- **Avoid hardcoded strings inside components.**
+- **Make adding new languages straightforward.**
+
+---
+
+# Themes
+
+- **Support dark mode by default.**
+- **Design the theme system so additional themes can be added easily.**
+- **Prefer CSS variables for theme values.**
+
+---
+
+# General Principles
+
+- **Write maintainable, scalable, and reusable code.**
+- **Prioritize readability over cleverness.**
+- **Prefer explicit code over implicit behavior.**
+- **Keep components, hooks, and utilities independent.**
+- **Always look for opportunities to reuse existing code before introducing new abstractions.**
+- **Follow modern React, TypeScript, and Vite best practices.**

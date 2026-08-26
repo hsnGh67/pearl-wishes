@@ -32,9 +32,12 @@ export function AwardsAndCertifications() {
     <section className="pt-32 pb-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-gray-900 mb-4">Awards & Certifications</h2>
+          <h2 className="text-gray-900 mb-4">
+            Awards & Certifications
+          </h2>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            Our commitment to excellence has been recognized by industry leaders and clients alike.
+            Our commitment to excellence has been recognized by
+            industry leaders and clients alike.
           </p>
         </div>
 
@@ -44,23 +47,40 @@ export function AwardsAndCertifications() {
               <div
                 key={item.id}
                 className="p-8 border rounded-xl text-center"
-                style={{ backgroundColor: "#FEFCFA", borderColor: "#DCD4CD" }}
+                style={{
+                  backgroundColor: "#FEFCFA",
+                  borderColor: "#DCD4CD",
+                }}
               >
                 <AwardBadge item={item} />
-                <h3 className="font-semibold mb-1" style={{ color: "#3D3935" }}>
+                <h3
+                  className="font-semibold mb-1"
+                  style={{ color: "#3D3935" }}
+                >
                   {item.name}
                 </h3>
-                <p className="text-gray-500 text-sm mb-2">{item.issuer}</p>
-                <p className="text-sm font-medium" style={{ color: "#D0A096" }}>
+                <p className="text-gray-500 text-sm mb-2">
+                  {item.issuer}
+                </p>
+                <p
+                  className="text-sm font-medium"
+                  style={{ color: "#D0A096" }}
+                >
                   {item.year}
                 </p>
               </div>
             ))}
           </div>
 
-          <div className="mt-8 p-6 border-2 border-gray-200" style={{ backgroundColor: '#FEFCFA' }}>
+          <div
+            className="mt-8 p-6 border-2 border-gray-200"
+            style={{ backgroundColor: "#FEFCFA" }}
+          >
             <p className="text-gray-600">
-              Our technicians are fully insured and regularly undertake continuing professional development to stay current with the latest techniques and trends.
+              Our technicians are fully insured and regularly
+              undertake continuing professional development to
+              stay current with the latest techniques and
+              trends.
             </p>
           </div>
         </div>

@@ -34,7 +34,8 @@ export function WhyChooseUs() {
         <div className="text-center mb-16">
           <h2 className="text-gray-900 mb-4">Why Choose Us</h2>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            We're committed to providing exceptional service that goes beyond expectations.
+            We're committed to providing exceptional service
+            that goes beyond expectations.
           </p>
         </div>
 
@@ -43,22 +44,33 @@ export function WhyChooseUs() {
             <div
               key={item.id}
               className="border-2 overflow-hidden"
-              style={{ backgroundColor: "#FEFCFA", borderColor: "#3D3935" }}
+              style={{
+                backgroundColor: "#FEFCFA",
+                borderColor: "#3D3935",
+              }}
             >
               <div className="grid md:grid-cols-2">
                 {index % 2 === 1 ? (
                   <>
                     <WhyChooseUsMedia item={item} />
                     <div className="p-12 flex flex-col justify-center bg-[#efe5e5]">
-                      <h3 className="text-gray-900 mb-4">{item.title}</h3>
-                      <p className="text-gray-600">{item.description}</p>
+                      <h3 className="text-gray-900 mb-4">
+                        {item.title}
+                      </h3>
+                      <p className="text-gray-600">
+                        {item.description}
+                      </p>
                     </div>
                   </>
                 ) : (
                   <>
                     <div className="p-12 flex flex-col justify-center bg-[#efe5e5]">
-                      <h3 className="text-gray-900 mb-4">{item.title}</h3>
-                      <p className="text-gray-600">{item.description}</p>
+                      <h3 className="text-gray-900 mb-4">
+                        {item.title}
+                      </h3>
+                      <p className="text-gray-600">
+                        {item.description}
+                      </p>
                     </div>
                     <WhyChooseUsMedia item={item} />
                   </>

@@ -47,9 +47,7 @@ export function ContactAndHours() {
               </div>
               <div>
                 <p className="text-gray-900 mb-1">Phone</p>
-                <p className="text-gray-600">
-                  {contact.phone}
-                </p>
+                <p className="text-gray-600">{contact.phone}</p>
               </div>
             </div>
 
@@ -62,9 +60,7 @@ export function ContactAndHours() {
               </div>
               <div>
                 <p className="text-gray-900 mb-1">Email</p>
-                <p className="text-gray-600">
-                  {contact.email}
-                </p>
+                <p className="text-gray-600">{contact.email}</p>
               </div>
             </div>
           </div>
@@ -84,7 +80,10 @@ export function ContactAndHours() {
               </div>
               <div className="space-y-3 flex-1">
                 {hours.map((hour) => (
-                  <div key={hour.id} className="flex justify-between gap-4">
+                  <div
+                    key={hour.id}
+                    className="flex justify-between gap-4"
+                  >
                     <span className="text-gray-900">
                       {hour.day}
                     </span>
@@ -97,7 +96,12 @@ export function ContactAndHours() {
             </div>
 
             <div className="p-6 border-2 border-gray-200 bg-[#4e4845]">
-              <p className="text-[#ecf0f8] text-justify">                We offer flexible scheduling including early morning and late evening appointments by request. Contact us to discuss your preferred time.
+              <p className="text-[#ecf0f8] text-justify">
+                {" "}
+                We offer flexible scheduling including early
+                morning and late evening appointments by
+                request. Contact us to discuss your preferred
+                time.
               </p>
             </div>
           </div>

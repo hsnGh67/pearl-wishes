@@ -3,6 +3,8 @@
  * Source of truth for all workshop-related data structures
  */
 
+import { z } from "zod";
+
 export enum WorkshopLevel {
   BEGINNER = "beginner",
   INTERMEDIATE = "intermediate",
@@ -19,31 +21,45 @@ export const WORKSHOP_LEVEL_LABELS: Record<string, string> = {
   all_levels: "All Levels",
 };
 
-/**
- * Workshop Database Model
- */
-export interface Workshop {
-  id: string;
-  title: string;
-  description: string;
-  /** Legacy free-text field — derived from session_count + session_duration_hours on new records */
-  session_count: number; // e.g. 3
-  session_duration_hours: number; // e.g. 240 (= 4 hours)
-  level: WorkshopLevel;
-  capacity: number;
-  class_type: string;
-  highlights: string[];
-  price?: number;
-  image_url?: string;
-  is_active: boolean;
-  display_order: number;
-  created_at?: string;
-  updated_at?: string;
-}
+// ─── Zod runtime schemas ───────────────────────────────────────────────────────
 
-/**
- * Workshop Display Model (UI)
- */
+export const WorkshopSchema = z.object({
+  id: z.string(),
+  title: z.string().min(1, "Title is required"),
+  description: z.string(),
+  session_count: z.number().int().min(1, "Session count must be at least 1"),
+  session_duration_hours: z.number().min(0),
+  level: z.nativeEnum(WorkshopLevel),
+  capacity: z.number().int().min(1, "Capacity must be at least 1"),
+  class_type: z.string(),
+  highlights: z.array(z.string()),
+  price: z.number().min(0).optional(),
+  image_url: z.string().nullable().optional(),
+  is_active: z.boolean(),
+  display_order: z.number().int().min(0),
+  created_at: z.string().optional(),
+  updated_at: z.string().optional(),
+});
+
+export const WorkshopCreateSchema = WorkshopSchema.omit({
+  id: true,
+  created_at: true,
+  updated_at: true,
+});
+
+export const WorkshopUpdateSchema = WorkshopCreateSchema.partial();
+
+// ─── Inferred types ───────────────────────────────────────────────────────────
+
+export type Workshop = z.infer<typeof WorkshopSchema>;
+export type WorkshopCreateInput = z.infer<typeof WorkshopCreateSchema>;
+export type WorkshopUpdateInput = z.infer<typeof WorkshopUpdateSchema>;
+
+/** Backward-compat alias — existing code imports WorkshopInput */
+export type WorkshopInput = WorkshopCreateInput;
+
+// ─── Display model (UI only — no Zod needed) ──────────────────────────────────
+
 export interface WorkshopDisplay {
   id: string;
   title: string;
@@ -61,25 +77,7 @@ export interface WorkshopDisplay {
   display_order: number;
 }
 
-/**
- * Workshop Create/Update Input
- */
-export interface WorkshopInput {
-  title: string;
-  description: string;
-  session_count: number;
-  session_duration_hours: number;
-  level: WorkshopLevel;
-  capacity: number;
-  class_type: string;
-  highlights: string[];
-  price?: number;
-  image_url?: string;
-  is_active: boolean;
-  display_order: number;
-}
-
-// ─── helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Returns hours as a compact string: 4 → "4h", 1.5 → "1.5h" */
 function fmtHours(minutes: number): string {
@@ -95,9 +93,7 @@ export function formatDurationLabel(
   if (!sessionCount || !sessionDurationHours) return "–";
   const perSession = sessionDurationHours;
   const totalH = sessionCount * sessionDurationHours;
-  const total = Number.isInteger(totalH)
-    ? `${totalH}`
-    : totalH.toFixed(1);
+  const total = Number.isInteger(totalH) ? `${totalH}` : totalH.toFixed(1);
   const sessWord = sessionCount === 1 ? "session" : "sessions";
   return `${sessionCount} ${sessWord} × ${perSession} (${total} hrs total)`;
 }
@@ -122,8 +118,7 @@ export function formatWorkshopForDisplay(
     description: workshop.description,
     sessionCount: workshop.session_count ?? 1,
     sessionDurationHours: workshop.session_duration_hours ?? 0,
-    level:
-      WORKSHOP_LEVEL_LABELS[workshop.level] || workshop.level,
+    level: WORKSHOP_LEVEL_LABELS[workshop.level] || workshop.level,
     levelValue: workshop.level,
     capacity: workshop.capacity,
     classType: workshop.class_type,

@@ -27,22 +27,30 @@ export const getAwards = async (): Promise<AwardCard[]> => {
       .order("sort_order", { ascending: true });
 
     if (error) {
-      dbLogger.error("Failed to fetch awards certifications cards", {
-        table: "awards_certifications",
-        error,
-      });
+      dbLogger.error(
+        "Failed to fetch awards certifications cards",
+        {
+          table: "awards_certifications",
+          error,
+        },
+      );
       throw error;
     }
 
     const items =
       data?.map((row) =>
-        mapAwardsItemToAwardCard(validateAwardsCertificationsItem(row)),
+        mapAwardsItemToAwardCard(
+          validateAwardsCertificationsItem(row),
+        ),
       ) || [];
 
-    dbLogger.info("Successfully fetched awards certifications cards", {
-      table: "awards_certifications",
-      data: { count: items.length },
-    });
+    dbLogger.info(
+      "Successfully fetched awards certifications cards",
+      {
+        table: "awards_certifications",
+        data: { count: items.length },
+      },
+    );
 
     return items;
   } catch (error) {
@@ -55,16 +63,17 @@ export const getAwards = async (): Promise<AwardCard[]> => {
  * Persist the full Awards & Certifications list.
  * Upserts rows by id and deletes cards that were removed in the admin UI.
  */
-export const saveAwards = async (items: AwardCard[]): Promise<AwardCard[]> => {
+export const saveAwards = async (
+  items: AwardCard[],
+): Promise<AwardCard[]> => {
   try {
     dbLogger.info("Saving awards certifications cards", {
       table: "awards_certifications",
       data: { count: items.length },
     });
 
-    const { data: existingRows, error: existingError } = await supabase
-      .from("awards_certifications")
-      .select("id");
+    const { data: existingRows, error: existingError } =
+      await supabase.from("awards_certifications").select("id");
 
     if (existingError) throw existingError;
 
@@ -86,17 +95,22 @@ export const saveAwards = async (items: AwardCard[]): Promise<AwardCard[]> => {
     }
 
     if (items.length === 0) {
-      dbLogger.info("Successfully saved awards certifications cards", {
-        table: "awards_certifications",
-        data: { count: 0 },
-      });
+      dbLogger.info(
+        "Successfully saved awards certifications cards",
+        {
+          table: "awards_certifications",
+          data: { count: 0 },
+        },
+      );
       return [];
     }
 
     const payload = items.map((item, index) =>
       validateAwardsCertificationsItemCreate({
         id: isUuid(item.id) ? item.id : crypto.randomUUID(),
-        image_url: item.imageUrl.startsWith("blob:") ? "" : item.imageUrl,
+        image_url: item.imageUrl.startsWith("blob:")
+          ? ""
+          : item.imageUrl,
         name: item.name,
         year: item.year,
         issuer: item.issuer,
@@ -114,13 +128,18 @@ export const saveAwards = async (items: AwardCard[]): Promise<AwardCard[]> => {
 
     const saved =
       data?.map((row) =>
-        mapAwardsItemToAwardCard(validateAwardsCertificationsItem(row)),
+        mapAwardsItemToAwardCard(
+          validateAwardsCertificationsItem(row),
+        ),
       ) || [];
 
-    dbLogger.info("Successfully saved awards certifications cards", {
-      table: "awards_certifications",
-      data: { count: saved.length },
-    });
+    dbLogger.info(
+      "Successfully saved awards certifications cards",
+      {
+        table: "awards_certifications",
+        data: { count: saved.length },
+      },
+    );
 
     return saved;
   } catch (error) {

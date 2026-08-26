@@ -7,6 +7,8 @@ import { supabase } from "../../config/supabase";
 import {
   Workshop,
   WorkshopInput,
+  WorkshopCreateSchema,
+  WorkshopUpdateSchema,
   formatWorkshopForDatabase,
 } from "../../schema/workshop.schema";
 
@@ -73,9 +75,8 @@ export async function getWorkshopById(
 export async function createWorkshop(
   input: WorkshopInput,
 ): Promise<Workshop> {
+  WorkshopCreateSchema.parse(input);
   const workshopData = formatWorkshopForDatabase(input);
-  console.log("input ===>", input);
-  console.log("createWorkshop ===>", workshopData);
   const { data, error } = await supabase
     .from("workshops")
     .insert([workshopData])
@@ -97,6 +98,7 @@ export async function updateWorkshop(
   id: string,
   input: Partial<WorkshopInput>,
 ): Promise<Workshop> {
+  WorkshopUpdateSchema.parse(input);
   const { data, error } = await supabase
     .from("workshops")
     .update({

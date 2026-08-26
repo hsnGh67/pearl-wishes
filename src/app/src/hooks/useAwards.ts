@@ -6,7 +6,9 @@ import {
 } from "../schema/awards-certifications.schema";
 
 export function useAwards() {
-  const [items, setItems] = useState<AwardCard[]>(DEFAULT_AWARD_ITEMS);
+  const [items, setItems] = useState<AwardCard[]>(
+    DEFAULT_AWARD_ITEMS,
+  );
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -21,7 +23,10 @@ export function useAwards() {
           setItems(data);
         }
       } catch (error) {
-        console.error("Error fetching awards certifications cards:", error);
+        console.error(
+          "Error fetching awards certifications cards:",
+          error,
+        );
       } finally {
         if (!isCancelled) {
           setIsLoading(false);

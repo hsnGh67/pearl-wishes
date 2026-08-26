@@ -14,14 +14,19 @@ export const WhyChooseUsItemSchema = z.object({
   updated_at: z.string().or(z.date()).optional(),
 });
 
-export type WhyChooseUsItem = z.infer<typeof WhyChooseUsItemSchema>;
+export type WhyChooseUsItem = z.infer<
+  typeof WhyChooseUsItemSchema
+>;
 
-export const WhyChooseUsItemCreateSchema = WhyChooseUsItemSchema.omit({
-  created_at: true,
-  updated_at: true,
-});
+export const WhyChooseUsItemCreateSchema =
+  WhyChooseUsItemSchema.omit({
+    created_at: true,
+    updated_at: true,
+  });
 
-export type WhyChooseUsItemCreate = z.infer<typeof WhyChooseUsItemCreateSchema>;
+export type WhyChooseUsItemCreate = z.infer<
+  typeof WhyChooseUsItemCreateSchema
+>;
 
 export interface WhyCard {
   id: string;

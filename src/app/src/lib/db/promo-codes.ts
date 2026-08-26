@@ -2,6 +2,8 @@ import { supabase } from "../../config/supabase";
 import {
   PromoCode,
   PromoCodeInput,
+  PromoCodeCreateSchema,
+  PromoCodeUpdateSchema,
   PromoCodeUsage,
   PromoValidationResult,
   AppliesToType,
@@ -68,6 +70,7 @@ export async function getPromoCodeByCode(
 export async function createPromoCode(
   input: PromoCodeInput,
 ): Promise<PromoCode> {
+  PromoCodeCreateSchema.parse(input);
   const { data, error } = await supabase
     .from("promo_codes")
     .insert({ ...input, code: input.code.toUpperCase().trim() })
@@ -81,6 +84,7 @@ export async function updatePromoCode(
   id: string,
   input: Partial<PromoCodeInput>,
 ): Promise<PromoCode> {
+  PromoCodeUpdateSchema.parse(input);
   const { data, error } = await supabase
     .from("promo_codes")
     .update({ ...input, updated_at: new Date().toISOString() })
