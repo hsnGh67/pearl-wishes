@@ -2,6 +2,7 @@ import { Plus, Edit, Trash2, DollarSign } from "lucide-react";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { useState, useEffect } from "react";
+import { ZodError } from "zod";
 import {
   Dialog,
   DialogContent,
@@ -14,6 +15,7 @@ import {
   formatServiceForDisplay,
   ServiceDisplay,
 } from "../../schema/service.schema";
+import { formatZodErrors } from "../../schema/validation";
 import {
   getAllServices,
   createService,
@@ -26,6 +28,22 @@ import {
   subscribeToServices,
   subscribeToCategories,
 } from "../../lib/db/realtime";
+
+const getServiceFormErrorMessage = (
+  error: unknown,
+  fallback: string,
+): string => {
+  if (error instanceof ZodError) {
+    const messages = formatZodErrors(error).map((e) => e.message);
+    if (messages.length > 0) {
+      return messages.join("\n");
+    }
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return fallback;
+};
 
 export function AdminServices() {
   const [isUpdatingService, setIsUpdatingService] =
@@ -226,6 +244,12 @@ export function AdminServices() {
       });
     } catch (error) {
       console.error("Failed to create service:", error);
+      alert(
+        getServiceFormErrorMessage(
+          error,
+          "Failed to create service",
+        ),
+      );
     } finally {
       setIsCreatingService(false);
     }
@@ -319,7 +343,12 @@ export function AdminServices() {
       setIsUpdatingService(false);
     } catch (error) {
       console.error("Failed to update service:", error);
-      alert("Failed to update service");
+      alert(
+        getServiceFormErrorMessage(
+          error,
+          "Failed to update service",
+        ),
+      );
       setIsUpdatingService(false);
     }
   };
