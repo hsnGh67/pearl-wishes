@@ -23,12 +23,12 @@ export const ContentSectionSchema = z.object({
     .string()
     .min(2, "Title must be at least 2 characters")
     .max(200),
-  subtitle: z.string().max(300).optional(),
-  description: z.string().max(1000).optional(),
-  cta_text: z.string().max(50).optional(),
-  cta_link: z.string().max(500).optional(),
-  content_url: z.string().url().optional().or(z.literal("")),
-  content_type: z.string().optional(),
+  subtitle: z.string().max(300).nullable().optional(),
+  description: z.string().max(1000).nullable().optional(),
+  cta_text: z.string().max(50).nullable().optional(),
+  cta_link: z.string().max(500).nullable().optional(),
+  content_url: z.string().url().nullable().optional().or(z.literal("")),
+  content_type: z.string().nullable().optional(),
   is_active: z.boolean().default(true),
   display_order: z.number().int().min(0).optional(),
   created_at: z.string().or(z.date()).optional(),

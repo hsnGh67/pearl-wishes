@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from "../../../components/ui/dialog";
 import { Service } from "../../schema/service.schema";
-import { getAllServices } from "../../lib/db/services";
+import { getAllServices, getActiveCategories } from "../../lib/db/services";
 
 export function Features() {
   const [showAll, setShowAll] = useState(false);
@@ -37,8 +37,23 @@ export function Features() {
   const loadServices = async () => {
     try {
       setIsLoading(true);
-      const services = await getAllServices();
-      setServices(services);
+      const [allServices, categories] = await Promise.all([
+        getAllServices(),
+        getActiveCategories(),
+      ]);
+      const addOnCategoryIds = new Set(
+        categories
+          .filter((c) => /add.?on/i.test(c.name))
+          .map((c) => c.id as string),
+      );
+      setServices(
+        allServices.filter(
+          (s) =>
+            s.is_active &&
+            !s.is_add_on &&
+            !addOnCategoryIds.has(s.category_id),
+        ),
+      );
       setIsLoading(false);
     } catch (e) {}
   };
@@ -47,9 +62,7 @@ export function Features() {
     loadServices();
   }, []);
 
-  const showableServices = services.filter(
-    (service) => service.is_active && !service.is_add_on,
-  );
+  const showableServices = services;
   const servicesToShow = showAll
     ? showableServices
     : showableServices.slice(0, 6);

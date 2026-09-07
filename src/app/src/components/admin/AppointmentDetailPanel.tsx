@@ -458,6 +458,9 @@ export function AppointmentDetailPanel({
                 </div>
                 <div className="text-sm text-gray-600">
                   {booking.district}
+                  {booking.postal_code && (
+                    <span className="ml-2 font-mono">{booking.postal_code}</span>
+                  )}
                 </div>
               </div>
             </div>

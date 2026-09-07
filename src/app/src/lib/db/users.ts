@@ -17,7 +17,7 @@ import { dbLogger } from "./logger";
  */
 export const getAllUsers = async (
   options?: { page?: number; limit?: number },
-): Promise<User[]> => {
+): Promise<{ data: User[]; totalCount: number }> => {
   const limit = options?.limit ?? 50;
   const page = options?.page ?? 1;
   const from = (page - 1) * limit;
@@ -29,10 +29,11 @@ export const getAllUsers = async (
       data: { page, limit },
     });
 
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from("users")
       .select(
         "*, user_notes(*), bookings!bookings_user_id_fkey(*), workshop_bookings(*, workshops(title, price))",
+        { count: "exact" },
       )
       .order("created_at", { ascending: false })
       .range(from, to);
@@ -64,7 +65,7 @@ export const getAllUsers = async (
           name: validated.full_name,
           hasAddress: !!validated.address,
           address: validated.address,
-          postcode: validated.postcode,
+          postal_code: validated.postal_code,
           district: validated.district,
           notesCount: validated.notes?.length ?? 0,
           bookingsCount: validated.bookings?.length ?? 0,
@@ -78,7 +79,7 @@ export const getAllUsers = async (
       data: { count: validatedUsers.length },
     });
 
-    return validatedUsers;
+    return { data: validatedUsers, totalCount: count ?? validatedUsers.length };
   } catch (error) {
     dbLogger.error("Error in getAllUsers", { error });
     throw error;
@@ -302,7 +303,7 @@ export const createUser = async (
       phone: validatedData.phone,
       role: validatedData.role,
       address: validatedData.address || null,
-      postcode: validatedData.postcode || null,
+      postal_code: validatedData.postal_code || null,
       district: validatedData.district || null,
     };
 
@@ -495,7 +496,7 @@ export const getUserByPhone = async (
       return null;
     }
 
-    const validatedUser = data;
+    const validatedUser = validateUser(data);
 
     dbLogger.info("Successfully fetched user by phone", {
       table: "users",

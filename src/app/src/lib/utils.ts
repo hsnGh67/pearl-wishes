@@ -46,11 +46,18 @@ export function formatDateTime(date: Date): string {
 }
 
 /**
- * Validate UK postcode format
+ * Normalize a UK postcode: trim whitespace and convert to uppercase.
  */
-export function isValidUKPostcode(postcode: string): boolean {
-  const postcodeRegex = /^[A-Z]{1,2}\d{1,2}[A-Z]?\s?\d[A-Z]{2}$/i;
-  return postcodeRegex.test(postcode.trim());
+export function normalizePostalCode(raw: string): string {
+  return raw.trim().toUpperCase();
+}
+
+/**
+ * Validate a UK postcode after normalization.
+ * Accepts formats such as SW1A 1AA, EC1A 1BB, W1A 0AX, M1 1AE, B1 1BB.
+ */
+export function isValidPostalCode(raw: string): boolean {
+  return /^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/.test(normalizePostalCode(raw));
 }
 
 /**

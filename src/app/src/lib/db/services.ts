@@ -223,6 +223,79 @@ export const getActiveCategories = async (): Promise<
   }
 };
 
+export const getAllCategories = async (): Promise<Category[]> => {
+  try {
+    dbLogger.info("Fetching all categories", { table: "categories" });
+    const { data, error } = await supabase
+      .from("categories")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) {
+      dbLogger.error("Failed to fetch all categories", { table: "categories", error });
+      throw error;
+    }
+    return data?.map((c) => validateCategory(c)) || [];
+  } catch (error) {
+    dbLogger.error("Error in getAllCategories", { error });
+    throw error;
+  }
+};
+
+export const updateCategoryStatus = async (
+  id: string,
+  is_active: boolean,
+): Promise<Category> => {
+  try {
+    dbLogger.info("Updating category status", { table: "categories", data: { id, is_active } });
+    const { data, error } = await supabase
+      .from("categories")
+      .update({ is_active })
+      .eq("id", id)
+      .select()
+      .single();
+    if (error) {
+      dbLogger.error("Failed to update category status", { table: "categories", error });
+      throw error;
+    }
+    return validateCategory(data);
+  } catch (error) {
+    dbLogger.error("Error in updateCategoryStatus", { error });
+    throw error;
+  }
+};
+
+export const deleteCategoryById = async (id: string): Promise<void> => {
+  try {
+    dbLogger.info("Deleting category", { table: "categories", data: { id } });
+    const { error } = await supabase
+      .from("categories")
+      .delete()
+      .eq("id", id);
+    if (error) {
+      dbLogger.error("Failed to delete category", { table: "categories", error });
+      throw error;
+    }
+    dbLogger.info("Successfully deleted category", { table: "categories", data: { id } });
+  } catch (error) {
+    dbLogger.error("Error in deleteCategoryById", { error });
+    throw error;
+  }
+};
+
+export const getServiceCountByCategory = async (categoryId: string): Promise<number> => {
+  try {
+    const { count, error } = await supabase
+      .from("services")
+      .select("*", { count: "exact", head: true })
+      .eq("category_id", categoryId);
+    if (error) throw error;
+    return count ?? 0;
+  } catch (error) {
+    dbLogger.error("Error in getServiceCountByCategory", { error });
+    throw error;
+  }
+};
+
 export const createCategory = async (
   categoryData: CategoryCreate,
 ): Promise<Category> => {
@@ -395,6 +468,79 @@ export const deleteService = async (
     dbLogger.error("Error in deleteService", { error });
     throw error;
   }
+};
+
+/**
+ * Get add-on service IDs mapped to a specific service
+ */
+export const getServiceAddonIds = async (
+  serviceId: string,
+): Promise<string[]> => {
+  const { data, error } = await supabase
+    .from("service_addons")
+    .select("addon_id")
+    .eq("service_id", serviceId)
+    .eq("is_active", true)
+    .order("display_order", { ascending: true });
+
+  if (error) {
+    dbLogger.error("Error in getServiceAddonIds", { error });
+    throw error;
+  }
+  return data?.map((r) => r.addon_id) ?? [];
+};
+
+/**
+ * Atomically replace all add-on mappings for a service.
+ * Passing an empty array clears all mappings.
+ */
+export const syncServiceAddons = async (
+  serviceId: string,
+  addonIds: string[],
+): Promise<void> => {
+  const deduped = [...new Set(addonIds)];
+
+  if (deduped.includes(serviceId)) {
+    throw new Error("A service cannot reference itself as an add-on");
+  }
+
+  // Delegates to the sync_service_addons DB function (migration 008).
+  // The function runs delete + insert in a single transaction, validates
+  // that all IDs are active is_add_on services, and rolls back on any failure.
+  const { error } = await supabase.rpc("sync_service_addons", {
+    p_service_id: serviceId,
+    p_addon_ids: deduped,
+  });
+
+  if (error) {
+    dbLogger.error("Error in syncServiceAddons", { error });
+    throw error;
+  }
+};
+
+/**
+ * Fetch a flat mapping of serviceId → addonId[] for all active services.
+ * Used in the booking flow to preload conditional add-on routing data.
+ */
+export const getServiceAddonMappings = async (): Promise<
+  Record<string, string[]>
+> => {
+  const { data, error } = await supabase
+    .from("service_addons")
+    .select("service_id, addon_id")
+    .eq("is_active", true);
+
+  if (error) {
+    dbLogger.error("Error in getServiceAddonMappings", { error });
+    throw error;
+  }
+
+  const mapping: Record<string, string[]> = {};
+  data?.forEach(({ service_id, addon_id }) => {
+    if (!mapping[service_id]) mapping[service_id] = [];
+    mapping[service_id].push(addon_id);
+  });
+  return mapping;
 };
 
 /**

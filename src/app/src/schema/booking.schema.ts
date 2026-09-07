@@ -68,6 +68,7 @@ export const BookingSchema = z.object({
   balance_amount: z.number(),
   people_numbers: z.number().min(1),
   tax_amount: z.number().min(0),
+  postal_code: z.string().max(10).nullable().optional(),
   notes: z.string().max(1000).nullable().optional(),
   stripe_payment_intent_id: z.string().nullable().optional(),
   promo_code_id: z.string().uuid().nullable().optional(),

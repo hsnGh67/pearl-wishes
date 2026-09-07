@@ -60,7 +60,10 @@ export function loadDraft<T extends object>(
   try {
     const raw = sessionStorage.getItem(key);
     if (!raw) return null;
-    const parsed = JSON.parse(raw, reviver) as VersionedDraft<T>;
+    const parsed = JSON.parse(
+      raw,
+      reviver,
+    ) as VersionedDraft<T>;
     if (!parsed || parsed.v !== BOOKING_DRAFT_VERSION) {
       return null;
     }

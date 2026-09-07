@@ -96,7 +96,7 @@ export function ContactAndHours() {
             </div>
 
             <div className="p-6 border-2 border-gray-200 bg-[#4e4845]">
-              <p className="text-[#ecf0f8] text-justify">
+              <p className="text-justify text-[#eac9c9]">
                 {" "}
                 We offer flexible scheduling including early
                 morning and late evening appointments by

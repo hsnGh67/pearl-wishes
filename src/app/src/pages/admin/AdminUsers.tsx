@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { AdminPagination } from "../../components/admin/AdminPagination";
 import {
   Search,
   UserPlus,
@@ -10,7 +11,11 @@ import {
   Plus,
   PenLine,
   Trash2,
+  History,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
+import { supabase } from "../../config/supabase";
 import { Card } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
@@ -97,6 +102,45 @@ const getPaymentStatusStyle = (status: string) => {
   return { backgroundColor: "#DCD4CD", color: "#3D3935" };
 };
 
+type TreatmentAddon = {
+  id?: string;
+  name: string;
+  price: number;
+  duration?: number;
+};
+
+type EnrichedTreatment = {
+  id?: string;
+  service_name: string;
+  person_name: string;
+  price: number;
+  duration: number;
+  status: string;
+  addOns: TreatmentAddon[];
+};
+
+type EnrichedBooking = {
+  booking: Booking & { id: string };
+  treatments: EnrichedTreatment[];
+};
+
+type WorkshopSession = {
+  id?: string;
+  date: string;
+  status?: string;
+  workshop_id?: string;
+};
+
+type EnrichedWorkshop = {
+  booking: UserWorkshop;
+  sessions: WorkshopSession[];
+};
+
+type UserHistoryData = {
+  bookings: EnrichedBooking[];
+  workshops: EnrichedWorkshop[];
+};
+
 const formatMoney = (amount?: number | null) =>
   `£${Number(amount ?? 0).toFixed(2)}`;
 
@@ -141,22 +185,31 @@ export function AdminUsers() {
     phone: "",
     houseNumber: "",
     street: "",
-    postcode: "",
+    postal_code: "",
     district: "",
   });
 
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [dbError, setDbError] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 50;
+
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
+  const [historyTab, setHistoryTab] = useState<Record<string, "treatments" | "workshops">>({});
+  const [historyCache, setHistoryCache] = useState<Record<string, UserHistoryData>>({});
+  const [historyLoading, setHistoryLoading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         setIsLoading(true);
         setDbError(null);
-        const fetchedUsers = await getAllUsers();
+        const { data: fetchedUsers, totalCount: count } = await getAllUsers({ page: currentPage, limit: PAGE_SIZE });
         console.log("fetchedUsers", fetchedUsers);
-        setUsers(fetchedUsers);
+        setUsers(fetchedUsers ?? []);
+        setTotalCount(count ?? 0);
       } catch (error) {
         // Silently handle - error already logged by dbLogger
         setDbError(
@@ -170,7 +223,11 @@ export function AdminUsers() {
     };
 
     fetchUsers();
-  }, []);
+  }, [currentPage]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterWorkshopUsers]);
 
   const handleCloseAddUserModal = () => {
     setShowAddUserModal(false);
@@ -181,7 +238,7 @@ export function AdminUsers() {
       phone: "",
       houseNumber: "",
       street: "",
-      postcode: "",
+      postal_code: "",
       district: "",
     });
   };
@@ -309,16 +366,21 @@ export function AdminUsers() {
     }
 
     try {
-      // Create user in database with correct schema
       const fullAddress =
         `${newUserData.houseNumber} ${newUserData.street}`.trim();
+      const normalizedPostalCode = newUserData.postal_code.trim().toUpperCase();
+
+      if (normalizedPostalCode && !/^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/.test(normalizedPostalCode)) {
+        alert("Invalid postcode format (e.g. SW1A 1AA).");
+        return;
+      }
 
       const createdUser = await createUser({
         full_name: newUserData.fullName,
         email: newUserData.email,
         phone: newUserData.phone,
         address: fullAddress,
-        postcode: newUserData.postcode,
+        postal_code: normalizedPostalCode || undefined,
         district: newUserData.district,
         role: UserRole.CLIENT,
       });
@@ -355,6 +417,62 @@ export function AdminUsers() {
     }
   };
 
+  const fetchUserHistory = async (user: User) => {
+    const userId = user.id!;
+    if (historyCache[userId] || historyLoading[userId]) return;
+    setHistoryLoading((prev) => ({ ...prev, [userId]: true }));
+    try {
+      const enrichedBookings: EnrichedBooking[] = await Promise.all(
+        (user.bookings ?? []).map(async (booking) => {
+          const { data } = await supabase
+            .from("booking_treatments")
+            .select("*, addOns:booking_treatment_addons(*)")
+            .eq("booking_id", booking.id!)
+            .order("created_at", { ascending: true });
+          return { booking, treatments: (data ?? []) as EnrichedTreatment[] };
+        }),
+      );
+
+      const enrichedWorkshops: EnrichedWorkshop[] = await Promise.all(
+        ((user.workshops as UserWorkshop[]) ?? []).map(async (wb) => {
+          if (!wb.workshop_id) return { booking: wb, sessions: [] };
+          const { data } = await supabase
+            .from("workshop_sessions")
+            .select("*")
+            .eq("workshop_id", wb.workshop_id)
+            .order("date", { ascending: true });
+          return { booking: wb, sessions: (data ?? []) as WorkshopSession[] };
+        }),
+      );
+
+      setHistoryCache((prev) => ({
+        ...prev,
+        [userId]: { bookings: enrichedBookings, workshops: enrichedWorkshops },
+      }));
+    } catch (err) {
+      console.error("Failed to fetch user history:", err);
+      setHistoryCache((prev) => ({
+        ...prev,
+        [userId]: { bookings: [], workshops: [] },
+      }));
+    } finally {
+      setHistoryLoading((prev) => ({ ...prev, [userId]: false }));
+    }
+  };
+
+  const toggleHistory = (user: User) => {
+    const userId = user.id!;
+    if (expandedUserId === userId) {
+      setExpandedUserId(null);
+    } else {
+      setExpandedUserId(userId);
+      if (!historyTab[userId]) {
+        setHistoryTab((prev) => ({ ...prev, [userId]: "treatments" }));
+      }
+      fetchUserHistory(user);
+    }
+  };
+
   // Helper function to parse date strings like "Feb 14, 2026"
   const parseAppointmentDate = (
     dateStr: string,
@@ -368,7 +486,7 @@ export function AdminUsers() {
   };
 
   // Filter users based on search term and workshop filter
-  const filteredUsers = users.filter((user) => {
+  const filteredUsers = (users ?? []).filter((user) => {
     const searchLower = searchTerm.toLowerCase().trim();
 
     // Check search term match
@@ -595,133 +713,578 @@ export function AdminUsers() {
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map((user) => (
-                <tr
-                  key={user.id}
-                  className="border-b hover:bg-gray-50"
-                  style={{ borderColor: "#DCD4CD" }}
-                >
-                  <td className="p-4">
-                    <p
-                      className="font-semibold"
-                      style={{ color: "#3D3935" }}
+              {filteredUsers.map((user) => {
+                const isExpanded = expandedUserId === user.id;
+                const activeTab = historyTab[user.id!] ?? "treatments";
+                const history = historyCache[user.id!];
+                const isHistoryLoading = historyLoading[user.id!];
+
+                return (
+                  <>
+                    <tr
+                      key={user.id}
+                      className="border-b hover:bg-gray-50"
+                      style={{ borderColor: "#DCD4CD" }}
                     >
-                      {user.full_name}
-                    </p>
-                  </td>
-                  <td className="p-4">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Mail className="w-4 h-4" />
-                        {user.email}
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Phone className="w-4 h-4" />
-                        {user.phone || "N/A"}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Auth:{" "}
-                        {user.auth_id ? "Linked" : "Not linked"}
-                      </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className="text-gray-500 text-sm">
-                      {user?.address || "-"}
-                    </span>
-                  </td>
-                  <td
-                    className="p-0 cursor-pointer"
-                    onClick={() => setBookingsUser(user)}
-                  >
-                    <div className="w-full h-full p-4">
-                      {(user.bookings?.length ?? 0) > 0 ? (
-                        <span
-                          className="text-sm font-semibold underline transition-colors hover:opacity-70"
+                      <td className="p-4">
+                        <p
+                          className="font-semibold"
                           style={{ color: "#3D3935" }}
                         >
-                          {user.bookings?.length > 0
-                            ? user.bookings.length
-                            : "-"}
-                        </span>
-                      ) : (
+                          {user.full_name}
+                        </p>
+                      </td>
+                      <td className="p-4">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Mail className="w-4 h-4" />
+                            {user.email}
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-gray-600">
+                            <Phone className="w-4 h-4" />
+                            {user.phone || "N/A"}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Auth:{" "}
+                            {user.auth_id ? "Linked" : "Not linked"}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4">
                         <span className="text-gray-500 text-sm">
-                          0
+                          {user?.address || "-"}
                         </span>
-                      )}
-                    </div>
-                  </td>
-                  <td
-                    className="p-0 cursor-pointer"
-                    onClick={() => setWorkshopsUser(user)}
-                  >
-                    <div className="w-full h-full p-4">
-                      {(user.workshops?.length ?? 0) > 0 ? (
-                        <span
-                          className="text-sm font-semibold underline transition-colors hover:opacity-70"
-                          style={{ color: "#3D3935" }}
-                        >
-                          {user.workshops?.length > 0
-                            ? user.workshops.length
-                            : "-"}
-                        </span>
-                      ) : (
-                        <span className="text-gray-500 text-sm">
-                          0
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="p-4 text-gray-600">
-                    {new Date(
-                      user.created_at || "",
-                    ).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </td>
-                  <td className="p-4 text-gray-600">-</td>
-                  <td className="p-4">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => setUserToDelete(user)}
-                        className="flex items-center justify-center w-8 h-8 border-2 transition-colors hover:bg-red-50"
-                        style={{
-                          borderColor: "#D0A096",
-                          color: "#D0A096",
-                          backgroundColor: "transparent",
-                        }}
-                        title="Delete User"
+                      </td>
+                      <td
+                        className="p-0 cursor-pointer"
+                        onClick={() => setBookingsUser(user)}
                       >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
-                  <td
-                    className="p-0 cursor-pointer"
-                    onClick={() => setNotesUser(user)}
-                  >
-                    <div className="w-full h-full p-4">
-                      {user.notes && user.notes.length > 0 ? (
-                        <span
-                          className="text-sm underline transition-colors hover:opacity-70"
-                          style={{ color: "#3D3935" }}
-                        >
-                          View
-                        </span>
-                      ) : (
-                        <span className="text-sm text-gray-400">
-                          -
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                        <div className="w-full h-full p-4">
+                          {(user.bookings?.length ?? 0) > 0 ? (
+                            <span
+                              className="text-sm font-semibold underline transition-colors hover:opacity-70"
+                              style={{ color: "#3D3935" }}
+                            >
+                              {user.bookings?.length > 0
+                                ? user.bookings.length
+                                : "-"}
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 text-sm">
+                              0
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td
+                        className="p-0 cursor-pointer"
+                        onClick={() => setWorkshopsUser(user)}
+                      >
+                        <div className="w-full h-full p-4">
+                          {(user.workshops?.length ?? 0) > 0 ? (
+                            <span
+                              className="text-sm font-semibold underline transition-colors hover:opacity-70"
+                              style={{ color: "#3D3935" }}
+                            >
+                              {user.workshops?.length > 0
+                                ? user.workshops.length
+                                : "-"}
+                            </span>
+                          ) : (
+                            <span className="text-gray-500 text-sm">
+                              0
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-gray-600">
+                        {new Date(
+                          user.created_at || "",
+                        ).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </td>
+                      <td className="p-4 text-gray-600">-</td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => toggleHistory(user)}
+                            className="flex items-center justify-center w-8 h-8 border-2 transition-colors hover:bg-[#FCEAE0]"
+                            style={{
+                              borderColor: isExpanded ? "#3D3935" : "#DCD4CD",
+                              color: isExpanded ? "#3D3935" : "#A09080",
+                              backgroundColor: isExpanded ? "#FCEAE0" : "transparent",
+                            }}
+                            title="View History"
+                          >
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <History className="w-4 h-4" />
+                            )}
+                          </button>
+                          <button
+                            onClick={() => setUserToDelete(user)}
+                            className="flex items-center justify-center w-8 h-8 border-2 transition-colors hover:bg-red-50"
+                            style={{
+                              borderColor: "#D0A096",
+                              color: "#D0A096",
+                              backgroundColor: "transparent",
+                            }}
+                            title="Delete User"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                      <td
+                        className="p-0 cursor-pointer"
+                        onClick={() => setNotesUser(user)}
+                      >
+                        <div className="w-full h-full p-4">
+                          {user.notes && user.notes.length > 0 ? (
+                            <span
+                              className="text-sm underline transition-colors hover:opacity-70"
+                              style={{ color: "#3D3935" }}
+                            >
+                              View
+                            </span>
+                          ) : (
+                            <PenLine className="w-4 h-4 text-gray-400 hover:text-[#3D3935] transition-colors" />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* Expandable history row */}
+                    {isExpanded && (
+                      <tr
+                        key={`${user.id}-history`}
+                        style={{ backgroundColor: "#FAF7F5" }}
+                      >
+                        <td colSpan={9} className="p-0">
+                          <div
+                            className="border-b-2"
+                            style={{ borderColor: "#DCD4CD" }}
+                          >
+                            {/* Tab strip */}
+                            <div
+                              className="flex items-center gap-0 border-b"
+                              style={{ borderColor: "#DCD4CD" }}
+                            >
+                              <button
+                                onClick={() =>
+                                  setHistoryTab((prev) => ({
+                                    ...prev,
+                                    [user.id!]: "treatments",
+                                  }))
+                                }
+                                className="px-5 py-3 text-sm font-medium border-b-2 transition-colors"
+                                style={{
+                                  borderColor:
+                                    activeTab === "treatments"
+                                      ? "#3D3935"
+                                      : "transparent",
+                                  color:
+                                    activeTab === "treatments"
+                                      ? "#3D3935"
+                                      : "#9CA3AF",
+                                  backgroundColor: "transparent",
+                                }}
+                              >
+                                Treatments &amp; Appointments
+                                {history && (
+                                  <span
+                                    className="ml-2 px-1.5 py-0.5 text-xs rounded-full"
+                                    style={{
+                                      backgroundColor: "#E9CFCA",
+                                      color: "#3D3935",
+                                    }}
+                                  >
+                                    {history.bookings.length}
+                                  </span>
+                                )}
+                              </button>
+                              <button
+                                onClick={() =>
+                                  setHistoryTab((prev) => ({
+                                    ...prev,
+                                    [user.id!]: "workshops",
+                                  }))
+                                }
+                                className="px-5 py-3 text-sm font-medium border-b-2 transition-colors"
+                                style={{
+                                  borderColor:
+                                    activeTab === "workshops"
+                                      ? "#3D3935"
+                                      : "transparent",
+                                  color:
+                                    activeTab === "workshops"
+                                      ? "#3D3935"
+                                      : "#9CA3AF",
+                                  backgroundColor: "transparent",
+                                }}
+                              >
+                                Workshops &amp; Classes
+                                {history && (
+                                  <span
+                                    className="ml-2 px-1.5 py-0.5 text-xs rounded-full"
+                                    style={{
+                                      backgroundColor: "#DCD4CD",
+                                      color: "#3D3935",
+                                    }}
+                                  >
+                                    {history.workshops.length}
+                                  </span>
+                                )}
+                              </button>
+                            </div>
+
+                            {/* Content area */}
+                            <div className="p-5">
+                              {isHistoryLoading ? (
+                                <div className="space-y-3">
+                                  {[1, 2].map((n) => (
+                                    <div
+                                      key={n}
+                                      className="h-20 rounded animate-pulse"
+                                      style={{ backgroundColor: "#EDE8E3" }}
+                                    />
+                                  ))}
+                                </div>
+                              ) : !history ? (
+                                <p className="text-sm text-gray-400 text-center py-4">
+                                  Failed to load history. Try collapsing and expanding again.
+                                </p>
+                              ) : activeTab === "treatments" ? (
+                                /* ── Treatments tab ── */
+                                <div className="space-y-4">
+                                  {history.bookings.length === 0 ? (
+                                    <p className="text-sm text-gray-400 text-center py-4">
+                                      No appointment history
+                                    </p>
+                                  ) : (
+                                    [...history.bookings]
+                                      .sort(
+                                        (a, b) =>
+                                          new Date(
+                                            b.booking.appointment_date as string,
+                                          ).getTime() -
+                                          new Date(
+                                            a.booking.appointment_date as string,
+                                          ).getTime(),
+                                      )
+                                      .map(({ booking, treatments }) => (
+                                        <div
+                                          key={booking.id}
+                                          className="border-2 rounded-sm overflow-hidden"
+                                          style={{ borderColor: "#DCD4CD" }}
+                                        >
+                                          {/* Booking header */}
+                                          <div
+                                            className="flex flex-wrap items-center gap-3 px-4 py-3 border-b"
+                                            style={{
+                                              backgroundColor: "#FEFCFA",
+                                              borderColor: "#DCD4CD",
+                                            }}
+                                          >
+                                            <span
+                                              className="text-sm font-semibold"
+                                              style={{ color: "#3D3935" }}
+                                            >
+                                              {formatDateLabel(booking.appointment_date)}
+                                            </span>
+                                            <span
+                                              className="text-sm text-gray-500"
+                                            >
+                                              {booking.appointment_time}
+                                            </span>
+                                            <span
+                                              className="px-2 py-0.5 text-xs font-semibold"
+                                              style={getBookingStatusStyle(booking.status)}
+                                            >
+                                              {BOOKING_STATUS_LABELS[
+                                                booking.status as BookingStatus
+                                              ] || booking.status}
+                                            </span>
+                                            <span
+                                              className="px-2 py-0.5 text-xs font-semibold"
+                                              style={getPaymentStatusStyle(booking.payment_status)}
+                                            >
+                                              {PAYMENT_STATUS_LABELS[booking.payment_status] ||
+                                                booking.payment_status}
+                                            </span>
+                                            <span
+                                              className="ml-auto text-sm font-bold"
+                                              style={{ color: "#3D3935" }}
+                                            >
+                                              {formatMoney(booking.total_amount)}
+                                            </span>
+                                          </div>
+
+                                          {/* Staff row */}
+                                          <div
+                                            className="px-4 py-2 text-xs flex items-center gap-2 border-b"
+                                            style={{
+                                              borderColor: "#DCD4CD",
+                                              backgroundColor: "#FAF7F5",
+                                              color: "#9CA3AF",
+                                            }}
+                                          >
+                                            <span className="font-medium">Nail Artist:</span>
+                                            <span>Not assigned</span>
+                                          </div>
+
+                                          {/* Treatments */}
+                                          <div className="divide-y" style={{ borderColor: "#DCD4CD" }}>
+                                            {treatments.length === 0 ? (
+                                              <p className="px-4 py-3 text-xs text-gray-400">
+                                                No treatment breakdown recorded
+                                              </p>
+                                            ) : (
+                                              treatments.map((t, ti) => (
+                                                <div key={t.id ?? ti} className="px-4 py-3">
+                                                  <div className="flex items-start justify-between gap-2">
+                                                    <div>
+                                                      <p
+                                                        className="text-sm font-medium"
+                                                        style={{ color: "#3D3935" }}
+                                                      >
+                                                        {t.service_name}
+                                                      </p>
+                                                      <p className="text-xs text-gray-500 mt-0.5">
+                                                        {t.person_name} · {t.duration} min
+                                                      </p>
+                                                    </div>
+                                                    <span
+                                                      className="text-sm font-semibold shrink-0"
+                                                      style={{ color: "#3D3935" }}
+                                                    >
+                                                      {formatMoney(t.price)}
+                                                    </span>
+                                                  </div>
+                                                  {t.addOns && t.addOns.length > 0 && (
+                                                    <div className="mt-2 pl-3 border-l-2 space-y-1" style={{ borderColor: "#E9CFCA" }}>
+                                                      {t.addOns.map((addon, ai) => (
+                                                        <div
+                                                          key={addon.id ?? ai}
+                                                          className="flex items-center justify-between text-xs text-gray-500"
+                                                        >
+                                                          <span>+ {addon.name}</span>
+                                                          <span>{formatMoney(addon.price)}</span>
+                                                        </div>
+                                                      ))}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              ))
+                                            )}
+                                          </div>
+
+                                          {/* Notes */}
+                                          {booking.notes && (
+                                            <div
+                                              className="px-4 py-2 border-t text-xs"
+                                              style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
+                                            >
+                                              <span className="text-gray-400 font-medium">
+                                                Customer note:{" "}
+                                              </span>
+                                              <span style={{ color: "#3D3935" }}>
+                                                {booking.notes}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))
+                                  )}
+                                </div>
+                              ) : (
+                                /* ── Workshops tab ── */
+                                <div className="space-y-4">
+                                  {history.workshops.length === 0 ? (
+                                    <p className="text-sm text-gray-400 text-center py-4">
+                                      No workshop history
+                                    </p>
+                                  ) : (
+                                    [...history.workshops]
+                                      .sort(
+                                        (a, b) =>
+                                          new Date(
+                                            b.booking.created_at || 0,
+                                          ).getTime() -
+                                          new Date(
+                                            a.booking.created_at || 0,
+                                          ).getTime(),
+                                      )
+                                      .map(({ booking: wb, sessions }, wi) => {
+                                        const today = new Date();
+                                        today.setHours(0, 0, 0, 0);
+                                        const doneSessions = sessions.filter(
+                                          (s) => new Date(s.date) < today,
+                                        );
+                                        const title =
+                                          wb.workshops?.title || "Workshop booking";
+
+                                        return (
+                                          <div
+                                            key={wb.id ?? wi}
+                                            className="border-2 rounded-sm overflow-hidden"
+                                            style={{ borderColor: "#DCD4CD" }}
+                                          >
+                                            {/* Workshop header */}
+                                            <div
+                                              className="flex flex-wrap items-center gap-3 px-4 py-3 border-b"
+                                              style={{
+                                                backgroundColor: "#FEFCFA",
+                                                borderColor: "#DCD4CD",
+                                              }}
+                                            >
+                                              <span
+                                                className="text-sm font-semibold"
+                                                style={{ color: "#3D3935" }}
+                                              >
+                                                {title}
+                                              </span>
+                                              {sessions.length > 0 && (
+                                                <span
+                                                  className="text-xs px-2 py-0.5 font-medium"
+                                                  style={{
+                                                    backgroundColor: "#E9CFCA",
+                                                    color: "#3D3935",
+                                                  }}
+                                                >
+                                                  {doneSessions.length} of {sessions.length} sessions done
+                                                </span>
+                                              )}
+                                              {wb.status && (
+                                                <span
+                                                  className="px-2 py-0.5 text-xs font-semibold"
+                                                  style={getBookingStatusStyle(wb.status)}
+                                                >
+                                                  {WORKSHOP_BOOKING_STATUS_LABELS[
+                                                    wb.status as WorkshopBookingStatus
+                                                  ] || wb.status}
+                                                </span>
+                                              )}
+                                              {wb.payment_status && (
+                                                <span
+                                                  className="px-2 py-0.5 text-xs font-semibold"
+                                                  style={getPaymentStatusStyle(wb.payment_status)}
+                                                >
+                                                  {WORKSHOP_PAYMENT_STATUS_LABELS[
+                                                    wb.payment_status as WorkshopPaymentStatus
+                                                  ] || wb.payment_status}
+                                                </span>
+                                              )}
+                                              {wb.workshops?.price != null && (
+                                                <span
+                                                  className="ml-auto text-sm font-bold"
+                                                  style={{ color: "#3D3935" }}
+                                                >
+                                                  {formatMoney(wb.workshops.price)}
+                                                </span>
+                                              )}
+                                            </div>
+
+                                            {/* Session progress */}
+                                            {sessions.length > 0 ? (
+                                              <div className="px-4 py-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                {sessions.map((session, si) => {
+                                                  const sessionDate = new Date(session.date);
+                                                  const isPast = sessionDate < today;
+                                                  return (
+                                                    <div
+                                                      key={session.id ?? si}
+                                                      className="flex items-center gap-2 px-3 py-2 rounded-sm text-xs"
+                                                      style={{
+                                                        backgroundColor: isPast
+                                                          ? "#E9CFCA"
+                                                          : "#FAF7F5",
+                                                        border: `1px solid ${isPast ? "#D0A096" : "#DCD4CD"}`,
+                                                      }}
+                                                    >
+                                                      <span
+                                                        className="font-semibold"
+                                                        style={{
+                                                          color: isPast ? "#3D3935" : "#9CA3AF",
+                                                        }}
+                                                      >
+                                                        S{si + 1}
+                                                      </span>
+                                                      <div>
+                                                        <p
+                                                          className="font-medium"
+                                                          style={{
+                                                            color: isPast ? "#3D3935" : "#6B7280",
+                                                          }}
+                                                        >
+                                                          {sessionDate.toLocaleDateString("en-GB", {
+                                                            day: "numeric",
+                                                            month: "short",
+                                                          })}
+                                                        </p>
+                                                        <p
+                                                          style={{
+                                                            color: isPast ? "#5C4D48" : "#9CA3AF",
+                                                          }}
+                                                        >
+                                                          {isPast ? "Done" : "Upcoming"}
+                                                        </p>
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            ) : (
+                                              <p className="px-4 py-3 text-xs text-gray-400">
+                                                No sessions scheduled yet
+                                              </p>
+                                            )}
+
+                                            {/* Notes */}
+                                            {wb.notes && (
+                                              <div
+                                                className="px-4 py-2 border-t text-xs"
+                                                style={{
+                                                  borderColor: "#DCD4CD",
+                                                  backgroundColor: "#FAF7F5",
+                                                }}
+                                              >
+                                                <span className="text-gray-400 font-medium">
+                                                  Note:{" "}
+                                                </span>
+                                                <span style={{ color: "#3D3935" }}>
+                                                  {wb.notes}
+                                                </span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
+                );
+              })}
             </tbody>
           </table>
         </div>
+        <AdminPagination
+          currentPage={currentPage}
+          pageSize={PAGE_SIZE}
+          totalCount={totalCount}
+          onPageChange={setCurrentPage}
+          isLoading={isLoading}
+        />
       </Card>
 
       {/* Address Modal */}
@@ -1770,16 +2333,16 @@ export function AdminUsers() {
                           opacity: 0.7,
                         }}
                       >
-                        Postcode
+                        Postal Code
                       </label>
                       <Input
                         type="text"
-                        placeholder="N2 0BP"
-                        value={newUserData.postcode}
+                        placeholder="SW1A 1AA"
+                        value={newUserData.postal_code}
                         onChange={(e) =>
                           setNewUserData({
                             ...newUserData,
-                            postcode: e.target.value,
+                            postal_code: e.target.value,
                           })
                         }
                         className="w-full p-3 border-2 focus:outline-none focus:border-gray-400"
@@ -1823,7 +2386,7 @@ export function AdminUsers() {
                   {/* Address Preview */}
                   {(newUserData.houseNumber ||
                     newUserData.street ||
-                    newUserData.postcode ||
+                    newUserData.postal_code ||
                     newUserData.district) && (
                     <div
                       className="mt-4 p-3 rounded border"
@@ -1848,8 +2411,8 @@ export function AdminUsers() {
                         {newUserData.houseNumber &&
                           `${newUserData.houseNumber} `}
                         {newUserData.street}
-                        {newUserData.postcode &&
-                          `, ${newUserData.postcode}`}
+                        {newUserData.postal_code &&
+                          `, ${newUserData.postal_code}`}
                         {newUserData.district &&
                           `, ${newUserData.district}`}
                       </p>

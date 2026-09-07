@@ -271,9 +271,7 @@ export default function WorkshopsDetails({
                     "#3D3935";
                   e.currentTarget.style.borderColor = "#3D3935";
                 }}
-              >
-                Book Your Place
-              </button>
+              >Reserve Your Spot</button>
               <button
                 className="h-12 px-8 py-3 border-2 transition-all"
                 style={{

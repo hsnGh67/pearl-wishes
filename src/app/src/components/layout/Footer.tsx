@@ -18,9 +18,9 @@ export function Footer() {
       style={{ backgroundColor: "#3D3935" }}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 mb-12 gap-x-[80px] gap-y-[48px] gap-x-[53px]">
           {/* About */}
-          <div>
+          <div className="m-[0px]">
             <h3 className="mb-4" style={{ color: "#FEFCFA" }}>
               Pearl Wishes Studio
             </h3>
@@ -82,37 +82,7 @@ export function Footer() {
           </div>
 
           {/* Hours */}
-          <div>
-            <h3 className="mb-4">Business Hours</h3>
-            <div
-              className="space-y-2"
-              style={{ color: "#DCD4CD" }}
-            >
-              <div className="flex items-start gap-3">
-                <Clock
-                  className="w-5 h-5 flex-shrink-0 mt-1"
-                  style={{ color: "#DCD4CD" }}
-                />
-                <div>
-                  {hours.map((hour) => (
-                    <div
-                      key={hour.id}
-                      style={{
-                        background:
-                          "linear-gradient(to right, #FCEAE0, #EACAB8)",
-                        WebkitBackgroundClip: "text",
-                        backgroundClip: "text",
-                        WebkitTextFillColor: "transparent",
-                        color: "transparent",
-                      }}
-                    >
-                      {hour.day}: {hour.time}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+          
         </div>
 
         {/* Social & Copyright */}
@@ -161,7 +131,7 @@ export function Footer() {
               </svg>
             </div>
           </div>
-          <p
+          <p className="text-center"
             style={{
               background:
                 "linear-gradient(to right, #FCEAE0, #EACAB8)",

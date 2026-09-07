@@ -23,7 +23,7 @@ export interface BookingData {
   email: string;
   phone: string;
   address: string;
-  postcode: string;
+  postal_code: string;
   specialRequests: string;
   voucherCode: string;
   discount: number;
@@ -61,7 +61,7 @@ export interface ContactInfo {
   phone: string;
   email: string;
   address: string;
-  postcode: string;
+  postal_code: string;
   city: string;
 }
 

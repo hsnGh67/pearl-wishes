@@ -762,7 +762,7 @@ export function BookingFlow({
             full_name: bookingData.name,
             phone: bookingData.phoneNumber,
             address: `${bookingData.houseNumber} ${bookingData.street}, ${bookingData.district}`,
-            postcode: "N12 0AX", // Default postcode for now
+            postal_code: bookingData.postal_code || undefined,
             district: bookingData.district,
             role: "client",
           });
@@ -824,7 +824,7 @@ export function BookingFlow({
             appointment_date: appointmentDate,
             appointment_time: bookingData.timeSlot,
             address: `${bookingData.houseNumber} ${bookingData.street}`,
-            postcode: "N12 0AX",
+            postal_code: bookingData.postal_code || undefined,
             district: bookingData.district,
             status: BookingStatus.CONFIRMED,
             payment_status: PaymentStatus.PAID,

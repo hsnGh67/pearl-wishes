@@ -1404,9 +1404,14 @@ export function ScheduleWorkshopDrawer({
                       <input
                         type="date"
                         value={firstSessionDate}
-                        min={
-                          new Date().toISOString().split("T")[0]
-                        }
+                        min={(() => {
+                          if (!selectedMonthInfo) return new Date().toISOString().split("T")[0];
+                          const monthStart = new Date(`${selectedMonthInfo.label} 1, ${selectedMonthInfo.year}`);
+                          const today = new Date();
+                          today.setHours(0, 0, 0, 0);
+                          const effective = monthStart > today ? monthStart : today;
+                          return `${effective.getFullYear()}-${String(effective.getMonth() + 1).padStart(2, "0")}-${String(effective.getDate()).padStart(2, "0")}`;
+                        })()}
                         max={maxFirstSessionDate}
                         disabled={!selectedMonth}
                         onChange={(e) =>

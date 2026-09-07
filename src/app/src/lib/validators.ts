@@ -4,7 +4,7 @@
  * Form and data validation utilities
  */
 
-import { isValidEmail, isValidUKPhone, isValidUKPostcode } from './utils';
+import { isValidEmail, isValidUKPhone, isValidPostalCode, normalizePostalCode } from './utils';
 
 export interface ValidationError {
   field: string;
@@ -20,7 +20,7 @@ export interface BookingFormData {
   email: string;
   phone: string;
   address: string;
-  postcode: string;
+  postal_code: string;
   specialRequests?: string;
 }
 
@@ -75,11 +75,11 @@ export function validateBookingForm(data: Partial<BookingFormData>): ValidationE
     errors.push({ field: 'address', message: 'Address is required' });
   }
 
-  // Postcode validation
-  if (!data.postcode?.trim()) {
-    errors.push({ field: 'postcode', message: 'Postcode is required' });
-  } else if (!isValidUKPostcode(data.postcode)) {
-    errors.push({ field: 'postcode', message: 'Please enter a valid UK postcode' });
+  // Postal code validation (UK alphanumeric format)
+  if (!data.postal_code?.trim()) {
+    errors.push({ field: 'postal_code', message: 'Postal code is required' });
+  } else if (!isValidPostalCode(data.postal_code)) {
+    errors.push({ field: 'postal_code', message: 'Invalid postcode format' });
   }
 
   return errors;

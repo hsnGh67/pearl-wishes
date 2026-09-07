@@ -35,7 +35,10 @@ import {
   getBusinessHoursForDate,
   PaymentStatus,
 } from "../../schema/booking.schema";
-import { User as UserType, UserRole } from "../../schema/user.schema";
+import {
+  User as UserType,
+  UserRole,
+} from "../../schema/user.schema";
 import { Service } from "../../schema/service.schema";
 import {
   getAllUsers,
@@ -76,6 +79,7 @@ import {
 import { PromoValidationResult } from "../../schema/promo-code.schema";
 import { useBookingDraft } from "../../hooks/useBookingDraft";
 import { BookingDraftKeys } from "../../lib/booking-draft";
+import { getBusinessSettings } from "../../lib/db/business-settings";
 
 interface AdminBookingFormProps {
   open: boolean;
@@ -137,23 +141,29 @@ export const GAP_MINUTES_PER_SERVICE = 5;
 const generateTimeSlots = (
   totalDurationMinutes: number,
   selectedDate: Date | undefined,
+  gapMinutes = GAP_MINUTES,
 ) => {
   const slots = [];
 
   // Get business hours for the selected date
   const date = selectedDate || new Date();
-  const { startHour: businessOpenHour, endHour: businessCloseHour } =
-    getBusinessHoursForDate(date);
+  const {
+    startHour: businessOpenHour,
+    endHour: businessCloseHour,
+  } = getBusinessHoursForDate(date);
 
-  const totalTimeNeeded = totalDurationMinutes + GAP_MINUTES;
+  // Latest valid start: service must finish by closing time
   const businessCloseMinutes = businessCloseHour * 60;
-  const latestStartMinutes = businessCloseMinutes - totalTimeNeeded;
+  const latestStartMinutes = businessCloseMinutes - totalDurationMinutes;
+
+  // Step = buffer only; overlap with existing bookings is handled by isSlotBlocked
+  const stepMinutes = gapMinutes;
   const businessOpenMinutes = businessOpenHour * 60;
 
   for (
     let timeInMinutes = businessOpenMinutes;
     timeInMinutes <= latestStartMinutes;
-    timeInMinutes += 30
+    timeInMinutes += stepMinutes
   ) {
     const startHour = Math.floor(timeInMinutes / 60);
     const startMinute = timeInMinutes % 60;
@@ -175,12 +185,18 @@ export function AdminBookingForm({
   const [users, setUsers] = useState<UserType[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [districts, setDistricts] = useState([]);
-  const [bookedTimeSlots, setBookedTimeSlots] = useState<BookedTimeSlot[]>([]);
+  const [bookedTimeSlots, setBookedTimeSlots] = useState<
+    BookedTimeSlot[]
+  >([]);
   const [getTimeSlotsState, setGetTimeSlotsState] = useState({
     isLoading: false,
     hasError: false,
   });
-  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [bufferMinutes, setBufferMinutes] = useState(GAP_MINUTES);
+  const [bufferEffectiveFrom, setBufferEffectiveFrom] = useState<string | null>(null);
+  const [previousBufferMinutes, setPreviousBufferMinutes] = useState(GAP_MINUTES);
+  const [selectedUserId, setSelectedUserId] =
+    useState<string>("");
   const [showNewUserForm, setShowNewUserForm] = useState(false);
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const { setDebounce } = useDebounce();
@@ -200,18 +216,25 @@ export function AdminBookingForm({
   });
 
   const [numberOfPeople, setNumberOfPeople] = useState(1);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedDate, setSelectedDate] = useState<
+    Date | undefined
+  >(undefined);
   const [selectedTime, setSelectedTime] = useState("");
-  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>(
-    PaymentStatus.UNPAID,
-  );
+  const [paymentStatus, setPaymentStatus] =
+    useState<PaymentStatus>(PaymentStatus.UNPAID);
   const [totalAmount, setTotalAmount] = useState(0);
   const [notes, setNotes] = useState("");
 
-  const [treatments, setTreatments] = useState<TreatmentSelection[]>([]);
+  const [treatments, setTreatments] = useState<
+    TreatmentSelection[]
+  >([]);
   const [totalDuration, setTotalDuration] = useState(0);
-  const [currentPersonIndex, setCurrentPersonIndex] = useState(0);
-  const [selectedServiceForAddOns, setSelectedServiceForAddOns] = useState<{
+  const [currentPersonIndex, setCurrentPersonIndex] =
+    useState(0);
+  const [
+    selectedServiceForAddOns,
+    setSelectedServiceForAddOns,
+  ] = useState<{
     name: string;
     serviceId: string;
     price: number;
@@ -233,9 +256,8 @@ export function AdminBookingForm({
 
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [promoValidating, setPromoValidating] = useState(false);
-  const [promoResult, setPromoResult] = useState<PromoValidationResult | null>(
-    null,
-  );
+  const [promoResult, setPromoResult] =
+    useState<PromoValidationResult | null>(null);
   const [appliedPromo, setAppliedPromo] = useState<{
     promoCodeId: string;
     code: string;
@@ -280,40 +302,50 @@ export function AdminBookingForm({
     ],
   );
 
-  const { clear: clearAdminDraft } = useBookingDraft<AdminCreateBookingDraft>({
-    storageKey: BookingDraftKeys.adminCreate,
-    enabled: open && isCreateMode,
-    snapshot: adminDraftSnapshot,
-    onHydrate: (draft) => {
-      setCurrentStep(draft.currentStep || "user");
-      setSelectedUserId(draft.selectedUserId || "");
-      setShowNewUserForm(Boolean(draft.showNewUserForm));
-      if (draft.newUser) setNewUser(draft.newUser);
-      if (draft.address) setAddress(draft.address);
-      setNumberOfPeople(draft.numberOfPeople || 1);
-      setSelectedDate(
-        draft.selectedDate instanceof Date
-          ? draft.selectedDate
-          : draft.selectedDate
-            ? new Date(draft.selectedDate as unknown as string)
-            : undefined,
-      );
-      setSelectedTime(draft.selectedTime || "");
-      if (draft.paymentStatus) {
-        setPaymentStatus(draft.paymentStatus);
-      }
-      setNotes(draft.notes || "");
-      setTreatments(draft.treatments || []);
-      setCurrentPersonIndex(draft.currentPersonIndex || 0);
-      setPromoCodeInput(draft.promoCodeInput || "");
-      setAppliedPromo(draft.appliedPromo || null);
-      return true;
-    },
-  });
+  const { clear: clearAdminDraft } =
+    useBookingDraft<AdminCreateBookingDraft>({
+      storageKey: BookingDraftKeys.adminCreate,
+      enabled: open && isCreateMode,
+      snapshot: adminDraftSnapshot,
+      onHydrate: (draft) => {
+        setCurrentStep(draft.currentStep || "user");
+        setSelectedUserId(draft.selectedUserId || "");
+        setShowNewUserForm(Boolean(draft.showNewUserForm));
+        if (draft.newUser) setNewUser(draft.newUser);
+        if (draft.address) setAddress(draft.address);
+        setNumberOfPeople(draft.numberOfPeople || 1);
+        setSelectedDate(
+          draft.selectedDate instanceof Date
+            ? draft.selectedDate
+            : draft.selectedDate
+              ? new Date(
+                  draft.selectedDate as unknown as string,
+                )
+              : undefined,
+        );
+        setSelectedTime(draft.selectedTime || "");
+        if (draft.paymentStatus) {
+          setPaymentStatus(draft.paymentStatus);
+        }
+        setNotes(draft.notes || "");
+        setTreatments(draft.treatments || []);
+        setCurrentPersonIndex(draft.currentPersonIndex || 0);
+        setPromoCodeInput(draft.promoCodeInput || "");
+        setAppliedPromo(draft.appliedPromo || null);
+        return true;
+      },
+    });
 
   useEffect(() => {
     if (open) {
       loadInitialData();
+      getBusinessSettings().then((s) => {
+        if (s) {
+          setBufferMinutes(s.travel_buffer_minutes);
+          setBufferEffectiveFrom(s.buffer_effective_from);
+          setPreviousBufferMinutes(s.previous_travel_buffer_minutes ?? s.travel_buffer_minutes);
+        }
+      });
     }
   }, [open]);
 
@@ -343,7 +375,9 @@ export function AdminBookingForm({
     });
 
     if (selectedUserId && users.length > 0) {
-      const selectedUser = users.find((u) => u.id === selectedUserId);
+      const selectedUser = users.find(
+        (u) => u.id === selectedUserId,
+      );
 
       console.log("👤 Found selected user:", {
         user: selectedUser,
@@ -368,11 +402,12 @@ export function AdminBookingForm({
 
   const loadInitialData = async () => {
     try {
-      const [usersData, servicesData, districtsData] = await Promise.all([
-        getAllUsers(),
-        getAllServices(),
-        getAllDistricts(),
-      ]);
+      const [usersData, servicesData, districtsData] =
+        await Promise.all([
+          getAllUsers(),
+          getAllServices(),
+          getAllDistricts(),
+        ]);
       console.log(
         "💰 Loaded services with prices:",
         servicesData.map((s) => ({
@@ -403,18 +438,25 @@ export function AdminBookingForm({
     setNumberOfPeople(existingBooking.number_of_people || 1);
     setTotalAmount(existingBooking.total_amount);
     setNotes(existingBooking.notes || "");
-    setPaymentStatus(existingBooking.payment_status as PaymentStatus);
+    setPaymentStatus(
+      existingBooking.payment_status as PaymentStatus,
+    );
     setAddress({
       fullAddress: existingBooking.address || "",
       district: existingBooking.district || "",
     });
 
     try {
-      const treatmentsData = await getBookingTreatments(existingBooking.id!);
-      console.log("treatmentsData AAAAAAAAAAAAAAAA ====>", treatmentsData);
+      const treatmentsData = await getBookingTreatments(
+        existingBooking.id!,
+      );
+      console.log(
+        "treatmentsData AAAAAAAAAAAAAAAA ====>",
+        treatmentsData,
+      );
 
-      const treatmentSelections: TreatmentSelection[] = treatmentsData.map(
-        (t, index) => {
+      const treatmentSelections: TreatmentSelection[] =
+        treatmentsData.map((t, index) => {
           return {
             addOns: t.addOns,
             personNumber: index + 1,
@@ -423,8 +465,7 @@ export function AdminBookingForm({
             price: t.price,
             duration: t.duration,
           };
-        },
-      );
+        });
       setTreatments(treatmentSelections);
       originalTreatments.current = treatmentSelections;
     } catch (error) {
@@ -472,15 +513,34 @@ export function AdminBookingForm({
     endB: number,
   ) => startA < endB && startB < endA;
 
+  // Active buffer for selected date: use new setting only on/after effective date
+  const activeBuffer = (() => {
+    if (!selectedDate || !bufferEffectiveFrom) return bufferMinutes;
+    const d = selectedDate;
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return dateStr >= bufferEffectiveFrom ? bufferMinutes : previousBufferMinutes;
+  })();
+
   const isSlotBlocked = (slot: string) => {
     const slotStart = minutesFromTime(slot);
-    const slotEnd = slotStart + (totalDuration || 60) + GAP_MINUTES;
+    const slotEnd =
+      slotStart + (totalDuration || 60) + activeBuffer;
 
-    return bookedTimeSlots.some((bookedSlot: BookedTimeSlot) => {
-      const bookedStart = minutesFromTime(bookedSlot.appointment_time);
-      const bookedEnd = bookedStart + bookedSlot.duration + GAP_MINUTES;
-      return doesTimeRangeOverlap(slotStart, slotEnd, bookedStart, bookedEnd);
-    });
+    return bookedTimeSlots.some(
+      (bookedSlot: BookedTimeSlot) => {
+        const bookedStart = minutesFromTime(
+          bookedSlot.appointment_time,
+        );
+        const bookedEnd =
+          bookedStart + bookedSlot.duration + activeBuffer;
+        return doesTimeRangeOverlap(
+          slotStart,
+          slotEnd,
+          bookedStart,
+          bookedEnd,
+        );
+      },
+    );
   };
 
   useEffect(() => {
@@ -495,15 +555,19 @@ export function AdminBookingForm({
     }, 0);
 
     console.log("treatments =>", treatments);
-    const totalServiceDuration = treatments.reduce((sum, treatment) => {
-      const serviceDuration = Number(treatment.duration);
-      const addOnsDuration =
-        treatment.addOns?.reduce(
-          (addOnSum, addOn) => addOnSum + Number(addOn.duration),
-          0,
-        ) || 0;
-      return sum + serviceDuration + addOnsDuration;
-    }, 0);
+    const totalServiceDuration = treatments.reduce(
+      (sum, treatment) => {
+        const serviceDuration = Number(treatment.duration);
+        const addOnsDuration =
+          treatment.addOns?.reduce(
+            (addOnSum, addOn) =>
+              addOnSum + Number(addOn.duration),
+            0,
+          ) || 0;
+        return sum + serviceDuration + addOnsDuration;
+      },
+      0,
+    );
 
     setTotalDuration(
       totalServiceDuration +
@@ -615,7 +679,8 @@ export function AdminBookingForm({
     }
 
     try {
-      const users = await findUserByNameOrEmailOrPhone(userSearchQuery);
+      const users =
+        await findUserByNameOrEmailOrPhone(userSearchQuery);
       setUsers(users);
     } catch (error) {
       console.error("Failed to find user", error);
@@ -686,14 +751,18 @@ export function AdminBookingForm({
     // Added treatments
     for (const [id, treatment] of newTreatments) {
       if (!originalTreatments.has(id)) {
-        reasons.push(`Added treatment "${treatment.serviceName}"`);
+        reasons.push(
+          `Added treatment "${treatment.serviceName}"`,
+        );
       }
     }
 
     // Removed treatments
     for (const [id, treatment] of originalTreatments) {
       if (!newTreatments.has(id)) {
-        reasons.push(`Removed treatment "${treatment.serviceName}"`);
+        reasons.push(
+          `Removed treatment "${treatment.serviceName}"`,
+        );
       }
     }
 
@@ -708,7 +777,9 @@ export function AdminBookingForm({
         originalTreatment.addOns.map((a) => [a.addonId, a]),
       );
       console.log("second");
-      const newAddons = new Map(newTreatment.addOns.map((a) => [a.addonId, a]));
+      const newAddons = new Map(
+        newTreatment.addOns.map((a) => [a.addonId, a]),
+      );
       console.log("third");
       // Added addons
       for (const [addonId, addon] of newAddons) {
@@ -729,7 +800,9 @@ export function AdminBookingForm({
       }
     }
 
-    return reasons.length ? reasons.join(", ") : "Booking updated";
+    return reasons.length
+      ? reasons.join(", ")
+      : "Booking updated";
   }
 
   const handleSubmit = async () => {
@@ -763,14 +836,23 @@ export function AdminBookingForm({
     console.log("✅ All validations passed");
     setLoading(true);
     let bookingId = null;
-    let treatmentsData: Omit<BookingTreatmentCreate, "booking_id">[] = [];
+    let treatmentsData: Omit<
+      BookingTreatmentCreate,
+      "booking_id"
+    >[] = [];
     try {
       const appointmentDateTime = new Date(selectedDate);
       const [hours, minutes] = selectedTime.split(":");
-      appointmentDateTime.setHours(parseInt(hours), parseInt(minutes));
+      appointmentDateTime.setHours(
+        parseInt(hours),
+        parseInt(minutes),
+      );
 
       if (mode === "reschedule" && existingBooking) {
-        console.log("📝 Rescheduling booking:", existingBooking.id);
+        console.log(
+          "📝 Rescheduling booking:",
+          existingBooking.id,
+        );
         for (const treatment of treatments) {
           const treatmentData = {
             serviceId: treatment.serviceId,
@@ -792,14 +874,18 @@ export function AdminBookingForm({
             notes: notes,
             payment_status: paymentStatus,
           },
-          generateBookingChangeReason(originalTreatments.current, {
-            treatments: treatmentsData,
-          }),
+          generateBookingChangeReason(
+            originalTreatments.current,
+            {
+              treatments: treatmentsData,
+            },
+          ),
         );
         console.log("✅ Booking rescheduled successfully");
       } else {
         const subtotal = totalAmount;
-        const discountAmount = appliedPromo?.discountAmount ?? 0;
+        const discountAmount =
+          appliedPromo?.discountAmount ?? 0;
         const finalTotal = appliedPromo?.finalTotal ?? subtotal;
 
         const bookingData = {
@@ -856,7 +942,10 @@ export function AdminBookingForm({
               finalTotal,
             );
           } catch (promoErr) {
-            console.error("Non-fatal: failed to record promo usage:", promoErr);
+            console.error(
+              "Non-fatal: failed to record promo usage:",
+              promoErr,
+            );
           }
         }
       }
@@ -971,14 +1060,23 @@ export function AdminBookingForm({
     );
   });
 
-  const selectedUser = users.find((u) => u.id === selectedUserId);
-  const timeSlots = generateTimeSlots(totalDuration || 60, selectedDate);
+  const selectedUser = users.find(
+    (u) => u.id === selectedUserId,
+  );
+  const timeSlots = generateTimeSlots(
+    totalDuration || 60,
+    selectedDate,
+    activeBuffer,
+  );
   const addOnServices = services.filter((s) => s.is_add_on);
   const availableTimeSlots = selectedDate
     ? timeSlots.filter((slot) => !isSlotBlocked(slot))
     : timeSlots;
 
-  console.log("Admin BookingForm existingBooking =======>", existingBooking);
+  console.log(
+    "Admin BookingForm existingBooking =======>",
+    existingBooking,
+  );
   return (
     <Dialog
       open={open}
@@ -1014,35 +1112,42 @@ export function AdminBookingForm({
             className="flex items-center justify-between border-b-2 pb-4"
             style={{ borderColor: "#DCD4CD" }}
           >
-            {["user", "treatments", "schedule", "review"].map((step, index) => (
-              <div
-                key={step}
-                className={`flex items-center gap-2 ${currentStep === step ? "opacity-100" : "opacity-50"}`}
-              >
+            {["user", "treatments", "schedule", "review"].map(
+              (step, index) => (
                 <div
-                  className="w-8 h-8 rounded-full flex items-center justify-center border-2"
-                  style={{
-                    backgroundColor:
-                      currentStep === step ? "#E9CFCA" : "transparent",
-                    borderColor: "#3D3935",
-                    color: "#3D3935",
-                  }}
+                  key={step}
+                  className={`flex items-center gap-2 ${currentStep === step ? "opacity-100" : "opacity-50"}`}
                 >
-                  {index + 1}
+                  <div
+                    className="w-8 h-8 rounded-full flex items-center justify-center border-2"
+                    style={{
+                      backgroundColor:
+                        currentStep === step
+                          ? "#E9CFCA"
+                          : "transparent",
+                      borderColor: "#3D3935",
+                      color: "#3D3935",
+                    }}
+                  >
+                    {index + 1}
+                  </div>
+                  <span
+                    className="text-sm font-medium capitalize"
+                    style={{ color: "#3D3935" }}
+                  >
+                    {step}
+                  </span>
                 </div>
-                <span
-                  className="text-sm font-medium capitalize"
-                  style={{ color: "#3D3935" }}
-                >
-                  {step}
-                </span>
-              </div>
-            ))}
+              ),
+            )}
           </div>
 
           {currentStep === "user" && (
             <div className="space-y-4">
-              <h3 className="font-semibold" style={{ color: "#3D3935" }}>
+              <h3
+                className="font-semibold"
+                style={{ color: "#3D3935" }}
+              >
                 Select or Create User
               </h3>
 
@@ -1057,7 +1162,9 @@ export function AdminBookingForm({
                       type="text"
                       placeholder="Search by name, email, or phone..."
                       value={userSearchQuery}
-                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      onChange={(e) =>
+                        setUserSearchQuery(e.target.value)
+                      }
                       className="border-0 focus:ring-0"
                     />
                   </div>
@@ -1067,13 +1174,19 @@ export function AdminBookingForm({
                       <Card
                         key={user.id}
                         className={`p-4 cursor-pointer border-2 transition-colors hover:bg-gray-50 ${
-                          selectedUserId === user.id ? "border-gray-800" : ""
+                          selectedUserId === user.id
+                            ? "border-gray-800"
+                            : ""
                         }`}
                         style={{
                           borderColor:
-                            selectedUserId === user.id ? "#3D3935" : "#DCD4CD",
+                            selectedUserId === user.id
+                              ? "#3D3935"
+                              : "#DCD4CD",
                         }}
-                        onClick={() => setSelectedUserId(user.id!)}
+                        onClick={() =>
+                          setSelectedUserId(user.id!)
+                        }
                       >
                         <div className="flex items-center justify-between">
                           <div>
@@ -1097,7 +1210,11 @@ export function AdminBookingForm({
                                 backgroundColor: "#E9CFCA",
                               }}
                             >
-                              <span style={{ color: "#3D3935" }}>✓</span>
+                              <span
+                                style={{ color: "#3D3935" }}
+                              >
+                                ✓
+                              </span>
                             </div>
                           )}
                         </div>
@@ -1124,12 +1241,17 @@ export function AdminBookingForm({
                   style={{ borderColor: "#DCD4CD" }}
                 >
                   <div className="space-y-4">
-                    <h4 className="font-medium" style={{ color: "#3D3935" }}>
+                    <h4
+                      className="font-medium"
+                      style={{ color: "#3D3935" }}
+                    >
                       New User Details
                     </h4>
 
                     <div>
-                      <Label style={{ color: "#3D3935" }}>Full Name</Label>
+                      <Label style={{ color: "#3D3935" }}>
+                        Full Name
+                      </Label>
                       <Input
                         value={newUser.fullName}
                         onChange={(e) =>
@@ -1145,7 +1267,9 @@ export function AdminBookingForm({
                     </div>
 
                     <div>
-                      <Label style={{ color: "#3D3935" }}>Email</Label>
+                      <Label style={{ color: "#3D3935" }}>
+                        Email
+                      </Label>
                       <Input
                         type="email"
                         value={newUser.email}
@@ -1162,7 +1286,9 @@ export function AdminBookingForm({
                     </div>
 
                     <div>
-                      <Label style={{ color: "#3D3935" }}>Phone</Label>
+                      <Label style={{ color: "#3D3935" }}>
+                        Phone
+                      </Label>
                       <Input
                         value={newUser.phone}
                         onChange={(e) =>
@@ -1178,7 +1304,9 @@ export function AdminBookingForm({
                     </div>
 
                     <div>
-                      <Label style={{ color: "#3D3935" }}>Address</Label>
+                      <Label style={{ color: "#3D3935" }}>
+                        Address
+                      </Label>
                       <Input
                         value={newUser.address}
                         onChange={(e) =>
@@ -1195,7 +1323,9 @@ export function AdminBookingForm({
 
                     <div className="grid grid-cols-2 gap-2">
                       <div>
-                        <Label style={{ color: "#3D3935" }}>District</Label>
+                        <Label style={{ color: "#3D3935" }}>
+                          District
+                        </Label>
                         <Select
                           value={newUser.district}
                           onValueChange={(v) =>
@@ -1244,7 +1374,9 @@ export function AdminBookingForm({
                           borderColor: "#3D3935",
                           color: "#3D3935",
                         }}
-                        onClick={() => setShowNewUserForm(false)}
+                        onClick={() =>
+                          setShowNewUserForm(false)
+                        }
                       >
                         Cancel
                       </Button>
@@ -1272,7 +1404,10 @@ export function AdminBookingForm({
 
           {currentStep === "schedule" && (
             <div className="space-y-4">
-              <h3 className="font-semibold" style={{ color: "#3D3935" }}>
+              <h3
+                className="font-semibold"
+                style={{ color: "#3D3935" }}
+              >
                 Schedule Appointment
               </h3>
 
@@ -1283,22 +1418,33 @@ export function AdminBookingForm({
                   backgroundColor: "#FAF7F5",
                 }}
               >
-                <h4 className="font-medium mb-2" style={{ color: "#3D3935" }}>
+                <h4
+                  className="font-medium mb-2"
+                  style={{ color: "#3D3935" }}
+                >
                   Treatment Summary
                 </h4>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Total Duration:</span>
+                    <span className="text-gray-600">
+                      Total Duration:
+                    </span>
                     <span style={{ color: "#3D3935" }}>
                       {totalDuration} minutes
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Number of People:</span>
-                    <span style={{ color: "#3D3935" }}>{numberOfPeople}</span>
+                    <span className="text-gray-600">
+                      Number of People:
+                    </span>
+                    <span style={{ color: "#3D3935" }}>
+                      {numberOfPeople}
+                    </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Total Amount:</span>
+                    <span className="text-gray-600">
+                      Total Amount:
+                    </span>
                     <span
                       className="font-semibold"
                       style={{ color: "#3D3935" }}
@@ -1325,7 +1471,9 @@ export function AdminBookingForm({
 
               {selectedDate && (
                 <div>
-                  <Label style={{ color: "#3D3935" }}>Select Time Slot</Label>
+                  <Label style={{ color: "#3D3935" }}>
+                    Select Time Slot
+                  </Label>
                   <div className="grid grid-cols-4 gap-2 mt-2 max-h-64 overflow-y-auto p-2">
                     {getTimeSlotsState.isLoading ? (
                       <div className="w-100 rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
@@ -1344,7 +1492,8 @@ export function AdminBookingForm({
                       </div>
                     ) : availableTimeSlots.length === 0 ? (
                       <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-                        No available time slots found for this date.
+                        No available time slots found for this
+                        date.
                       </div>
                     ) : (
                       availableTimeSlots.map((slot) => (
@@ -1355,11 +1504,17 @@ export function AdminBookingForm({
                           className={`border-2 ${selectedTime === slot ? "bg-gray-800 text-white" : ""}`}
                           style={{
                             borderColor:
-                              selectedTime === slot ? "#3D3935" : "#DCD4CD",
+                              selectedTime === slot
+                                ? "#3D3935"
+                                : "#DCD4CD",
                             backgroundColor:
-                              selectedTime === slot ? "#3D3935" : "transparent",
+                              selectedTime === slot
+                                ? "#3D3935"
+                                : "transparent",
                             color:
-                              selectedTime === slot ? "#FEFCFA" : "#3D3935",
+                              selectedTime === slot
+                                ? "#FEFCFA"
+                                : "#3D3935",
                           }}
                           onClick={() => setSelectedTime(slot)}
                         >
@@ -1396,7 +1551,9 @@ export function AdminBookingForm({
                   className="border-2"
                   style={{
                     backgroundColor:
-                      selectedDate && selectedTime ? "#E9CFCA" : "#DCD4CD",
+                      selectedDate && selectedTime
+                        ? "#E9CFCA"
+                        : "#DCD4CD",
                     borderColor: "#3D3935",
                     color: "#3D3935",
                   }}
@@ -1410,7 +1567,10 @@ export function AdminBookingForm({
 
           {currentStep === "treatments" && (
             <div className="space-y-4">
-              <h3 className="font-semibold" style={{ color: "#3D3935" }}>
+              <h3
+                className="font-semibold"
+                style={{ color: "#3D3935" }}
+              >
                 Treatment Selection
               </h3>
 
@@ -1422,16 +1582,25 @@ export function AdminBookingForm({
                     backgroundColor: "#FAF7F5",
                   }}
                 >
-                  <p className="text-sm text-gray-600">Selected User:</p>
-                  <p className="font-medium" style={{ color: "#3D3935" }}>
+                  <p className="text-sm text-gray-600">
+                    Selected User:
+                  </p>
+                  <p
+                    className="font-medium"
+                    style={{ color: "#3D3935" }}
+                  >
                     {selectedUser.full_name}
                   </p>
-                  <p className="text-sm text-gray-600">{selectedUser.email}</p>
+                  <p className="text-sm text-gray-600">
+                    {selectedUser.email}
+                  </p>
                 </Card>
               )}
 
               <div>
-                <Label style={{ color: "#3D3935" }}>Number of People</Label>
+                <Label style={{ color: "#3D3935" }}>
+                  Number of People
+                </Label>
                 <Select
                   value={numberOfPeople.toString()}
                   onValueChange={(v) => {
@@ -1439,7 +1608,9 @@ export function AdminBookingForm({
                     setNumberOfPeople(newNum);
                     if (newNum < numberOfPeople) {
                       setTreatments(
-                        treatments.filter((t) => t.personNumber <= newNum),
+                        treatments.filter(
+                          (t) => t.personNumber <= newNum,
+                        ),
                       );
                     }
                     setCurrentPersonIndex(0);
@@ -1453,7 +1624,10 @@ export function AdminBookingForm({
                   </SelectTrigger>
                   <SelectContent>
                     {[1, 2, 3, 4, 5].map((num) => (
-                      <SelectItem key={num} value={num.toString()}>
+                      <SelectItem
+                        key={num}
+                        value={num.toString()}
+                      >
                         {num} {num === 1 ? "Person" : "People"}
                       </SelectItem>
                     ))}
@@ -1462,9 +1636,12 @@ export function AdminBookingForm({
               </div>
 
               <div className="space-y-3">
-                <h4 className="font-medium" style={{ color: "#3D3935" }}>
-                  Choose Services for Person {currentPersonIndex + 1} of{" "}
-                  {numberOfPeople}
+                <h4
+                  className="font-medium"
+                  style={{ color: "#3D3935" }}
+                >
+                  Choose Services for Person{" "}
+                  {currentPersonIndex + 1} of {numberOfPeople}
                 </h4>
                 <p className="text-sm text-gray-600">
                   Select one or more services for{" "}
@@ -1476,7 +1653,8 @@ export function AdminBookingForm({
 
                 <div className="max-h-[60vh] overflow-y-auto space-y-3">
                   {treatments.filter(
-                    (s) => s.personNumber === currentPersonIndex + 1,
+                    (s) =>
+                      s.personNumber === currentPersonIndex + 1,
                   ).length > 0 && (
                     <Card
                       style={{
@@ -1489,12 +1667,16 @@ export function AdminBookingForm({
                     >
                       <CardContent className="p-4">
                         <div className="flex items-center gap-2 mb-3">
-                          <Check style={{ color: "#3D3935" }} size={18} />
+                          <Check
+                            style={{ color: "#3D3935" }}
+                            size={18}
+                          />
                           <p
                             className="text-sm font-bold"
                             style={{ color: "#3D3935" }}
                           >
-                            Selected for Person {currentPersonIndex + 1}:
+                            Selected for Person{" "}
+                            {currentPersonIndex + 1}:
                           </p>
                         </div>
                         <div className="space-y-2">
@@ -1505,79 +1687,95 @@ export function AdminBookingForm({
                             }))
                             .filter(
                               ({ service }) =>
-                                service.personNumber === currentPersonIndex + 1,
+                                service.personNumber ===
+                                currentPersonIndex + 1,
                             )
-                            .map(({ service, originalIndex }) => {
-                              const serviceTotal =
-                                service.price +
-                                (service.addOns?.reduce(
-                                  (sum, a) => sum + a.price,
-                                  0,
-                                ) || 0);
-                              const serviceDuration =
-                                service.duration +
-                                (service.addOns?.reduce(
-                                  (sum, a) => sum + a.duration,
-                                  0,
-                                ) || 0);
+                            .map(
+                              ({ service, originalIndex }) => {
+                                const serviceTotal =
+                                  service.price +
+                                  (service.addOns?.reduce(
+                                    (sum, a) => sum + a.price,
+                                    0,
+                                  ) || 0);
+                                const serviceDuration =
+                                  service.duration +
+                                  (service.addOns?.reduce(
+                                    (sum, a) =>
+                                      sum + a.duration,
+                                    0,
+                                  ) || 0);
 
-                              return (
-                                <div
-                                  key={originalIndex}
-                                  className="p-3 rounded border"
-                                  style={{
-                                    backgroundColor: "#FEFCFA",
-                                    borderColor: "#DCD4CD",
-                                  }}
-                                >
-                                  <div className="flex justify-between items-center">
-                                    <div className="flex-1">
-                                      <p className="text-sm text-gray-800">
-                                        {service.serviceName}
-                                      </p>
-                                      <p className="text-xs text-gray-500">
-                                        {serviceDuration} min
-                                      </p>
-                                      {service.addOns &&
-                                        service.addOns.length > 0 && (
-                                          <div className="mt-1.5 space-y-0.5">
-                                            {service.addOns.map((addOn, i) => (
-                                              <p
-                                                key={i}
-                                                className="text-xs"
-                                                style={{
-                                                  color: "#3D3935",
-                                                }}
-                                              >
-                                                + {addOn.name} (£
-                                                {addOn.price})
-                                              </p>
-                                            ))}
-                                          </div>
-                                        )}
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                      <span className="text-sm text-gray-800">
-                                        £{serviceTotal}
-                                      </span>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() =>
-                                          handleRemoveService(originalIndex)
-                                        }
-                                        className="h-8 px-2"
-                                        style={{
-                                          color: "#3D3935",
-                                        }}
-                                      >
-                                        Remove
-                                      </Button>
+                                return (
+                                  <div
+                                    key={originalIndex}
+                                    className="p-3 rounded border"
+                                    style={{
+                                      backgroundColor:
+                                        "#FEFCFA",
+                                      borderColor: "#DCD4CD",
+                                    }}
+                                  >
+                                    <div className="flex justify-between items-center">
+                                      <div className="flex-1">
+                                        <p className="text-sm text-gray-800">
+                                          {service.serviceName}
+                                        </p>
+                                        <p className="text-xs text-gray-500">
+                                          {serviceDuration} min
+                                        </p>
+                                        {service.addOns &&
+                                          service.addOns
+                                            .length > 0 && (
+                                            <div className="mt-1.5 space-y-0.5">
+                                              {service.addOns.map(
+                                                (addOn, i) => (
+                                                  <p
+                                                    key={i}
+                                                    className="text-xs"
+                                                    style={{
+                                                      color:
+                                                        "#3D3935",
+                                                    }}
+                                                  >
+                                                    +{" "}
+                                                    {addOn.name}{" "}
+                                                    (£
+                                                    {
+                                                      addOn.price
+                                                    }
+                                                    )
+                                                  </p>
+                                                ),
+                                              )}
+                                            </div>
+                                          )}
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                        <span className="text-sm text-gray-800">
+                                          £{serviceTotal}
+                                        </span>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() =>
+                                            handleRemoveService(
+                                              originalIndex,
+                                            )
+                                          }
+                                          className="h-8 px-2"
+                                          style={{
+                                            color: "#3D3935",
+                                          }}
+                                        >
+                                          Remove
+                                        </Button>
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              },
+                            )}
                         </div>
                       </CardContent>
                     </Card>
@@ -1592,12 +1790,17 @@ export function AdminBookingForm({
                         {services
                           .filter((s) => !s.is_add_on)
                           .map((service) => {
-                            const currentPersonServices = treatments.filter(
-                              (s) => s.personNumber === currentPersonIndex + 1,
-                            );
+                            const currentPersonServices =
+                              treatments.filter(
+                                (s) =>
+                                  s.personNumber ===
+                                  currentPersonIndex + 1,
+                              );
                             const isAlreadySelected =
                               currentPersonServices.some(
-                                (s) => s.serviceName === service.name,
+                                (s) =>
+                                  s.serviceName ===
+                                  service.name,
                               );
 
                             return (
@@ -1611,7 +1814,8 @@ export function AdminBookingForm({
                                 style={
                                   isAlreadySelected
                                     ? {
-                                        backgroundColor: "#FAF7F5",
+                                        backgroundColor:
+                                          "#FAF7F5",
                                       }
                                     : {}
                                 }
@@ -1644,7 +1848,8 @@ export function AdminBookingForm({
                                         <span
                                           className="text-xs px-1.5 py-0.5 rounded"
                                           style={{
-                                            backgroundColor: "#E9CFCA",
+                                            backgroundColor:
+                                              "#E9CFCA",
                                             color: "#3D3935",
                                           }}
                                         >
@@ -1687,7 +1892,8 @@ export function AdminBookingForm({
                               </span>
                             </p>
                             <p className="text-xs text-gray-600 mt-0.5">
-                              Select optional add-ons for this service:
+                              Select optional add-ons for this
+                              service:
                             </p>
                           </div>
 
@@ -1695,9 +1901,10 @@ export function AdminBookingForm({
 
                           <div className="space-y-2 mb-3">
                             {addOnServices.map((addOn) => {
-                              const isSelected = tempAddOns.some(
-                                (a) => a.id === addOn.id,
-                              );
+                              const isSelected =
+                                tempAddOns.some(
+                                  (a) => a.id === addOn.id,
+                                );
 
                               return (
                                 <div
@@ -1710,12 +1917,14 @@ export function AdminBookingForm({
                                   style={
                                     isSelected
                                       ? {
-                                          backgroundColor: "#FAF7F5",
+                                          backgroundColor:
+                                            "#FAF7F5",
                                           boxShadow:
                                             "0 2px 4px rgba(0, 0, 0, 0.1)",
                                         }
                                       : {
-                                          backgroundColor: "#FEFCFA",
+                                          backgroundColor:
+                                            "#FEFCFA",
                                         }
                                   }
                                   onClick={() =>
@@ -1767,7 +1976,9 @@ export function AdminBookingForm({
 
                           <div className="flex gap-2">
                             <Button
-                              onClick={handleAddServiceWithAddOns}
+                              onClick={
+                                handleAddServiceWithAddOns
+                              }
                               className="flex-1 transition-all"
                               style={{
                                 backgroundColor: "#3D3935",
@@ -1808,42 +2019,57 @@ export function AdminBookingForm({
                             Price Summary
                           </h4>
                           <div className="space-y-1 text-sm">
-                            {treatments.map((treatment, idx) => {
-                              const serviceTotal =
-                                treatment.price +
-                                (treatment.addOns?.reduce(
-                                  (sum, a) => sum + a.price,
-                                  0,
-                                ) || 0);
-                              return (
-                                <div key={idx} className="flex justify-between">
-                                  <span className="text-gray-600">
-                                    Person {treatment.personNumber}:{" "}
-                                    {treatment.serviceName}
-                                    {treatment.addOns &&
-                                      treatment.addOns.length > 0 &&
-                                      ` (+${treatment.addOns.length} add-on${treatment.addOns.length > 1 ? "s" : ""})`}
-                                  </span>
-                                  <span
-                                    style={{
-                                      color: "#3D3935",
-                                    }}
+                            {treatments.map(
+                              (treatment, idx) => {
+                                const serviceTotal =
+                                  treatment.price +
+                                  (treatment.addOns?.reduce(
+                                    (sum, a) => sum + a.price,
+                                    0,
+                                  ) || 0);
+                                return (
+                                  <div
+                                    key={idx}
+                                    className="flex justify-between"
                                   >
-                                    £{serviceTotal}
-                                  </span>
-                                </div>
-                              );
-                            })}
+                                    <span className="text-gray-600">
+                                      Person{" "}
+                                      {treatment.personNumber}:{" "}
+                                      {treatment.serviceName}
+                                      {treatment.addOns &&
+                                        treatment.addOns
+                                          .length > 0 &&
+                                        ` (+${treatment.addOns.length} add-on${treatment.addOns.length > 1 ? "s" : ""})`}
+                                    </span>
+                                    <span
+                                      style={{
+                                        color: "#3D3935",
+                                      }}
+                                    >
+                                      £{serviceTotal}
+                                    </span>
+                                  </div>
+                                );
+                              },
+                            )}
                             <Separator className="my-2" />
                             <div className="flex justify-between font-semibold">
-                              <span style={{ color: "#3D3935" }}>Total</span>
-                              <span style={{ color: "#3D3935" }}>
+                              <span
+                                style={{ color: "#3D3935" }}
+                              >
+                                Total
+                              </span>
+                              <span
+                                style={{ color: "#3D3935" }}
+                              >
                                 £{totalAmount}
                               </span>
                             </div>
                             <div className="flex justify-between text-xs text-gray-600">
                               <span>Total Duration</span>
-                              <span>{totalDuration} minutes</span>
+                              <span>
+                                {totalDuration} minutes
+                              </span>
                             </div>
                           </div>
                         </CardContent>
@@ -1855,7 +2081,9 @@ export function AdminBookingForm({
                         variant="outline"
                         onClick={() => {
                           if (currentPersonIndex > 0) {
-                            setCurrentPersonIndex(currentPersonIndex - 1);
+                            setCurrentPersonIndex(
+                              currentPersonIndex - 1,
+                            );
                           } else {
                             setCurrentStep("user");
                           }
@@ -1871,7 +2099,9 @@ export function AdminBookingForm({
                         style={{
                           backgroundColor:
                             treatments.filter(
-                              (s) => s.personNumber === currentPersonIndex + 1,
+                              (s) =>
+                                s.personNumber ===
+                                currentPersonIndex + 1,
                             ).length > 0
                               ? "#E9CFCA"
                               : "#DCD4CD",
@@ -1880,7 +2110,9 @@ export function AdminBookingForm({
                         }}
                         disabled={
                           treatments.filter(
-                            (s) => s.personNumber === currentPersonIndex + 1,
+                            (s) =>
+                              s.personNumber ===
+                              currentPersonIndex + 1,
                           ).length === 0
                         }
                       >
@@ -1897,7 +2129,10 @@ export function AdminBookingForm({
 
           {currentStep === "review" && (
             <div className="space-y-4">
-              <h3 className="font-semibold" style={{ color: "#3D3935" }}>
+              <h3
+                className="font-semibold"
+                style={{ color: "#3D3935" }}
+              >
                 Review & Finalize
               </h3>
 
@@ -1908,28 +2143,42 @@ export function AdminBookingForm({
                   backgroundColor: "#FAF7F5",
                 }}
               >
-                <h4 className="font-medium mb-3" style={{ color: "#3D3935" }}>
+                <h4
+                  className="font-medium mb-3"
+                  style={{ color: "#3D3935" }}
+                >
                   Appointment Summary
                 </h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Client:</span>
+                    <span className="text-gray-600">
+                      Client:
+                    </span>
                     <span style={{ color: "#3D3935" }}>
                       {selectedUser?.full_name}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Date & Time:</span>
+                    <span className="text-gray-600">
+                      Date & Time:
+                    </span>
                     <span style={{ color: "#3D3935" }}>
-                      {selectedDate?.toLocaleDateString()} at {selectedTime}
+                      {selectedDate?.toLocaleDateString()} at{" "}
+                      {selectedTime}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Number of People:</span>
-                    <span style={{ color: "#3D3935" }}>{numberOfPeople}</span>
+                    <span className="text-gray-600">
+                      Number of People:
+                    </span>
+                    <span style={{ color: "#3D3935" }}>
+                      {numberOfPeople}
+                    </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Duration:</span>
+                    <span className="text-gray-600">
+                      Duration:
+                    </span>
                     <span style={{ color: "#3D3935" }}>
                       {totalDuration} minutes
                     </span>
@@ -1940,7 +2189,9 @@ export function AdminBookingForm({
               {/* Promo Code */}
               {mode === "create" && (
                 <div>
-                  <Label style={{ color: "#3D3935" }}>Promo Code</Label>
+                  <Label style={{ color: "#3D3935" }}>
+                    Promo Code
+                  </Label>
                   {appliedPromo ? (
                     <div
                       className="mt-2 flex items-center justify-between px-3 py-2 border-2"
@@ -1957,7 +2208,11 @@ export function AdminBookingForm({
                           {appliedPromo.code}
                         </span>
                         <span className="text-sm text-gray-600">
-                          — £{appliedPromo.discountAmount.toFixed(2)} off
+                          — £
+                          {appliedPromo.discountAmount.toFixed(
+                            2,
+                          )}{" "}
+                          off
                         </span>
                       </div>
                       <button
@@ -1974,18 +2229,24 @@ export function AdminBookingForm({
                         placeholder="Enter promo code"
                         value={promoCodeInput}
                         onChange={(e) => {
-                          setPromoCodeInput(e.target.value.toUpperCase());
+                          setPromoCodeInput(
+                            e.target.value.toUpperCase(),
+                          );
                           setPromoResult(null);
                         }}
                         className="border-2 font-mono"
                         style={{ borderColor: "#DCD4CD" }}
                         onKeyDown={(e) => {
-                          if (e.key === "Enter") handleApplyPromo();
+                          if (e.key === "Enter")
+                            handleApplyPromo();
                         }}
                       />
                       <Button
                         type="button"
-                        disabled={!promoCodeInput.trim() || promoValidating}
+                        disabled={
+                          !promoCodeInput.trim() ||
+                          promoValidating
+                        }
                         className="border-2 whitespace-nowrap"
                         style={{
                           backgroundColor: "#3D3935",
@@ -1994,17 +2255,25 @@ export function AdminBookingForm({
                         }}
                         onClick={handleApplyPromo}
                       >
-                        {promoValidating ? "Checking…" : "Apply"}
+                        {promoValidating
+                          ? "Checking…"
+                          : "Apply"}
                       </Button>
                     </div>
                   )}
                   {promoResult && !promoResult.valid && (
-                    <p className="mt-1 text-xs" style={{ color: "#8B2C2C" }}>
+                    <p
+                      className="mt-1 text-xs"
+                      style={{ color: "#8B2C2C" }}
+                    >
                       {promoResult.error}
                     </p>
                   )}
                   {promoResult && promoResult.valid && (
-                    <p className="mt-1 text-xs" style={{ color: "#2E6B30" }}>
+                    <p
+                      className="mt-1 text-xs"
+                      style={{ color: "#2E6B30" }}
+                    >
                       Code applied! Saving £
                       {promoResult.discountAmount.toFixed(2)}
                     </p>
@@ -2028,7 +2297,9 @@ export function AdminBookingForm({
                 </h4>
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Subtotal</span>
+                    <span className="text-gray-600">
+                      Subtotal
+                    </span>
                     <span style={{ color: "#3D3935" }}>
                       £{totalAmount.toFixed(2)}
                     </span>
@@ -2038,7 +2309,9 @@ export function AdminBookingForm({
                       className="flex justify-between"
                       style={{ color: "#2E6B30" }}
                     >
-                      <span>Discount ({appliedPromo.code})</span>
+                      <span>
+                        Discount ({appliedPromo.code})
+                      </span>
                       <span>
                         −£
                         {appliedPromo.discountAmount.toFixed(2)}
@@ -2047,7 +2320,9 @@ export function AdminBookingForm({
                   )}
                   <Separator className="my-1" />
                   <div className="flex justify-between font-semibold">
-                    <span style={{ color: "#3D3935" }}>Total</span>
+                    <span style={{ color: "#3D3935" }}>
+                      Total
+                    </span>
                     <span style={{ color: "#3D3935" }}>
                       £
                       {(appliedPromo
@@ -2061,9 +2336,12 @@ export function AdminBookingForm({
 
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <Label style={{ color: "#3D3935" }}>Address</Label>
+                  <Label style={{ color: "#3D3935" }}>
+                    Address
+                  </Label>
                   {selectedUserId &&
-                    users.find((u) => u.id === selectedUserId)?.address && (
+                    users.find((u) => u.id === selectedUserId)
+                      ?.address && (
                       <span
                         className="text-xs px-2 py-1"
                         style={{
@@ -2102,7 +2380,10 @@ export function AdminBookingForm({
                     </SelectTrigger>
                     <SelectContent>
                       {districts.map((district) => (
-                        <SelectItem key={district.id} value={district.name}>
+                        <SelectItem
+                          key={district.id}
+                          value={district.name}
+                        >
                           {district.name}
                         </SelectItem>
                       ))}
@@ -2112,10 +2393,14 @@ export function AdminBookingForm({
               </div>
 
               <div>
-                <Label style={{ color: "#3D3935" }}>Payment Status</Label>
+                <Label style={{ color: "#3D3935" }}>
+                  Payment Status
+                </Label>
                 <Select
                   value={paymentStatus}
-                  onValueChange={(v) => setPaymentStatus(v as any)}
+                  onValueChange={(v) =>
+                    setPaymentStatus(v as any)
+                  }
                 >
                   <SelectTrigger
                     className="border-2 mt-2"
@@ -2124,11 +2409,17 @@ export function AdminBookingForm({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={PaymentStatus.PAID}>Paid</SelectItem>
-                    <SelectItem value={PaymentStatus.PARTIALL_PAID}>
+                    <SelectItem value={PaymentStatus.PAID}>
+                      Paid
+                    </SelectItem>
+                    <SelectItem
+                      value={PaymentStatus.PARTIALL_PAID}
+                    >
                       Partially Paid
                     </SelectItem>
-                    <SelectItem value={PaymentStatus.PARTIALL_REFUNDED}>
+                    <SelectItem
+                      value={PaymentStatus.PARTIALL_REFUNDED}
+                    >
                       Partially Refunded
                     </SelectItem>
                     <SelectItem value={PaymentStatus.UNPAID}>
@@ -2142,7 +2433,9 @@ export function AdminBookingForm({
               </div>
 
               <div>
-                <Label style={{ color: "#3D3935" }}>Notes (Optional)</Label>
+                <Label style={{ color: "#3D3935" }}>
+                  Notes (Optional)
+                </Label>
                 <textarea
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}

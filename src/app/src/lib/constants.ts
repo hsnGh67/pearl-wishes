@@ -12,7 +12,7 @@ export const CONTACT_INFO: ContactInfo = {
   phone: "+44 7930 515131",
   email: "info@pearlwishesstudio.com",
   address: "123 King's Road",
-  postcode: "SW3 4PA",
+  postal_code: "SW3 4PA",
   city: "London",
 };
 

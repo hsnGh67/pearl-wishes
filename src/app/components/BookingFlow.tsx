@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +29,6 @@ import { VisuallyHidden } from "./ui/visually-hidden";
 import { Separator } from "./ui/separator";
 import { PhoneAuthForm } from "../src/components/auth/PhoneAuthForm";
 import { useAuth } from "../src/hooks/useAuth";
-import { useBookingDraft } from "../src/hooks/useBookingDraft";
 import {
   isPlaceholderFullName,
   parseAddressFromProfile,
@@ -38,7 +37,6 @@ import {
   COUNTRY_CODES,
   parsePhoneParts,
 } from "../src/lib/constants/country-codes";
-import { BookingDraftKeys } from "../src/lib/booking-draft";
 import { User as AppUser } from "../src/schema/user.schema";
 import {
   getBookedTimesForDate,
@@ -51,7 +49,10 @@ import {
 } from "../src/schema/booking.schema";
 import { createBookingWithTreatments } from "../src/lib/db/booking-with-treatments";
 import { createUser, updateUser } from "../src/lib/db/users";
-import { getActiveServices } from "../src/lib/db/services";
+import {
+  getActiveServices,
+  getServiceAddonMappings,
+} from "../src/lib/db/services";
 import { getAllDistricts } from "../src/lib/db/districts";
 import { formatDate } from "../src/utils/formatDate";
 import {
@@ -71,6 +72,7 @@ import {
   GAP_MINUTES_PER_PEOPLE,
   GAP_MINUTES_PER_SERVICE,
 } from "../src/components/admin/AdminBookingForm";
+import { getBusinessSettings } from "../src/lib/db/business-settings";
 
 interface BookingFlowProps {
   open: boolean;
@@ -96,6 +98,8 @@ interface ServiceBooking {
   name: string;
   price: number;
   duration: number;
+  has_addons?: boolean;
+  mapped_addon_ids?: string[];
   addOns?: Array<{
     name: string;
     price: number;
@@ -111,6 +115,7 @@ interface BookingData {
   district: string;
   street: string;
   houseNumber: string;
+  postal_code: string;
   numberOfPeople: number;
   services: ServiceBooking[];
   servicePrice: number;
@@ -122,35 +127,10 @@ interface BookingData {
   finalPrice: number;
 }
 
-type AppointmentBookingDraft = {
-  step: BookingStep;
-  bookingData: BookingData;
-  appliedVoucherCode: string;
-  currentPersonIndex: number;
-};
-
-const EMPTY_BOOKING_DATA: BookingData = {
-  user_id: "",
-  name: "",
-  countryCode: "uk-44",
-  phoneNumber: "",
-  district: "",
-  street: "",
-  houseNumber: "",
-  numberOfPeople: 1,
-  services: [],
-  servicePrice: 0,
-  totalDuration: 0,
-  date: undefined,
-  timeSlot: "",
-  voucherCode: "",
-  discount: 0,
-  finalPrice: 0,
-};
-
 const generateTimeSlots = (
   totalDurationMinutes: number,
   selectedDate?: Date,
+  gapMinutes = 30,
 ) => {
   const slots = [];
 
@@ -161,23 +141,18 @@ const generateTimeSlots = (
     endHour: businessCloseHour,
   } = getBusinessHoursForDate(date);
 
-  const gapMinutes = 30; // 30 minutes gap after appointment
-
-  // Total time needed including the appointment and gap
-  const totalTimeNeeded = totalDurationMinutes + gapMinutes;
-
-  // Calculate latest possible start time in minutes from midnight
+  // Latest valid start: the appointment must finish by close (buffer handled by isSlotBlocked)
   const businessCloseMinutes = businessCloseHour * 60;
-  const latestStartMinutes =
-    businessCloseMinutes - totalTimeNeeded;
+  const latestStartMinutes = businessCloseMinutes - totalDurationMinutes;
 
-  // Generate slots in 30-minute increments
+  // Step = buffer only — slots are offered every <buffer> minutes; overlap is filtered by isSlotBlocked
+  const stepMinutes = gapMinutes;
   const businessOpenMinutes = businessOpenHour * 60;
 
   for (
     let timeInMinutes = businessOpenMinutes;
     timeInMinutes <= latestStartMinutes;
-    timeInMinutes += 30
+    timeInMinutes += stepMinutes
   ) {
     const startHour = Math.floor(timeInMinutes / 60);
     const startMinute = timeInMinutes % 60;
@@ -199,14 +174,35 @@ export function BookingFlow({
     isLoading: false,
     hasError: false,
   });
+  const [bufferMinutes, setBufferMinutes] = useState(30);
+  const [bufferEffectiveFrom, setBufferEffectiveFrom] = useState<string | null>(null);
+  const [previousBufferMinutes, setPreviousBufferMinutes] = useState(30);
   const [isLoadingPromoCodes, setIsLoadingPromoCodes] =
     useState(false);
   const [activePromoCodes, setActivePromoCodes] = useState<
     PromoCode[]
   >([]);
   const [step, setStep] = useState<BookingStep>("phone");
-  const [bookingData, setBookingData] =
-    useState<BookingData>(EMPTY_BOOKING_DATA);
+  const [bookingData, setBookingData] = useState<BookingData>({
+    user_id: "",
+    name: "",
+    countryCode: "uk-44",
+    phoneNumber: "",
+    district: "",
+    street: "",
+    houseNumber: "",
+    postal_code: "",
+    numberOfPeople: 1,
+    services: [],
+    servicePrice: 0,
+    totalDuration: 0,
+    date: undefined,
+    timeSlot: "",
+    voucherCode: "",
+    discount: 0,
+    finalPrice: 0,
+  });
+  const [postalCodeError, setPostalCodeError] = useState("");
   const [districts, setDistricts] = useState([]);
   const [isLoadingDistricts, setIsLoadingDistricts] =
     useState(false);
@@ -244,6 +240,11 @@ export function BookingFlow({
   const [availableAddons, setAvailableAddons] = useState<
     ServiceBooking[]
   >([]);
+  // filteredAddons: per-service view for the add-on panel.
+  // availableAddons is canonical and is never mutated for filtering.
+  const [filteredAddons, setFilteredAddons] = useState<
+    ServiceBooking[]
+  >([]);
   const [isServicesLoading, setIsServicesLoading] =
     useState(false);
 
@@ -270,58 +271,15 @@ export function BookingFlow({
         district: userProfile.district || "",
         street,
         houseNumber,
+        postal_code: (userProfile as any).postal_code || "",
       }));
     },
     [],
   );
 
-  // Payment & Booking Saving State
-  const [paymentState, setPaymentState] = useState({
-    isSaving: false,
-    error: null as string | null,
-  });
-
-  const appointmentDraftSnapshot = useMemo<AppointmentBookingDraft>(
-    () => ({
-      step,
-      bookingData,
-      appliedVoucherCode,
-      currentPersonIndex,
-    }),
-    [step, bookingData, appliedVoucherCode, currentPersonIndex],
-  );
-
-  const { clear: clearAppointmentDraft, ready: draftReady } =
-    useBookingDraft<AppointmentBookingDraft>({
-      storageKey: BookingDraftKeys.appointment,
-      enabled: open,
-      snapshot: appointmentDraftSnapshot,
-      shouldPersist: (s) => s.step !== "receipt",
-      onHydrate: (draft) => {
-        if (draft.step === "receipt") return false;
-        setStep(draft.step);
-        setBookingData({
-          ...EMPTY_BOOKING_DATA,
-          ...draft.bookingData,
-          date:
-            draft.bookingData?.date instanceof Date
-              ? draft.bookingData.date
-              : draft.bookingData?.date
-                ? new Date(
-                    draft.bookingData.date as unknown as string,
-                  )
-                : undefined,
-        });
-        setAppliedVoucherCode(draft.appliedVoucherCode || "");
-        setCurrentPersonIndex(draft.currentPersonIndex || 0);
-        return true;
-      },
-    });
-
   useEffect(() => {
     if (
       open &&
-      draftReady &&
       isAuthenticated &&
       profile &&
       step === "phone"
@@ -331,19 +289,43 @@ export function BookingFlow({
     }
   }, [
     open,
-    draftReady,
     isAuthenticated,
     profile,
     step,
     prefillFromProfile,
   ]);
 
+  // Fetch business settings once on open so buffer is always fresh
+  useEffect(() => {
+    if (!open) return;
+    getBusinessSettings().then((s) => {
+      if (s) {
+        setBufferMinutes(s.travel_buffer_minutes);
+        setBufferEffectiveFrom(s.buffer_effective_from);
+        setPreviousBufferMinutes(s.previous_travel_buffer_minutes ?? s.travel_buffer_minutes);
+      }
+    });
+  }, [open]);
+
+  // Payment & Booking Saving State
+  const [paymentState, setPaymentState] = useState({
+    isSaving: false,
+    error: null as string | null,
+  });
+
+  // Determine which buffer applies for the currently selected date
+  const activeBuffer = (() => {
+    if (!bookingData.date || !bufferEffectiveFrom) return bufferMinutes;
+    const d = bookingData.date;
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return dateStr >= bufferEffectiveFrom ? bufferMinutes : previousBufferMinutes;
+  })();
+
   const timeSlots = generateTimeSlots(
     bookingData.totalDuration || 60,
     bookingData.date,
+    activeBuffer,
   );
-
-  const GAP_MINUTES = 30;
 
   const minutesFromTime = (time: string) => {
     const [hours, minutes] = time.split(":").map(Number);
@@ -362,7 +344,7 @@ export function BookingFlow({
     const slotEnd =
       slotStart +
       (bookingData.totalDuration || 60) +
-      GAP_MINUTES;
+      activeBuffer;
 
     return bookedTimeSlots.some(
       (bookedSlot: BookedTimeSlot) => {
@@ -370,7 +352,7 @@ export function BookingFlow({
           bookedSlot.appointment_time,
         );
         const bookedEnd =
-          bookedStart + bookedSlot.duration + GAP_MINUTES;
+          bookedStart + bookedSlot.duration + activeBuffer;
         return doesTimeRangeOverlap(
           slotStart,
           slotEnd,
@@ -437,21 +419,26 @@ export function BookingFlow({
   const loadAvailableServices = async () => {
     try {
       setIsServicesLoading(true);
-      const services = await getActiveServices();
+      const [services, addonMappings] = await Promise.all([
+        getActiveServices(),
+        getServiceAddonMappings(),
+      ]);
       const mappedServices: ServiceBooking[] = services
         .filter((s) => !s.is_add_on)
         .map((service) => ({
-          id: service.id,
+          id: service.id!,
           personNumber: 0,
           name: service.name,
           price: service.price,
           duration: service.duration,
+          has_addons: service.has_addons ?? false,
+          mapped_addon_ids: addonMappings[service.id!] ?? [],
           addOns: [],
         }));
       const mappedAddons: ServiceBooking[] = services
         .filter((s) => s.is_add_on)
         .map((service) => ({
-          id: service.id,
+          id: service.id!,
           personNumber: 0,
           name: service.name,
           price: service.price,
@@ -547,36 +534,55 @@ export function BookingFlow({
   };
 
   const handleDistrictSelect = (district: string) => {
-    setBookingData({ ...bookingData, district });
+    setBookingData((prev) => ({ ...prev, district }));
   };
 
   const handleAddressSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Normalize: trim + uppercase, then validate UK postcode format
+    const normalizedPostalCode = bookingData.postal_code.trim().toUpperCase();
+    if (!normalizedPostalCode) {
+      setPostalCodeError("Postcode is required.");
+      return;
+    }
+    if (!/^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/.test(normalizedPostalCode)) {
+      setPostalCodeError("Invalid postcode format.");
+      return;
+    }
+    setPostalCodeError("");
+
     if (
       bookingData.name &&
       bookingData.district &&
       bookingData.street &&
       bookingData.houseNumber
     ) {
-      console.log("tempUser ===>", tempUser);
+      // Store normalized value
+      const updatedBookingData = {
+        ...bookingData,
+        postal_code: normalizedPostalCode,
+      };
+      setBookingData(updatedBookingData);
+
       if (bookingData.user_id) {
         await updateUser({
           id: bookingData.user_id,
           address: `${bookingData.houseNumber} ${bookingData.street}`,
           district: bookingData.district,
+          postal_code: normalizedPostalCode,
         });
       } else if (tempUser) {
-        // Create new user
         setIsAddingNewUser(true);
         const existingUser = await createUser({
           full_name: bookingData.name,
           phone: tempUser.phone,
           address: `${bookingData.houseNumber} ${bookingData.street}`,
           district: bookingData.district,
+          postal_code: normalizedPostalCode,
           role: "client",
         });
         setBookingData({
-          ...bookingData,
+          ...updatedBookingData,
           user_id: existingUser.id,
           name: existingUser.full_name,
         });
@@ -607,20 +613,47 @@ export function BookingFlow({
     setStep("service");
   };
 
-  const handleServiceClick = (
-    serviceId: string,
-    name: string,
-    price: number,
-    duration: number,
-  ) => {
-    // Open add-ons selection for this service
-    setSelectedServiceForAddOns({
-      id: serviceId,
-      name: name,
-      price,
-      duration,
-    });
-    setTempAddOns([]);
+  const handleServiceClick = (service: ServiceBooking) => {
+    const serviceSpecificAddons =
+      service.has_addons && (service.mapped_addon_ids?.length ?? 0) > 0
+        ? availableAddons.filter((a) =>
+            service.mapped_addon_ids!.includes(a.id),
+          )
+        : [];
+
+    if (serviceSpecificAddons.length > 0) {
+      // Populate the panel view — never overwrite canonical availableAddons
+      setFilteredAddons(serviceSpecificAddons);
+      setSelectedServiceForAddOns({
+        id: service.id,
+        name: service.name,
+        price: service.price,
+        duration: service.duration,
+      });
+      setTempAddOns([]);
+    } else {
+      // No mapped add-ons — add service directly without the panel
+      const newService: ServiceBooking = {
+        id: service.id,
+        personNumber: currentPersonIndex + 1,
+        name: service.name,
+        price: service.price,
+        duration: service.duration,
+        addOns: [],
+      };
+      const updatedServices = [...bookingData.services, newService];
+      const { totalPrice, totalDuration } = calculateTotals(
+        updatedServices,
+        bookingData.numberOfPeople,
+      );
+      setBookingData({
+        ...bookingData,
+        services: updatedServices,
+        servicePrice: totalPrice,
+        totalDuration,
+        finalPrice: totalPrice,
+      });
+    }
   };
 
   const handleAddOnToggle = (
@@ -677,9 +710,9 @@ export function BookingFlow({
       finalPrice: totalPrice,
     });
 
-    // Reset add-ons selection
     setSelectedServiceForAddOns(null);
     setTempAddOns([]);
+    setFilteredAddons([]);
   };
 
   const handleAddServiceWithoutAddOns = () => {
@@ -711,9 +744,9 @@ export function BookingFlow({
       finalPrice: totalPrice,
     });
 
-    // Reset add-ons selection
     setSelectedServiceForAddOns(null);
     setTempAddOns([]);
+    setFilteredAddons([]);
   };
 
   const handleCancelAddOns = () => {
@@ -895,6 +928,7 @@ export function BookingFlow({
             appointment_time: bookingData.timeSlot,
             address: `${bookingData.houseNumber} ${bookingData.street}`,
             district: bookingData.district,
+            postal_code: bookingData.postal_code || undefined,
             status: BookingStatus.CONFIRMED,
             payment_status: PaymentStatus.PAID,
             discount_amount: bookingData.discount,
@@ -914,6 +948,7 @@ export function BookingFlow({
         id: bookingData.user_id,
         address: `${bookingData.houseNumber} ${bookingData.street}`,
         district: bookingData.district,
+        postal_code: bookingData.postal_code || undefined,
       });
 
       console.log("✅ Booking saved successfully:", {
@@ -923,7 +958,6 @@ export function BookingFlow({
 
       // Step 3: Generate receipt and show success
       const receipt = `REC-${booking.id.slice(0, 8).toUpperCase()}`;
-      clearAppointmentDraft();
       setReceiptNumber(receipt);
       setPaymentState({ isSaving: false, error: null });
       setStep("receipt");
@@ -940,37 +974,39 @@ export function BookingFlow({
     }
   };
 
-  const softClose = () => {
-    onOpenChange(false);
-  };
-
-  const resetBookingState = () => {
+  const handleClose = () => {
     setStep("phone");
-    setBookingData(EMPTY_BOOKING_DATA);
+    setBookingData({
+      user_id: "",
+      name: "",
+      countryCode: "uk-44",
+      phoneNumber: "",
+      district: "",
+      street: "",
+      houseNumber: "",
+      postal_code: "",
+      numberOfPeople: 1,
+      services: [],
+      servicePrice: 0,
+      totalDuration: 0,
+      date: undefined,
+      timeSlot: "",
+      voucherCode: "",
+      discount: 0,
+      finalPrice: 0,
+    });
+    setPostalCodeError("");
     setCurrentPersonIndex(0);
     setReceiptNumber("");
     setVoucherError("");
     setVoucherSuccess("");
     setAppliedVoucherCode("");
-    setSelectedServiceForAddOns(null);
-    setTempAddOns([]);
-    setPaymentState({ isSaving: false, error: null });
-  };
-
-  const hardResetAndClose = () => {
-    clearAppointmentDraft();
-    resetBookingState();
     onOpenChange(false);
   };
 
   console.log("bookingData ===>", bookingData);
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next) softClose();
-      }}
-    >
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent
         className={`max-h-[90vh] overflow-y-auto ${step === "date" ? "max-w-4xl" : "max-w-2xl"}`}
         style={{ backgroundColor: "#FEFCFA" }}
@@ -1037,19 +1073,13 @@ export function BookingFlow({
                 <Label className="mb-3 block">
                   Select District
                 </Label>
-                {isLoadingDistricts ? (
-                  <div className="flex justify-center py-8">
-                    <span className="text-sm text-gray-500">
-                      ⏳ Loading Districts...
-                    </span>
-                  </div>
-                ) : (
-                  <Dropdown>
+                <Dropdown>
                     <DropdownTrigger asChild>
                       <Button
                         type="button"
                         variant="outline"
                         className="w-full justify-between"
+                        disabled={isLoadingDistricts}
                         style={{
                           backgroundColor: "#FEFCFA",
                           borderColor: "#DCD4CD",
@@ -1058,7 +1088,9 @@ export function BookingFlow({
                       >
                         <span>
                           {bookingData.district ||
-                            "Choose a district"}
+                            (isLoadingDistricts
+                              ? "Loading districts…"
+                              : "Choose a district")}
                         </span>
                         <ChevronDown className="size-4" />
                       </Button>
@@ -1096,7 +1128,6 @@ export function BookingFlow({
                       ))}
                     </DropdownContent>
                   </Dropdown>
-                )}
 
                 <p className="text-xs text-gray-500 mb-4">
                   Service available in central London districts
@@ -1145,6 +1176,33 @@ export function BookingFlow({
                   </div>
                 </div>
 
+                {/* Postal Code */}
+                <div className="space-y-1">
+                  <Label htmlFor="postal_code">Postal Code</Label>
+                  <Input
+                    id="postal_code"
+                    type="text"
+                    placeholder="SW1A 1AA"
+                    value={bookingData.postal_code}
+                    onChange={(e) => {
+                      setPostalCodeError("");
+                      setBookingData({
+                        ...bookingData,
+                        postal_code: e.target.value,
+                      });
+                    }}
+                    required
+                    style={{
+                      borderColor: postalCodeError ? "#E9CFCA" : "#DCD4CD",
+                    }}
+                  />
+                  {postalCodeError && (
+                    <p className="text-xs" style={{ color: "#c0392b" }}>
+                      {postalCodeError}
+                    </p>
+                  )}
+                </div>
+
                 {bookingData.district && (
                   <div
                     className="p-3 rounded border"
@@ -1168,6 +1226,7 @@ export function BookingFlow({
                       {bookingData.houseNumber || "___"}{" "}
                       {bookingData.street || "___"},{" "}
                       {bookingData.district}
+                      {bookingData.postal_code && ` — ${bookingData.postal_code}`}
                     </p>
                   </div>
                 )}
@@ -1245,7 +1304,8 @@ export function BookingFlow({
                       !bookingData.name ||
                       !bookingData.district ||
                       !bookingData.street ||
-                      !bookingData.houseNumber
+                      !bookingData.houseNumber ||
+                      !bookingData.postal_code
                     }
                   >
                     {bookingData.name &&
@@ -1627,12 +1687,7 @@ export function BookingFlow({
                                 !isAlreadySelected &&
                                 !selectedServiceForAddOns
                               ) {
-                                handleServiceClick(
-                                  service.id,
-                                  service.name,
-                                  service.price,
-                                  service.duration,
-                                );
+                                handleServiceClick(service);
                               }
                             }}
                           >
@@ -1678,7 +1733,8 @@ export function BookingFlow({
               )}
 
               {/* Add-Ons Selection for Selected Service */}
-              {selectedServiceForAddOns && (
+              {selectedServiceForAddOns &&
+                filteredAddons.length > 0 && (
                   <div className="pt-3 border-t">
                     <Card
                       style={{
@@ -1695,95 +1751,84 @@ export function BookingFlow({
                             </span>
                           </p>
                           <p className="text-xs text-gray-600 mt-0.5">
-                            {availableAddons.length > 0
-                              ? "Select optional add-ons for this service:"
-                              : "No add-ons available for this service."}
+                            Select optional add-ons for this
+                            service:
                           </p>
                         </div>
 
                         <Separator className="my-3" />
 
-                        {availableAddons.length > 0 ? (
-                          <div className="space-y-2 mb-3">
-                            {availableAddons.map((addOn) => {
-                              const isSelected = tempAddOns.some(
-                                (a) => a.name === addOn.name,
-                              );
+                        <div className="space-y-2 mb-3">
+                          {filteredAddons.map((addOn) => {
+                            const isSelected = tempAddOns.some(
+                              (a) => a.name === addOn.name,
+                            );
 
-                              return (
-                                <div
-                                  key={addOn.name}
-                                  className={`border rounded p-3 cursor-pointer transition-all ${
-                                    isSelected
-                                      ? "border-[#E9CFCA]"
-                                      : "hover:border-[#E9CFCA] border-[#DCD4CD]"
-                                  }`}
-                                  style={
-                                    isSelected
-                                      ? {
-                                          backgroundColor:
-                                            "#FAF7F5",
-                                          boxShadow:
-                                            "0 2px 4px rgba(0, 0, 0, 0.1)",
-                                        }
-                                      : {
-                                          backgroundColor:
-                                            "#FEFCFA",
-                                        }
-                                  }
-                                  onClick={() =>
-                                    handleAddOnToggle(
-                                      addOn.id,
-                                      addOn.name,
-                                      addOn.price,
-                                      addOn.duration,
-                                    )
-                                  }
-                                >
-                                  <div className="flex justify-between items-center gap-4">
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2">
-                                        <span
-                                          className="text-sm"
+                            return (
+                              <div
+                                key={addOn.name}
+                                className={`border rounded p-3 cursor-pointer transition-all ${
+                                  isSelected
+                                    ? "border-[#E9CFCA]"
+                                    : "hover:border-[#E9CFCA] border-[#DCD4CD]"
+                                }`}
+                                style={
+                                  isSelected
+                                    ? {
+                                        backgroundColor:
+                                          "#FAF7F5",
+                                        boxShadow:
+                                          "0 2px 4px rgba(0, 0, 0, 0.1)",
+                                      }
+                                    : {
+                                        backgroundColor:
+                                          "#FEFCFA",
+                                      }
+                                }
+                                onClick={() =>
+                                  handleAddOnToggle(
+                                    addOn.id,
+                                    addOn.name,
+                                    addOn.price,
+                                    addOn.duration,
+                                  )
+                                }
+                              >
+                                <div className="flex justify-between items-center gap-4">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className="text-sm"
+                                        style={{
+                                          color: "#3D3935",
+                                        }}
+                                      >
+                                        {addOn.name}
+                                      </span>
+                                      {isSelected && (
+                                        <Check
+                                          className="h-4 w-4"
                                           style={{
                                             color: "#3D3935",
                                           }}
-                                        >
-                                          {addOn.name}
-                                        </span>
-                                        {isSelected && (
-                                          <Check
-                                            className="h-4 w-4"
-                                            style={{
-                                              color: "#3D3935",
-                                            }}
-                                          />
-                                        )}
-                                      </div>
-                                      <p className="text-xs text-gray-500 mt-0.5">
-                                        {addOn.duration} min
-                                      </p>
+                                        />
+                                      )}
                                     </div>
-                                    <div
-                                      className="text-sm flex-shrink-0"
-                                      style={{ color: "#3D3935" }}
-                                    >
-                                      £{addOn.price}
-                                    </div>
+                                    <p className="text-xs text-gray-500 mt-0.5">
+                                      {addOn.duration} min
+                                    </p>
+                                  </div>
+                                  <div
+                                    className="text-sm flex-shrink-0"
+                                    style={{ color: "#3D3935" }}
+                                  >
+                                    £{addOn.price}
                                   </div>
                                 </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <p
-                            className="text-sm mb-3"
-                            style={{ color: "#3D3935" }}
-                          >
-                            You can add this service without
-                            add-ons.
-                          </p>
-                        )}
+                              </div>
+                            );
+                          })}
+                        </div>
 
                         <div className="flex gap-2">
                           <Button
@@ -3223,7 +3268,7 @@ export function BookingFlow({
               </div>
 
               <Button
-                onClick={hardResetAndClose}
+                onClick={handleClose}
                 className="w-full transition-all"
                 style={{
                   backgroundColor: "#3D3935",

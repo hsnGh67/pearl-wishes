@@ -35,7 +35,7 @@ import {
   deleteWorkshop,
 } from "../../lib/db/workshops";
 import { subscribeToWorkshops } from "../../lib/db/realtime";
-import { supabase } from "../../config/supabase";
+import { ImageUploadField } from "../../components/admin/ImageUploadField";
 
 export function AdminWorkshops() {
   const [isAddingWorkshop, setIsAddingWorkshop] =
@@ -45,8 +45,6 @@ export function AdminWorkshops() {
     useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] =
     useState(false);
-  const [workshopImageFile, setWorkshopImageFile] =
-    useState<File | null>(null);
   const [selectedWorkshop, setSelectedWorkshop] =
     useState<WorkshopDisplay | null>(null);
   const [workshops, setWorkshops] = useState<WorkshopDisplay[]>(
@@ -105,46 +103,8 @@ export function AdminWorkshops() {
     }
   };
 
-  const uploadImageAndGetUrl = async (
-    file: File | null,
-    folder: string,
-  ) => {
-    if (!file) {
-      return "";
-    }
-
-    const sanitizedFilename = file.name.replace(
-      /[^a-zA-Z0-9_.-]/g,
-      "-",
-    );
-    const filePath = `${folder}/${Date.now()}-${sanitizedFilename}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("images")
-      .upload(filePath, file);
-
-    if (uploadError) {
-      console.error("Image upload failed:", uploadError);
-      throw uploadError;
-    }
-
-    const { data: publicUrlData, error: publicUrlError } =
-      supabase.storage.from("images").getPublicUrl(filePath);
-
-    if (publicUrlError) {
-      console.error(
-        "Generating image public URL failed:",
-        publicUrlError,
-      );
-      throw publicUrlError;
-    }
-
-    return publicUrlData.publicUrl;
-  };
-
   const handleEdit = (workshop: WorkshopDisplay) => {
     setSelectedWorkshop(workshop);
-    setWorkshopImageFile(null);
     setFormData({
       title: workshop.title,
       description: workshop.description,
@@ -195,10 +155,6 @@ export function AdminWorkshops() {
     );
     setIsAddingWorkshop(true);
     try {
-      const image_url = await uploadImageAndGetUrl(
-        workshopImageFile,
-        "workshops",
-      );
       const newWorkshop = {
         title: formData.title,
         description: formData.description,
@@ -213,13 +169,12 @@ export function AdminWorkshops() {
         price: formData.price
           ? parseFloat(formData.price)
           : undefined,
-        image_url: image_url || undefined,
+        image_url: formData.image_url || undefined,
         is_active: formData.is_active,
         display_order: formData.display_order,
       };
       await createWorkshop(newWorkshop);
       setIsAddDialogOpen(false);
-      setWorkshopImageFile(null);
       await loadWorkshops();
     } catch (e) {
       console.error("Failed to create workshop:", e);
@@ -756,33 +711,18 @@ export function AdminWorkshops() {
                 </p>
               )}
             </div>
-            <div className="grid gap-2">
-              <label
-                className="text-sm font-medium"
-                style={{ color: "#3D3935" }}
-              >
-                Cover Image
-              </label>
-              <input
-                type="file"
-                accept=".jpeg,.jpg,.png,.webp,image/*"
-                className="flex h-10 w-full rounded-md border px-3 py-2 text-sm"
-                style={{
-                  borderColor: "#DCD4CD",
-                  backgroundColor: "#FEFCFA",
-                }}
-                onChange={(e) =>
-                  setWorkshopImageFile(
-                    e.target.files?.[0] ?? null,
-                  )
-                }
-              />
-              <p className="text-xs text-gray-500">
-                {workshopImageFile
-                  ? `Selected file: ${workshopImageFile.name}`
-                  : "Upload an image for the workshop cover."}
-              </p>
-            </div>
+            <ImageUploadField
+              folder="workshops"
+              value={formData.image_url}
+              onChange={(url) =>
+                setFormData((prev) => ({ ...prev, image_url: url }))
+              }
+              label="Cover Image"
+              hint="Upload an image for the workshop cover."
+              accept=".jpeg,.jpg,.png,.webp,image/*"
+              maxSizeMB={5}
+              disabled={isAddingWorkshop}
+            />
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -1106,35 +1046,17 @@ export function AdminWorkshops() {
                 </p>
               )}
             </div>
-            <div className="grid gap-2">
-              <label
-                className="text-sm font-medium"
-                style={{ color: "#3D3935" }}
-              >
-                Cover Image
-              </label>
-              <input
-                type="file"
-                accept=".jpeg,.jpg,.png,.webp,image/*"
-                className="flex h-10 w-full rounded-md border px-3 py-2 text-sm"
-                style={{
-                  borderColor: "#DCD4CD",
-                  backgroundColor: "#FEFCFA",
-                }}
-                onChange={(e) =>
-                  setWorkshopImageFile(
-                    e.target.files?.[0] ?? null,
-                  )
-                }
-              />
-              <p className="text-xs text-gray-500">
-                {workshopImageFile
-                  ? `Selected file: ${workshopImageFile.name}`
-                  : formData.image_url
-                    ? "Current image kept unless you upload a new one."
-                    : "Upload an image for the workshop cover."}
-              </p>
-            </div>
+            <ImageUploadField
+              folder="workshops"
+              value={formData.image_url}
+              onChange={(url) =>
+                setFormData((prev) => ({ ...prev, image_url: url }))
+              }
+              label="Cover Image"
+              hint={formData.image_url ? "Current image kept unless you upload a new one." : "Upload an image for the workshop cover."}
+              accept=".jpeg,.jpg,.png,.webp,image/*"
+              maxSizeMB={5}
+            />
             <div className="flex items-center gap-2">
               <input
                 type="checkbox"
@@ -1373,12 +1295,6 @@ export function AdminWorkshops() {
                   try {
                     const sessionCount =
                       parseInt(formData.session_count) || 1;
-                    const uploadedImageUrl =
-                      await uploadImageAndGetUrl(
-                        workshopImageFile,
-                        "workshops",
-                      );
-
                     const updatedWorkshop = {
                       title: formData.title,
                       description: formData.description,
@@ -1391,10 +1307,7 @@ export function AdminWorkshops() {
                       price: formData.price
                         ? parseFloat(formData.price)
                         : undefined,
-                      image_url:
-                        uploadedImageUrl ||
-                        formData.image_url ||
-                        undefined,
+                      image_url: formData.image_url || undefined,
                       is_active: formData.is_active,
                       display_order: formData.display_order,
                     };
@@ -1407,7 +1320,6 @@ export function AdminWorkshops() {
                       formData.title || selectedWorkshop.title,
                       tabData,
                     );
-                    setWorkshopImageFile(null);
                     setIsEditDialogOpen(false);
                     await loadWorkshops();
                   } catch (error) {

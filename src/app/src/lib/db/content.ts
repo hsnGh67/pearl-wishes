@@ -416,6 +416,75 @@ export const updateContentSection = async (
 };
 
 /**
+ * Get the single "Our Story" (about) content section
+ */
+export const getOurStorySection = async (): Promise<ContentSection | null> => {
+  try {
+    const { data, error } = await supabase
+      .from("content_sections")
+      .select("*")
+      .eq("section_name", "about")
+      .order("updated_at", { ascending: false })
+      .limit(1);
+    if (error) {
+      dbLogger.error("Failed to fetch our story section", { table: "content_sections", error });
+      throw error;
+    }
+    const row = data?.[0] ?? null;
+    return row ? validateContentSection(row) : null;
+  } catch (error) {
+    dbLogger.error("Error in getOurStorySection", { error });
+    throw error;
+  }
+};
+
+/**
+ * Upsert the "Our Story" (about) content section
+ */
+export const upsertOurStorySection = async (payload: {
+  id?: string;
+  title: string;
+  description?: string;
+  content_url?: string;
+}): Promise<ContentSection> => {
+  try {
+    const base = {
+      section_name: "about" as const,
+      title: payload.title,
+      description: payload.description || undefined,
+      content_url: payload.content_url || undefined,
+      is_active: true,
+    };
+
+    let data, error;
+    if (payload.id) {
+      ({ data, error } = await supabase
+        .from("content_sections")
+        .update(base)
+        .eq("id", payload.id)
+        .select()
+        .single());
+    } else {
+      ({ data, error } = await supabase
+        .from("content_sections")
+        .insert([base])
+        .select()
+        .single());
+    }
+
+    if (error) {
+      dbLogger.error("Failed to upsert our story section", { table: "content_sections", error });
+      throw error;
+    }
+
+    return validateContentSection(data);
+  } catch (error) {
+    dbLogger.error("Error in upsertOurStorySection", { error });
+    throw error;
+  }
+};
+
+/**
  * Delete a content section
  */
 export const deleteContentSection = async (

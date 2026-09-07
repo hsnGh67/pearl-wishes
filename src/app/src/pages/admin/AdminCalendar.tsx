@@ -162,7 +162,7 @@ export function AdminCalendar() {
       }
 
       try {
-        usersData = await getAllUsers();
+        ({ data: usersData } = await getAllUsers());
       } catch (err) {
         // Silently handle - error already logged by dbLogger
       }
@@ -1434,7 +1434,7 @@ function BookingDetailsDialog({
                     {booking.address}
                   </div>
                   <div className="text-sm text-gray-600">
-                    {booking.postcode} • {booking.district}
+                    {booking.postal_code} • {booking.district}
                   </div>
                 </div>
               </div>

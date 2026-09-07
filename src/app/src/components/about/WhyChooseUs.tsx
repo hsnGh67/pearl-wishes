@@ -29,7 +29,7 @@ export function WhyChooseUs() {
   const { items } = useWhyChooseUs();
 
   return (
-    <section className="pt-32 pb-20 bg-[#fef5f5]">
+    <section className="bg-[#fef5f5] px-[0px] py-[80px]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-gray-900 mb-4">Why Choose Us</h2>
@@ -53,7 +53,7 @@ export function WhyChooseUs() {
                 {index % 2 === 1 ? (
                   <>
                     <WhyChooseUsMedia item={item} />
-                    <div className="p-12 flex flex-col justify-center bg-[#efe5e5]">
+                    <div className="p-12 flex flex-col justify-center bg-[#e7cfc2b3]">
                       <h3 className="text-gray-900 mb-4">
                         {item.title}
                       </h3>
@@ -64,7 +64,7 @@ export function WhyChooseUs() {
                   </>
                 ) : (
                   <>
-                    <div className="p-12 flex flex-col justify-center bg-[#efe5e5]">
+                    <div className="p-12 flex flex-col justify-center bg-[#e7cfc2b3]">
                       <h3 className="text-gray-900 mb-4">
                         {item.title}
                       </h3>

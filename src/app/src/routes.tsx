@@ -21,6 +21,8 @@ import { AdminPromoCodes } from "./pages/admin/AdminPromoCodes";
 import { AdminPromoCodeCreate } from "./pages/admin/AdminPromoCodeCreate";
 import { AdminPromoCodeDetails } from "./pages/admin/AdminPromoCodeDetails";
 import TestBookingCreation from "./pages/admin/TestBookingCreation";
+import { AdminMessages } from "./pages/admin/AdminMessages";
+import { AdminSettings } from "./pages/admin/AdminSettings";
 import DatabaseSetup from "./pages/DatabaseSetup";
 import { Login } from "./pages/Login";
 
@@ -83,6 +85,14 @@ export const router = createBrowserRouter([
           {
             path: "test-booking-creation",
             element: <TestBookingCreation />,
+          },
+          {
+            path: "messages",
+            element: <AdminMessages />,
+          },
+          {
+            path: "settings",
+            element: <AdminSettings />,
           },
         ],
       },

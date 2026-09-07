@@ -11,10 +11,13 @@ import {
   FileText,
   LayoutDashboard,
   LogOut,
+  MessageSquare,
   Scissors,
   Sparkles,
   Tag,
+  SlidersHorizontal,
 } from "lucide-react";
+import { Toaster } from "../../../components/ui/sonner";
 import { useAuth } from "../../hooks/useAuth";
 
 export function AdminLayout() {
@@ -55,9 +58,19 @@ export function AdminLayout() {
       icon: Tag,
     },
     {
+      path: "/admin/messages",
+      label: "Messages",
+      icon: MessageSquare,
+    },
+    {
       path: "/admin/content",
       label: "Content Management",
       icon: FileText,
+    },
+    {
+      path: "/admin/settings",
+      label: "Settings",
+      icon: SlidersHorizontal,
     },
   ];
 
@@ -179,6 +192,8 @@ export function AdminLayout() {
       <main className="flex-1 h-screen overflow-y-auto">
         <Outlet />
       </main>
+
+      <Toaster position="bottom-right" richColors />
     </div>
   );
 }

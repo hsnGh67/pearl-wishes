@@ -227,6 +227,7 @@ create table public.workshop_session_participants (
   created_at timestamp with time zone null default now(),
   constraint workshop_session_participants_pkey primary key (id),
   constraint workshop_session_participants_user_id_fkey foreign KEY (user_id) references users (id) on delete CASCADE,
+  constraint workshop_session_participants_workshop_class_id_fkey foreign KEY (workshop_class_id) references workshop_sessions (id) on delete CASCADE,
   constraint workshop_session_participants_workshop_id_fkey foreign KEY (workshop_id) references workshops (id) on delete CASCADE,
   constraint workshop_session_participants_workshop_session_id_fkey foreign KEY (workshop_session_id) references workshop_sessions (id) on delete CASCADE
 ) TABLESPACE pg_default;

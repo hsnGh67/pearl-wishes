@@ -56,6 +56,7 @@ export const ServiceSchema = z.object({
   category_id: z.string(), // Temporarily accept any string to see what values we're getting
   is_active: z.boolean().default(true),
   is_add_on: z.boolean().default(false).optional(),
+  has_addons: z.boolean().default(false).optional(),
   display_order: z.number().int().min(0).optional(),
   image_url: z
     .union([z.string().url(), z.literal("")])

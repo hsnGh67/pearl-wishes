@@ -6,7 +6,8 @@ import {
 } from "lucide-react";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
+import { AdminPagination } from "../../components/admin/AdminPagination";
 import { getAllBookings } from "../../lib/db/bookings";
 import { getAllWorkshopBookings } from "../../lib/db/workshop-bookings";
 import { getAllUsers } from "../../lib/db/users";
@@ -38,6 +39,8 @@ export function AdminPayments() {
     Transaction[]
   >([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 50;
   const [stats, setStats] = useState({
     totalRevenue: 0,
     weekRevenue: 0,
@@ -55,13 +58,13 @@ export function AdminPayments() {
       const [
         bookings,
         workshopBookings,
-        users,
+        { data: users },
         services,
         workshops,
       ] = await Promise.all([
-        getAllBookings(),
-        getAllWorkshopBookings(),
-        getAllUsers(),
+        getAllBookings({ limit: 1000 }),
+        getAllWorkshopBookings({ limit: 1000 }),
+        getAllUsers({ limit: 1000 }),
         getAllServices(),
         getAllWorkshops(),
       ]);
@@ -75,20 +78,24 @@ export function AdminPayments() {
         workshops.map((w) => [w.id, w]),
       );
 
+      const safeDate = (value: string | null | undefined): string => {
+        if (!value) return new Date().toISOString().split("T")[0];
+        const d = new Date(value);
+        return isNaN(d.getTime())
+          ? new Date().toISOString().split("T")[0]
+          : d.toISOString().split("T")[0];
+      };
+
       // Convert bookings to transactions
       const bookingTransactions: Transaction[] = bookings.map(
         (booking) => ({
           id: booking.id || "",
-          date: new Date(booking.appointment_date)
-            .toISOString()
-            .split("T")[0],
+          date: safeDate(booking.appointment_date),
           client:
             userMap.get(booking.user_id)?.full_name ||
             "Unknown",
-          service:
-            serviceMap.get(booking.service_id)?.name ||
-            "Unknown Service",
-          amount: booking.total_price,
+          service: "Service",
+          amount: booking.total_amount,
           status: booking.status,
           method: "Stripe",
           type: "session" as const,
@@ -100,15 +107,13 @@ export function AdminPayments() {
       const workshopTransactions: Transaction[] =
         workshopBookings.map((wb) => ({
           id: wb.id || "",
-          date: new Date(wb.workshop_date)
-            .toISOString()
-            .split("T")[0],
+          date: safeDate(wb.scheduled_date ?? wb.created_at),
           client: wb.participant_name,
           service:
             workshopMap.get(wb.workshop_id)?.title ||
             "Unknown Workshop",
-          amount: wb.total_amount,
-          status: wb.booking_status,
+          amount: workshopMap.get(wb.workshop_id)?.price ?? 0,
+          status: wb.status,
           method: "Stripe",
           type: "workshop" as const,
           paymentStatus: wb.payment_status,
@@ -192,6 +197,11 @@ export function AdminPayments() {
       change: "+22%",
     },
   ];
+
+  const pagedTransactions = useMemo(
+    () => transactions.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE),
+    [transactions, currentPage],
+  );
 
   return (
     <div className="p-8">
@@ -365,7 +375,7 @@ export function AdminPayments() {
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((transaction) => (
+                {pagedTransactions.map((transaction) => (
                   <tr
                     key={transaction.id}
                     className="border-b hover:bg-gray-50"
@@ -451,6 +461,13 @@ export function AdminPayments() {
             </table>
           </div>
         )}
+        <AdminPagination
+          currentPage={currentPage}
+          pageSize={PAGE_SIZE}
+          totalCount={transactions.length}
+          onPageChange={setCurrentPage}
+          isLoading={loading}
+        />
       </Card>
     </div>
   );

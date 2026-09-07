@@ -35,9 +35,11 @@ import {
   deleteLookbook,
   getContentSectionByName,
   getlookbooks,
+  getOurStorySection,
   updateContentSection,
   updateHeroPosition,
   updateLookbooksPosition,
+  upsertOurStorySection,
 } from "../../lib/db/content";
 import {
   getAllDistricts,
@@ -66,6 +68,7 @@ import {
   DEFAULT_AWARD_ITEMS,
 } from "../../schema/awards-certifications.schema";
 import { getAllServices } from "../../lib/db/services";
+import { ImageUploadField } from "../../components/admin/ImageUploadField";
 import { Service } from "../../schema/service.schema";
 import {
   Dropdown,
@@ -180,8 +183,10 @@ const LOOKBOOK_DRAG_TYPE = "LOOKBOOK_IMAGE";
 
 // ── About page types ──────────────────────────────────────────────────────────
 interface AboutMainFields {
+  id?: string;
   title: string;
   description: string;
+  image_url: string;
 }
 interface HourRow {
   id: string;
@@ -573,16 +578,21 @@ export function AdminContent() {
     null,
   );
 
+  const OUR_STORY_FALLBACK_DESCRIPTION =
+    "At Pearl Wishes Studio, we approach nail artistry with intention, care, and respect for individuality. Every service is thoughtfully designed to feel calm, personal, and refined — never rushed, never generic.\n\nOur studio was created for clients who value precision, healthy nails, and timeless beauty. From private appointments to bridal and VIP services, we focus on clean structure, elegant finishes, and an experience that feels considered from start to finish.\n\nWe work exclusively with trusted, high-quality products and refined techniques, prioritising nail health and long-lasting results. Based in London, Pearl Wishes Studio also offers select mobile appointments, delivering the same level of care wherever you are.";
+
   const [aboutMain, setAboutMain] = useState<AboutMainFields>({
-    title: "About Pearl Wishes Studio",
-    description:
-      "Pearl Wishes Studio is London's premier mobile nail care service, bringing luxury treatments directly to your door. Founded with a passion for exceptional nail artistry and client convenience, we combine professional-grade products with personalised care.",
+    title: "Our Story",
+    description: OUR_STORY_FALLBACK_DESCRIPTION,
+    image_url: "",
   });
   const [aboutMainDraft, setAboutMainDraft] =
     useState<AboutMainFields>({
       title: "",
       description: "",
+      image_url: "",
     });
+  const [isSavingAboutMain, setIsSavingAboutMain] = useState(false);
 
   const [whyItems, setWhyItems] = useState<WhyCard[]>(
     DEFAULT_WHY_ITEMS,
@@ -809,6 +819,22 @@ export function AdminContent() {
     }
   };
 
+  const fetchOurStory = async () => {
+    try {
+      const data = await getOurStorySection();
+      if (data) {
+        setAboutMain({
+          id: data.id,
+          title: data.title || "Our Story",
+          description: data.description || OUR_STORY_FALLBACK_DESCRIPTION,
+          image_url: data.content_url || "",
+        });
+      }
+    } catch {
+      // silently fall back to defaults
+    }
+  };
+
   useEffect(() => {
     getTestimonialSection();
     getHeroSection();
@@ -819,6 +845,7 @@ export function AdminContent() {
     getContactSection();
     getWhyChooseUsSection();
     getAwardsSection();
+    fetchOurStory();
   }, []);
 
   useEffect(() => {
@@ -2909,7 +2936,7 @@ export function AdminContent() {
     </div>
   );
 
-  // ── About page: 1 · Main About ─────────────────────────────────────────────
+  // ── About page: 1 · Our Story ─────────────────────────────────────────────
   const renderAboutMainCard = () => {
     const isEditing = editingAboutCard === "about-main";
     const inputCls =
@@ -2919,6 +2946,34 @@ export function AdminContent() {
       backgroundColor: "#FAF7F5",
       color: "#3D3935",
     };
+
+    const handleSaveOurStory = async () => {
+      if (!aboutMainDraft.title || aboutMainDraft.title.trim().length < 2) {
+        return;
+      }
+      setIsSavingAboutMain(true);
+      try {
+        const saved = await upsertOurStorySection({
+          id: aboutMainDraft.id,
+          title: aboutMainDraft.title.trim(),
+          description: aboutMainDraft.description || undefined,
+          content_url: aboutMainDraft.image_url || undefined,
+        });
+        setAboutMain({
+          id: saved.id,
+          title: saved.title,
+          description: saved.description || "",
+          image_url: saved.content_url || "",
+        });
+        setEditingAboutCard(null);
+        flashAboutSaved("about-main");
+      } catch {
+        // leave edit mode open so the user can retry
+      } finally {
+        setIsSavingAboutMain(false);
+      }
+    };
+
     return (
       <div
         className="p-4 border-2 rounded-md"
@@ -2929,24 +2984,23 @@ export function AdminContent() {
       >
         {aboutCardHeader(
           "about-main",
-          "Main About",
+          "Our Story",
           () => {
             setEditingAboutCard("about-main");
             setAboutMainDraft({ ...aboutMain });
           },
-          () => {
-            setAboutMain({ ...aboutMainDraft });
-            setEditingAboutCard(null);
-            flashAboutSaved("about-main");
-          },
+          handleSaveOurStory,
+          undefined,
+          isSavingAboutMain,
         )}
-        <div className="space-y-3 text-sm">
+        <div className="space-y-4 text-sm">
+          {/* Title */}
           <div>
             <label
               className="font-medium block mb-1"
               style={{ color: "#3D3935" }}
             >
-              Title
+              Story Heading
             </label>
             {isEditing ? (
               <input
@@ -2960,47 +3014,99 @@ export function AdminContent() {
                 }
                 className={inputCls}
                 style={inputStyle}
-                placeholder="e.g. About Pearl Wishes Studio"
+                placeholder="e.g. Our Story"
+                maxLength={200}
               />
             ) : (
               <p className="text-gray-600 mt-1">
                 {aboutMain.title || (
-                  <span className="italic text-gray-400">
-                    No title set
-                  </span>
+                  <span className="italic text-gray-400">No heading set</span>
                 )}
               </p>
             )}
           </div>
+
+          {/* Body copy */}
           <div>
             <label
               className="font-medium block mb-1"
               style={{ color: "#3D3935" }}
             >
-              Description
+              Story Body
             </label>
             {isEditing ? (
-              <textarea
-                value={aboutMainDraft.description}
-                rows={5}
-                onChange={(e) =>
-                  setAboutMainDraft((p) => ({
-                    ...p,
-                    description: e.target.value,
-                  }))
+              <>
+                <textarea
+                  value={aboutMainDraft.description}
+                  rows={8}
+                  maxLength={1000}
+                  onChange={(e) =>
+                    setAboutMainDraft((p) => ({
+                      ...p,
+                      description: e.target.value,
+                    }))
+                  }
+                  className={inputCls + " resize-none"}
+                  style={inputStyle}
+                  placeholder="Write your story here. Separate paragraphs with a blank line."
+                />
+                <p
+                  className="text-xs mt-1"
+                  style={{ color: "#9ca3af" }}
+                >
+                  {aboutMainDraft.description.length}/1000 · Separate paragraphs with a blank line
+                </p>
+              </>
+            ) : (
+              <div className="text-gray-600 mt-1 leading-relaxed space-y-2">
+                {aboutMain.description ? (
+                  aboutMain.description
+                    .split(/\n\n+/)
+                    .filter(Boolean)
+                    .map((para, i) => <p key={i}>{para}</p>)
+                ) : (
+                  <span className="italic text-gray-400">No body copy set</span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Image */}
+          <div>
+            <label
+              className="font-medium block mb-1"
+              style={{ color: "#3D3935" }}
+            >
+              Story Image
+            </label>
+            {isEditing ? (
+              <ImageUploadField
+                folder="about"
+                value={aboutMainDraft.image_url}
+                onChange={(url) =>
+                  setAboutMainDraft((p) => ({ ...p, image_url: url }))
                 }
-                className={inputCls + " resize-none"}
-                style={inputStyle}
-                placeholder="Describe your studio, values, and mission..."
+                onRemove={() =>
+                  setAboutMainDraft((p) => ({ ...p, image_url: "" }))
+                }
+                accept=".png,.jpg,.jpeg,.webp"
+                maxSizeMB={5}
+                hint="Recommended: square crop · max 5 MB · PNG, JPEG, WebP"
+              />
+            ) : aboutMain.image_url ? (
+              <img
+                src={aboutMain.image_url}
+                alt="Our Story"
+                className="w-32 h-32 object-cover rounded border-2"
+                style={{ borderColor: "#DCD4CD" }}
               />
             ) : (
-              <p className="text-gray-600 mt-1 leading-relaxed">
-                {aboutMain.description || (
-                  <span className="italic text-gray-400">
-                    No description set
-                  </span>
-                )}
-              </p>
+              <div
+                className="w-32 h-32 rounded border-2 flex items-center justify-center"
+                style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
+              >
+                <span className="text-xs text-gray-400">No image</span>
+              </div>
             )}
           </div>
         </div>
@@ -3209,25 +3315,7 @@ export function AdminContent() {
                         </>
                       )}
                     </button>
-                    <input
-                      type="text"
-                      value={item.icon}
-                      maxLength={2}
-                      onChange={(e) =>
-                        updateItem(
-                          item.id,
-                          "icon",
-                          e.target.value,
-                        )
-                      }
-                      className="w-16 text-center px-1 py-1 border rounded text-sm outline-none"
-                      style={{
-                        borderColor: "#DCD4CD",
-                        backgroundColor: "#FEFCFA",
-                        color: "#3D3935",
-                      }}
-                      placeholder="Icon"
-                    />
+                    
                   </div>
                   {/* Text fields */}
                   <div className="flex-1 space-y-2">

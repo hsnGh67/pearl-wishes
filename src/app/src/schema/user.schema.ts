@@ -61,7 +61,7 @@ export const UserSchema = z.object({
     .nullable()
     .optional()
     .transform((val) => val || ""),
-  postcode: z
+  postal_code: z
     .string()
     .max(10)
     .nullable()
