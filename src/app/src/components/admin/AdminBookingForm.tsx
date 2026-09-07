@@ -402,12 +402,15 @@ export function AdminBookingForm({
 
   const loadInitialData = async () => {
     try {
-      const [usersData, servicesData, districtsData] =
-        await Promise.all([
-          getAllUsers(),
-          getAllServices(),
-          getAllDistricts(),
-        ]);
+      const [
+        { data: usersData },
+        servicesData,
+        districtsData,
+      ] = await Promise.all([
+        getAllUsers({ limit: 1000 }),
+        getAllServices(),
+        getAllDistricts(),
+      ]);
       console.log(
         "💰 Loaded services with prices:",
         servicesData.map((s) => ({

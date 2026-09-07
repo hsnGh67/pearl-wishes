@@ -144,9 +144,9 @@ export function AdminCalendar() {
     ScheduledRun[]
   >([]);
 
-  const loadData = async () => {
+  const loadData = async ({ silent = false } = {}) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
 
       let bookingsData: Booking[] = [];
       let usersData: UserType[] = [];
@@ -212,7 +212,7 @@ export function AdminCalendar() {
     } catch (error) {
       // Silently handle - error already logged by dbLogger
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -855,7 +855,7 @@ export function AdminCalendar() {
         }}
         workshops={workshops}
         workshopBookings={workshopBookings}
-        onScheduleCreated={(sessions, workshop) => {
+        onScheduleCreated={async (sessions, workshop) => {
           const capMatch =
             workshop.class_type?.match(/(\d+)\s*student/i);
           setScheduledRuns((prev) => [
@@ -869,6 +869,7 @@ export function AdminCalendar() {
                 : 3,
             },
           ]);
+          await loadData({ silent: true });
         }}
       />
 
