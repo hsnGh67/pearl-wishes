@@ -54,6 +54,11 @@ import {
   getServiceAddonMappings,
 } from "../src/lib/db/services";
 import { getAllDistricts } from "../src/lib/db/districts";
+import { isPostcodeInServiceArea } from "../src/lib/db/districts-postcodes";
+import {
+  isValidPostalCode,
+  normalizePostalCode,
+} from "../src/lib/utils";
 import { formatDate } from "../src/utils/formatDate";
 import {
   getWorkshopSessionsByDate,
@@ -539,14 +544,24 @@ export function BookingFlow({
 
   const handleAddressSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Normalize: trim + uppercase, then validate UK postcode format
-    const normalizedPostalCode = bookingData.postal_code.trim().toUpperCase();
+    const normalizedPostalCode = normalizePostalCode(
+      bookingData.postal_code,
+    );
     if (!normalizedPostalCode) {
       setPostalCodeError("Postcode is required.");
       return;
     }
-    if (!/^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/.test(normalizedPostalCode)) {
+    if (!isValidPostalCode(normalizedPostalCode)) {
       setPostalCodeError("Invalid postcode format.");
+      return;
+    }
+
+    const inServiceArea =
+      await isPostcodeInServiceArea(normalizedPostalCode);
+    if (!inServiceArea) {
+      setPostalCodeError(
+        "Sorry, we don't currently serve this postcode area.",
+      );
       return;
     }
     setPostalCodeError("");

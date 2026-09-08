@@ -11,6 +11,7 @@ export * from "./booking.schema";
 export * from "./booking-treatment.schema";
 export * from "./content.schema";
 export * from "./district.schema";
+export * from "./district-postcode.schema";
 export * from "./workshop.schema";
 export * from "./workshop-booking.schema";
 export * from "./why-choose-us.schema";

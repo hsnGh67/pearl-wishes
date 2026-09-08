@@ -14,6 +14,7 @@ export * from "./studio-contact";
 export * from "./why-choose-us";
 export * from "./awards-certifications";
 export * from "./districts";
+export * from "./districts-postcodes";
 export * from "./workshops";
 export * from "./workshop-bookings";
 export * from "./logger";

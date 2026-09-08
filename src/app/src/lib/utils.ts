@@ -61,6 +61,17 @@ export function isValidPostalCode(raw: string): boolean {
 }
 
 /**
+ * Extract the UK outward code (area + district) from a postcode.
+ * Strips spaces and returns everything except the last 3 inward-code characters.
+ * e.g. "NW7 1AA" → "NW7", "N12 5AB" → "N12"
+ */
+export function getPostcodeOutwardCode(raw: string): string | null {
+  const compact = normalizePostalCode(raw).replace(/\s+/g, "");
+  if (compact.length < 5) return null;
+  return compact.slice(0, -3);
+}
+
+/**
  * Validate UK phone number
  */
 export function isValidUKPhone(phone: string): boolean {
