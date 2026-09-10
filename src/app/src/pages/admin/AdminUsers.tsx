@@ -14,6 +14,7 @@ import {
   History,
   ChevronDown,
   ChevronUp,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "../../config/supabase";
 import { Card } from "../../components/ui/card";
@@ -21,13 +22,20 @@ import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import {
   getAllUsers,
-  createUser,
+  updateUser,
   deleteUser as dbDeleteUser,
   addUserNote,
   updateUserNote,
   deleteUserNote,
 } from "../../lib/db/users";
-import { User, UserRole, Note } from "../../schema/user.schema";
+import { adminCreateUser } from "../../lib/db/admin-create-user";
+import {
+  User,
+  UserRole,
+  Note,
+  USER_ROLE_LABELS,
+  ASSIGNABLE_USER_ROLES,
+} from "../../schema/user.schema";
 import {
   Booking,
   BookingStatus,
@@ -172,6 +180,7 @@ export function AdminUsers() {
     useState("");
   const [showAddUserModal, setShowAddUserModal] =
     useState(false);
+  const [isAddingUser, setIsAddingUser] = useState(false);
   const [filterWorkshopUsers, setFilterWorkshopUsers] =
     useState(false);
   const [dateFrom, setDateFrom] = useState("");
@@ -187,7 +196,11 @@ export function AdminUsers() {
     street: "",
     postal_code: "",
     district: "",
+    role: UserRole.CLIENT as (typeof ASSIGNABLE_USER_ROLES)[number],
   });
+  const [updatingRoleUserId, setUpdatingRoleUserId] = useState<
+    string | null
+  >(null);
 
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -230,6 +243,7 @@ export function AdminUsers() {
   }, [searchTerm, filterWorkshopUsers]);
 
   const handleCloseAddUserModal = () => {
+    if (isAddingUser) return;
     setShowAddUserModal(false);
     // Reset form data when modal is closed
     setNewUserData({
@@ -240,7 +254,31 @@ export function AdminUsers() {
       street: "",
       postal_code: "",
       district: "",
+      role: UserRole.CLIENT,
     });
+  };
+
+  const handleChangeUserRole = async (
+    user: User,
+    nextRole: (typeof ASSIGNABLE_USER_ROLES)[number],
+  ) => {
+    if (!user.id || user.role === nextRole) return;
+    if (user.role === UserRole.ADMIN) return;
+
+    try {
+      setUpdatingRoleUserId(user.id);
+      const updated = await updateUser({ id: user.id, role: nextRole });
+      setUsers((prevUsers) =>
+        prevUsers.map((u) =>
+          u.id === updated.id ? { ...u, role: updated.role } : u,
+        ),
+      );
+    } catch (error) {
+      console.error("Failed to update user role:", error);
+      alert("Failed to update user role. Please try again.");
+    } finally {
+      setUpdatingRoleUserId(null);
+    }
   };
 
   const handleAddNote = async () => {
@@ -346,6 +384,7 @@ export function AdminUsers() {
   };
 
   const handleAddUser = async () => {
+    if (isAddingUser) return;
     if (
       !newUserData.fullName.trim() ||
       !newUserData.email.trim() ||
@@ -365,34 +404,41 @@ export function AdminUsers() {
       return;
     }
 
+    const fullAddress =
+      `${newUserData.houseNumber} ${newUserData.street}`.trim();
+    const normalizedPostalCode = newUserData.postal_code.trim().toUpperCase();
+
+    if (normalizedPostalCode && !/^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/.test(normalizedPostalCode)) {
+      alert("Invalid postcode format (e.g. SW1A 1AA).");
+      return;
+    }
+
+    setIsAddingUser(true);
     try {
-      const fullAddress =
-        `${newUserData.houseNumber} ${newUserData.street}`.trim();
-      const normalizedPostalCode = newUserData.postal_code.trim().toUpperCase();
-
-      if (normalizedPostalCode && !/^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/.test(normalizedPostalCode)) {
-        alert("Invalid postcode format (e.g. SW1A 1AA).");
-        return;
-      }
-
-      const createdUser = await createUser({
+      const createdUser = await adminCreateUser({
         full_name: newUserData.fullName,
         email: newUserData.email,
         phone: newUserData.phone,
         address: fullAddress,
         postal_code: normalizedPostalCode || undefined,
         district: newUserData.district,
-        role: UserRole.CLIENT,
+        role: newUserData.role,
       });
 
       // Add the new user to the state
       setUsers((prevUsers) => [createdUser, ...prevUsers]);
 
       // Close the modal
+      setIsAddingUser(false);
       handleCloseAddUserModal();
     } catch (error) {
       console.error("Failed to create user:", error);
-      alert("Failed to create user. Please try again.");
+      const message =
+        error instanceof Error && error.message
+          ? error.message
+          : "Failed to create user. Please try again.";
+      alert(message);
+      setIsAddingUser(false);
     }
   };
 
@@ -666,6 +712,12 @@ export function AdminUsers() {
                   className="text-left p-4"
                   style={{ color: "#3D3935" }}
                 >
+                  Role
+                </th>
+                <th
+                  className="text-left p-4"
+                  style={{ color: "#3D3935" }}
+                >
                   Contact
                 </th>
                 <th
@@ -733,6 +785,44 @@ export function AdminUsers() {
                         >
                           {user.full_name}
                         </p>
+                      </td>
+                      <td className="p-4">
+                        {user.role === UserRole.ADMIN ? (
+                          <span
+                            className="text-sm font-medium"
+                            style={{ color: "#3D3935" }}
+                          >
+                            {USER_ROLE_LABELS[UserRole.ADMIN]}
+                          </span>
+                        ) : (
+                          <select
+                            value={
+                              user.role === UserRole.ARTIST
+                                ? UserRole.ARTIST
+                                : UserRole.CLIENT
+                            }
+                            disabled={updatingRoleUserId === user.id}
+                            onChange={(e) =>
+                              handleChangeUserRole(
+                                user,
+                                e.target.value as (typeof ASSIGNABLE_USER_ROLES)[number],
+                              )
+                            }
+                            className="p-2 border-2 text-sm focus:outline-none focus:border-gray-400 disabled:opacity-60"
+                            style={{
+                              borderColor: "#DCD4CD",
+                              color: "#3D3935",
+                              backgroundColor: "#FEFCFA",
+                            }}
+                            aria-label={`Role for ${user.full_name}`}
+                          >
+                            {ASSIGNABLE_USER_ROLES.map((role) => (
+                              <option key={role} value={role}>
+                                {USER_ROLE_LABELS[role]}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </td>
                       <td className="p-4">
                         <div className="space-y-1">
@@ -864,7 +954,7 @@ export function AdminUsers() {
                         key={`${user.id}-history`}
                         style={{ backgroundColor: "#FAF7F5" }}
                       >
-                        <td colSpan={9} className="p-0">
+                        <td colSpan={10} className="p-0">
                           <div
                             className="border-b-2"
                             style={{ borderColor: "#DCD4CD" }}
@@ -2226,31 +2316,62 @@ export function AdminUsers() {
                   </div>
                 </div>
 
-                {/* Phone */}
-                <div>
-                  <label
-                    className="block text-sm mb-2 font-medium"
-                    style={{ color: "#3D3935" }}
-                  >
-                    Phone
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="e.g. 020 7946 1234"
-                    value={newUserData.phone}
-                    onChange={(e) =>
-                      setNewUserData({
-                        ...newUserData,
-                        phone: e.target.value,
-                      })
-                    }
-                    className="w-full p-3 border-2 focus:outline-none focus:border-gray-400"
-                    style={{
-                      borderColor: "#DCD4CD",
-                      color: "#3D3935",
-                      backgroundColor: "#FEFCFA",
-                    }}
-                  />
+                {/* Phone and Role */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label
+                      className="block text-sm mb-2 font-medium"
+                      style={{ color: "#3D3935" }}
+                    >
+                      Phone
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="e.g. 020 7946 1234"
+                      value={newUserData.phone}
+                      onChange={(e) =>
+                        setNewUserData({
+                          ...newUserData,
+                          phone: e.target.value,
+                        })
+                      }
+                      className="w-full p-3 border-2 focus:outline-none focus:border-gray-400"
+                      style={{
+                        borderColor: "#DCD4CD",
+                        color: "#3D3935",
+                        backgroundColor: "#FEFCFA",
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label
+                      className="block text-sm mb-2 font-medium"
+                      style={{ color: "#3D3935" }}
+                    >
+                      Role
+                    </label>
+                    <select
+                      value={newUserData.role}
+                      onChange={(e) =>
+                        setNewUserData({
+                          ...newUserData,
+                          role: e.target.value as (typeof ASSIGNABLE_USER_ROLES)[number],
+                        })
+                      }
+                      className="w-full p-3 border-2 focus:outline-none focus:border-gray-400"
+                      style={{
+                        borderColor: "#DCD4CD",
+                        color: "#3D3935",
+                        backgroundColor: "#FEFCFA",
+                      }}
+                    >
+                      {ASSIGNABLE_USER_ROLES.map((role) => (
+                        <option key={role} value={role}>
+                          {USER_ROLE_LABELS[role]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Address Section */}
@@ -2423,15 +2544,23 @@ export function AdminUsers() {
                 {/* Submit Button */}
                 <div className="flex justify-end pt-4">
                   <Button
-                    className="border-2 px-6"
+                    className="border-2 px-6 disabled:opacity-60 disabled:cursor-not-allowed"
                     style={{
                       backgroundColor: "#E9CFCA",
                       borderColor: "#3D3935",
                       color: "#3D3935",
                     }}
                     onClick={handleAddUser}
+                    disabled={isAddingUser}
                   >
-                    Add User
+                    {isAddingUser ? (
+                      <span className="inline-flex items-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Adding…
+                      </span>
+                    ) : (
+                      "Add User"
+                    )}
                   </Button>
                 </div>
               </div>

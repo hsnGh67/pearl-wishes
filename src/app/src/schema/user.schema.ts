@@ -21,7 +21,7 @@ export type Note = z.infer<typeof NoteSchema>;
 export enum UserRole {
   ADMIN = "admin",
   CLIENT = "client",
-  TECHNICIAN = "technician",
+  ARTIST = "artist",
 }
 
 /**
@@ -30,8 +30,14 @@ export enum UserRole {
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
   [UserRole.ADMIN]: "Administrator",
   [UserRole.CLIENT]: "Client",
-  [UserRole.TECHNICIAN]: "Technician",
+  [UserRole.ARTIST]: "Artist",
 };
+
+/** Roles an admin may assign from the Users tab (never admin). */
+export const ASSIGNABLE_USER_ROLES = [
+  UserRole.CLIENT,
+  UserRole.ARTIST,
+] as const;
 
 /**
  * Zod Schema for User Validation

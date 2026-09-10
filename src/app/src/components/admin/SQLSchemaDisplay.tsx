@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   full_name TEXT NOT NULL,
   phone TEXT,
-  role TEXT NOT NULL DEFAULT 'client' CHECK (role IN ('client', 'admin')),
+  role TEXT NOT NULL DEFAULT 'client' CHECK (role IN ('client', 'admin', 'artist')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
