@@ -148,7 +148,8 @@ const generateTimeSlots = (
 
   // Latest valid start: the appointment must finish by close (buffer handled by isSlotBlocked)
   const businessCloseMinutes = businessCloseHour * 60;
-  const latestStartMinutes = businessCloseMinutes - totalDurationMinutes;
+  const latestStartMinutes =
+    businessCloseMinutes - totalDurationMinutes;
 
   // Step = buffer only — slots are offered every <buffer> minutes; overlap is filtered by isSlotBlocked
   const stepMinutes = gapMinutes;
@@ -180,8 +181,10 @@ export function BookingFlow({
     hasError: false,
   });
   const [bufferMinutes, setBufferMinutes] = useState(30);
-  const [bufferEffectiveFrom, setBufferEffectiveFrom] = useState<string | null>(null);
-  const [previousBufferMinutes, setPreviousBufferMinutes] = useState(30);
+  const [bufferEffectiveFrom, setBufferEffectiveFrom] =
+    useState<string | null>(null);
+  const [previousBufferMinutes, setPreviousBufferMinutes] =
+    useState(30);
   const [isLoadingPromoCodes, setIsLoadingPromoCodes] =
     useState(false);
   const [activePromoCodes, setActivePromoCodes] = useState<
@@ -307,7 +310,10 @@ export function BookingFlow({
       if (s) {
         setBufferMinutes(s.travel_buffer_minutes);
         setBufferEffectiveFrom(s.buffer_effective_from);
-        setPreviousBufferMinutes(s.previous_travel_buffer_minutes ?? s.travel_buffer_minutes);
+        setPreviousBufferMinutes(
+          s.previous_travel_buffer_minutes ??
+            s.travel_buffer_minutes,
+        );
       }
     });
   }, [open]);
@@ -320,10 +326,13 @@ export function BookingFlow({
 
   // Determine which buffer applies for the currently selected date
   const activeBuffer = (() => {
-    if (!bookingData.date || !bufferEffectiveFrom) return bufferMinutes;
+    if (!bookingData.date || !bufferEffectiveFrom)
+      return bufferMinutes;
     const d = bookingData.date;
     const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    return dateStr >= bufferEffectiveFrom ? bufferMinutes : previousBufferMinutes;
+    return dateStr >= bufferEffectiveFrom
+      ? bufferMinutes
+      : previousBufferMinutes;
   })();
 
   const timeSlots = generateTimeSlots(
@@ -556,8 +565,9 @@ export function BookingFlow({
       return;
     }
 
-    const inServiceArea =
-      await isPostcodeInServiceArea(normalizedPostalCode);
+    const inServiceArea = await isPostcodeInServiceArea(
+      normalizedPostalCode,
+    );
     if (!inServiceArea) {
       setPostalCodeError(
         "Sorry, we don't currently serve this postcode area.",
@@ -630,7 +640,8 @@ export function BookingFlow({
 
   const handleServiceClick = (service: ServiceBooking) => {
     const serviceSpecificAddons =
-      service.has_addons && (service.mapped_addon_ids?.length ?? 0) > 0
+      service.has_addons &&
+      (service.mapped_addon_ids?.length ?? 0) > 0
         ? availableAddons.filter((a) =>
             service.mapped_addon_ids!.includes(a.id),
           )
@@ -656,7 +667,10 @@ export function BookingFlow({
         duration: service.duration,
         addOns: [],
       };
-      const updatedServices = [...bookingData.services, newService];
+      const updatedServices = [
+        ...bookingData.services,
+        newService,
+      ];
       const { totalPrice, totalDuration } = calculateTotals(
         updatedServices,
         bookingData.numberOfPeople,
@@ -1089,60 +1103,59 @@ export function BookingFlow({
                   Select District
                 </Label>
                 <Dropdown>
-                    <DropdownTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="w-full justify-between"
-                        disabled={isLoadingDistricts}
+                  <DropdownTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full justify-between"
+                      disabled={isLoadingDistricts}
+                      style={{
+                        backgroundColor: "#FEFCFA",
+                        borderColor: "#DCD4CD",
+                        color: "#3D3935",
+                      }}
+                    >
+                      <span>
+                        {bookingData.district ||
+                          (isLoadingDistricts
+                            ? "Loading districts…"
+                            : "Choose a district")}
+                      </span>
+                      <ChevronDown className="size-4" />
+                    </Button>
+                  </DropdownTrigger>
+                  <DropdownContent className="w-full min-w-[12rem] bg-white border border-gray-200 p-1">
+                    {districts.map((district) => (
+                      <DropdownItem
+                        key={district.id}
+                        disabled={district.is_coming_soon}
+                        onSelect={() =>
+                          !district.is_coming_soon &&
+                          handleDistrictSelect(district.name)
+                        }
+                        className={`flex items-center justify-between gap-2 rounded-sm px-3 py-2 text-sm transition-all ${
+                          bookingData.district === district.name
+                            ? "bg-[#EADDD5] text-[#3D3935]"
+                            : "text-[#3D3935] hover:bg-[#F4E8E1]"
+                        } ${!district.is_coming_soon ? "" : "opacity-50 cursor-not-allowed"}`}
                         style={{
-                          backgroundColor: "#FEFCFA",
-                          borderColor: "#DCD4CD",
-                          color: "#3D3935",
-                        }}
-                      >
-                        <span>
-                          {bookingData.district ||
-                            (isLoadingDistricts
-                              ? "Loading districts…"
-                              : "Choose a district")}
-                        </span>
-                        <ChevronDown className="size-4" />
-                      </Button>
-                    </DropdownTrigger>
-                    <DropdownContent className="w-full min-w-[12rem] bg-white border border-gray-200 p-1">
-                      {districts.map((district) => (
-                        <DropdownItem
-                          key={district.id}
-                          disabled={district.is_coming_soon}
-                          onSelect={() =>
-                            !district.is_coming_soon &&
-                            handleDistrictSelect(district.name)
-                          }
-                          className={`flex items-center justify-between gap-2 rounded-sm px-3 py-2 text-sm transition-all ${
+                          backgroundColor:
                             bookingData.district ===
                             district.name
-                              ? "bg-[#EADDD5] text-[#3D3935]"
-                              : "text-[#3D3935] hover:bg-[#F4E8E1]"
-                          } ${!district.is_coming_soon ? "" : "opacity-50 cursor-not-allowed"}`}
-                          style={{
-                            backgroundColor:
-                              bookingData.district ===
-                              district.name
-                                ? "#EADDD5"
-                                : undefined,
-                          }}
-                        >
-                          <span>{district.name}</span>
-                          {district.is_coming_soon && (
-                            <span className="text-xs text-gray-500">
-                              Unavailable
-                            </span>
-                          )}
-                        </DropdownItem>
-                      ))}
-                    </DropdownContent>
-                  </Dropdown>
+                              ? "#EADDD5"
+                              : undefined,
+                        }}
+                      >
+                        <span>{district.name}</span>
+                        {district.is_coming_soon && (
+                          <span className="text-xs text-gray-500">
+                            Unavailable
+                          </span>
+                        )}
+                      </DropdownItem>
+                    ))}
+                  </DropdownContent>
+                </Dropdown>
 
                 <p className="text-xs text-gray-500 mb-4">
                   Service available in central London districts
@@ -1193,7 +1206,9 @@ export function BookingFlow({
 
                 {/* Postal Code */}
                 <div className="space-y-1">
-                  <Label htmlFor="postal_code">Postal Code</Label>
+                  <Label htmlFor="postal_code">
+                    Postal Code
+                  </Label>
                   <Input
                     id="postal_code"
                     type="text"
@@ -1208,11 +1223,16 @@ export function BookingFlow({
                     }}
                     required
                     style={{
-                      borderColor: postalCodeError ? "#E9CFCA" : "#DCD4CD",
+                      borderColor: postalCodeError
+                        ? "#E9CFCA"
+                        : "#DCD4CD",
                     }}
                   />
                   {postalCodeError && (
-                    <p className="text-xs" style={{ color: "#c0392b" }}>
+                    <p
+                      className="text-xs"
+                      style={{ color: "#c0392b" }}
+                    >
                       {postalCodeError}
                     </p>
                   )}
@@ -1241,7 +1261,8 @@ export function BookingFlow({
                       {bookingData.houseNumber || "___"}{" "}
                       {bookingData.street || "___"},{" "}
                       {bookingData.district}
-                      {bookingData.postal_code && ` — ${bookingData.postal_code}`}
+                      {bookingData.postal_code &&
+                        ` — ${bookingData.postal_code}`}
                     </p>
                   </div>
                 )}

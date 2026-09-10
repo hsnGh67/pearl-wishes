@@ -1,6 +1,6 @@
 /**
  * Utility Functions
- * 
+ *
  * Common utility functions used throughout the application
  */
 
@@ -25,10 +25,10 @@ export function formatPrice(price: number): string {
  * Format date to UK format
  */
 export function formatDate(date: Date): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
   }).format(date);
 }
 
@@ -36,12 +36,12 @@ export function formatDate(date: Date): string {
  * Format date and time to UK format
  */
 export function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat('en-GB', {
-    day: '2-digit',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   }).format(date);
 }
 
@@ -57,7 +57,9 @@ export function normalizePostalCode(raw: string): string {
  * Accepts formats such as SW1A 1AA, EC1A 1BB, W1A 0AX, M1 1AE, B1 1BB.
  */
 export function isValidPostalCode(raw: string): boolean {
-  return /^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/.test(normalizePostalCode(raw));
+  return /^[A-Z]{1,2}\d[A-Z\d]? ?\d[A-Z]{2}$/.test(
+    normalizePostalCode(raw),
+  );
 }
 
 /**
@@ -65,7 +67,9 @@ export function isValidPostalCode(raw: string): boolean {
  * Strips spaces and returns everything except the last 3 inward-code characters.
  * e.g. "NW7 1AA" → "NW7", "N12 5AB" → "N12"
  */
-export function getPostcodeOutwardCode(raw: string): string | null {
+export function getPostcodeOutwardCode(
+  raw: string,
+): string | null {
   const compact = normalizePostalCode(raw).replace(/\s+/g, "");
   if (compact.length < 5) return null;
   return compact.slice(0, -3);
@@ -75,7 +79,8 @@ export function getPostcodeOutwardCode(raw: string): string | null {
  * Validate UK phone number
  */
 export function isValidUKPhone(phone: string): boolean {
-  const phoneRegex = /^(\+44\s?7\d{3}|\(?07\d{3}\)?)\s?\d{3}\s?\d{3}$/;
+  const phoneRegex =
+    /^(\+44\s?7\d{3}|\(?07\d{3}\)?)\s?\d{3}\s?\d{3}$/;
   return phoneRegex.test(phone.trim());
 }
 
@@ -100,9 +105,9 @@ export function generateId(): string {
 export function calculateDiscount(
   price: number,
   discount: number,
-  type: 'percentage' | 'fixed'
+  type: "percentage" | "fixed",
 ): number {
-  if (type === 'percentage') {
+  if (type === "percentage") {
     return (price * discount) / 100;
   }
   return discount;
@@ -114,7 +119,7 @@ export function calculateDiscount(
 export function scrollToElement(elementId: string): void {
   const element = document.getElementById(elementId);
   if (element) {
-    element.scrollIntoView({ behavior: 'smooth' });
+    element.scrollIntoView({ behavior: "smooth" });
   }
 }
 
@@ -123,16 +128,16 @@ export function scrollToElement(elementId: string): void {
  */
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
-  wait: number
+  wait: number,
 ): (...args: Parameters<T>) => void {
   let timeout: NodeJS.Timeout | null = null;
-  
+
   return function executedFunction(...args: Parameters<T>) {
     const later = () => {
       timeout = null;
       func(...args);
     };
-    
+
     if (timeout) {
       clearTimeout(timeout);
     }
@@ -145,10 +150,10 @@ export function debounce<T extends (...args: any[]) => any>(
  */
 export function throttle<T extends (...args: any[]) => any>(
   func: T,
-  limit: number
+  limit: number,
 ): (...args: Parameters<T>) => void {
   let inThrottle: boolean;
-  
+
   return function executedFunction(...args: Parameters<T>) {
     if (!inThrottle) {
       func(...args);

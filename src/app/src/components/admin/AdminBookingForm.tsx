@@ -154,7 +154,8 @@ const generateTimeSlots = (
 
   // Latest valid start: service must finish by closing time
   const businessCloseMinutes = businessCloseHour * 60;
-  const latestStartMinutes = businessCloseMinutes - totalDurationMinutes;
+  const latestStartMinutes =
+    businessCloseMinutes - totalDurationMinutes;
 
   // Step = buffer only; overlap with existing bookings is handled by isSlotBlocked
   const stepMinutes = gapMinutes;
@@ -192,9 +193,12 @@ export function AdminBookingForm({
     isLoading: false,
     hasError: false,
   });
-  const [bufferMinutes, setBufferMinutes] = useState(GAP_MINUTES);
-  const [bufferEffectiveFrom, setBufferEffectiveFrom] = useState<string | null>(null);
-  const [previousBufferMinutes, setPreviousBufferMinutes] = useState(GAP_MINUTES);
+  const [bufferMinutes, setBufferMinutes] =
+    useState(GAP_MINUTES);
+  const [bufferEffectiveFrom, setBufferEffectiveFrom] =
+    useState<string | null>(null);
+  const [previousBufferMinutes, setPreviousBufferMinutes] =
+    useState(GAP_MINUTES);
   const [selectedUserId, setSelectedUserId] =
     useState<string>("");
   const [showNewUserForm, setShowNewUserForm] = useState(false);
@@ -343,7 +347,10 @@ export function AdminBookingForm({
         if (s) {
           setBufferMinutes(s.travel_buffer_minutes);
           setBufferEffectiveFrom(s.buffer_effective_from);
-          setPreviousBufferMinutes(s.previous_travel_buffer_minutes ?? s.travel_buffer_minutes);
+          setPreviousBufferMinutes(
+            s.previous_travel_buffer_minutes ??
+              s.travel_buffer_minutes,
+          );
         }
       });
     }
@@ -402,15 +409,12 @@ export function AdminBookingForm({
 
   const loadInitialData = async () => {
     try {
-      const [
-        { data: usersData },
-        servicesData,
-        districtsData,
-      ] = await Promise.all([
-        getAllUsers({ limit: 1000 }),
-        getAllServices(),
-        getAllDistricts(),
-      ]);
+      const [{ data: usersData }, servicesData, districtsData] =
+        await Promise.all([
+          getAllUsers({ limit: 1000 }),
+          getAllServices(),
+          getAllDistricts(),
+        ]);
       console.log(
         "💰 Loaded services with prices:",
         servicesData.map((s) => ({
@@ -518,10 +522,13 @@ export function AdminBookingForm({
 
   // Active buffer for selected date: use new setting only on/after effective date
   const activeBuffer = (() => {
-    if (!selectedDate || !bufferEffectiveFrom) return bufferMinutes;
+    if (!selectedDate || !bufferEffectiveFrom)
+      return bufferMinutes;
     const d = selectedDate;
     const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    return dateStr >= bufferEffectiveFrom ? bufferMinutes : previousBufferMinutes;
+    return dateStr >= bufferEffectiveFrom
+      ? bufferMinutes
+      : previousBufferMinutes;
   })();
 
   const isSlotBlocked = (slot: string) => {

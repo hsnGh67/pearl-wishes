@@ -608,7 +608,7 @@ export function AdminCalendar() {
               className="font-semibold text-sm"
               style={{ color: "#3D3935" }}
             >
-              Status    
+              Status
             </h3>
             <div className="flex items-center gap-6 mx-[232px] my-[0px]">
               <div className="flex items-center gap-2">
