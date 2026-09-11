@@ -1,4 +1,8 @@
-import { supabase, supabaseUrl, supabaseAnonKey } from "../../config/supabase";
+import {
+  supabase,
+  supabaseUrl,
+  supabaseAnonKey,
+} from "../../config/supabase";
 import {
   User,
   UserRole,
@@ -41,8 +45,14 @@ export class AdminCreateUserError extends Error {
 export const adminCreateUser = async (
   input: AdminCreateUserInput,
 ): Promise<User> => {
-  if (input.role !== UserRole.CLIENT && input.role !== UserRole.ARTIST) {
-    throw new AdminCreateUserError("role must be client or artist", 400);
+  if (
+    input.role !== UserRole.CLIENT &&
+    input.role !== UserRole.ARTIST
+  ) {
+    throw new AdminCreateUserError(
+      "role must be client or artist",
+      400,
+    );
   }
 
   const {

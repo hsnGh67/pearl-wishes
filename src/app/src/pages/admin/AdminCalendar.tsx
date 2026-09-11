@@ -99,9 +99,17 @@ const getStatusDotColor = (status?: string) => {
   return "#34D399"; // green
 };
 
+const NAIL_ARTISTS = [
+  { id: "sara", name: "Sara Rossi" },
+  { id: "mia", name: "Mia Chen" },
+  { id: "jade", name: "Jade Williams" },
+  { id: "leah", name: "Leah Park" },
+];
+
 export function AdminCalendar() {
   const [viewType, setViewType] = useState<ViewType>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedArtist, setSelectedArtist] = useState<string>("arezoo");
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [users, setUsers] = useState<UserType[]>([]);
   const [services, setServices] = useState<Service[]>([]);
@@ -754,6 +762,35 @@ export function AdminCalendar() {
         </div>
       </Card>
 
+      {/* Artist Chip Selector */}
+      <div className="flex items-center gap-2 mb-6 flex-wrap">
+        <button
+          onClick={() => setSelectedArtist("arezoo")}
+          className="px-4 py-1.5 text-sm font-medium border-2 transition-colors"
+          style={{
+            borderColor: selectedArtist === "arezoo" ? "#3D3935" : "#DCD4CD",
+            backgroundColor: selectedArtist === "arezoo" ? "#3D3935" : "#FEFCFA",
+            color: selectedArtist === "arezoo" ? "#FEFCFA" : "#3D3935",
+          }}
+        >
+          Arezoo
+        </button>
+        {NAIL_ARTISTS.map((artist) => (
+          <button
+            key={artist.id}
+            onClick={() => setSelectedArtist(artist.id)}
+            className="px-4 py-1.5 text-sm font-medium border-2 transition-colors"
+            style={{
+              borderColor: selectedArtist === artist.id ? "#3D3935" : "#DCD4CD",
+              backgroundColor: selectedArtist === artist.id ? "#E9CFCA" : "#FEFCFA",
+              color: "#3D3935",
+            }}
+          >
+            {artist.name}
+          </button>
+        ))}
+      </div>
+
       {/* Calendar Views */}
       {viewType === "day" && (
         <DayView
@@ -767,6 +804,7 @@ export function AdminCalendar() {
           scheduledSessions={getScheduledSessionsForDate(
             currentDate,
           )}
+          showWorkshops={selectedArtist === "arezoo"}
         />
       )}
       {viewType === "week" && (
@@ -778,6 +816,7 @@ export function AdminCalendar() {
           getServiceName={getServiceName}
           getBookingsForDate={getBookingsForDate}
           onBookingClick={handleBookingClick}
+          showWorkshops={selectedArtist === "arezoo"}
         />
       )}
       {viewType === "month" && (
@@ -1919,6 +1958,7 @@ function DayView({
   getServiceName,
   getService,
   onBookingClick,
+  showWorkshops = true,
 }: {
   date: Date;
   bookings: Booking[];
@@ -1930,6 +1970,7 @@ function DayView({
     booking: Booking,
     type: "booking" | "workshop",
   ) => void;
+  showWorkshops?: boolean;
 }) {
   // Get business hours for this specific date
   const { startHour, endHour } = getBusinessHoursForDate(date);
@@ -2097,7 +2138,7 @@ function DayView({
         })}
 
         {/* Scheduled workshop sessions */}
-        {workshopBookings
+        {showWorkshops && workshopBookings
           .filter((s) => s.date === dayDate)
           .map((s, i) => {
             const startStr = s.starts_at
@@ -2189,6 +2230,7 @@ function WeekView({
   getServiceName,
   getBookingsForDate,
   onBookingClick,
+  showWorkshops = true,
 }: {
   date: Date;
   bookings: Booking[];
@@ -2200,6 +2242,7 @@ function WeekView({
     session: WorkshopSession,
     type: "booking" | "workshop",
   ) => void;
+  showWorkshops?: boolean;
 }) {
   const getWeekStart = (d: Date) => {
     const date = new Date(d);
@@ -2255,9 +2298,11 @@ function WeekView({
                 <div className="text-xs text-gray-600 truncate">
                   {(() => {
                     const dayDateStr = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
-                    const wsCount = workshopBookings.filter(
-                      (s) => s.date === dayDateStr,
-                    ).length;
+                    const wsCount = showWorkshops
+                      ? workshopBookings.filter(
+                          (s) => s.date === dayDateStr,
+                        ).length
+                      : 0;
                     return (
                       getBookingsForDate(day).length + wsCount
                     );
@@ -2385,7 +2430,7 @@ function WeekView({
                           </div>
                         </div>
                       ))}
-                    {workshopSessions
+                    {showWorkshops && workshopSessions
                       .filter((s) =>
                         s.starts_at.startsWith(
                           time.split(":")[0],
