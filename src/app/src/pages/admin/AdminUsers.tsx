@@ -22,7 +22,6 @@ import { Input } from "../../components/ui/input";
 import { Button } from "../../components/ui/button";
 import {
   getAllUsers,
-  updateUser,
   deleteUser as dbDeleteUser,
   addUserNote,
   updateUserNote,
@@ -33,8 +32,6 @@ import {
   User,
   UserRole,
   Note,
-  USER_ROLE_LABELS,
-  ASSIGNABLE_USER_ROLES,
 } from "../../schema/user.schema";
 import {
   Booking,
@@ -196,11 +193,7 @@ export function AdminUsers() {
     street: "",
     postal_code: "",
     district: "",
-    role: UserRole.CLIENT as (typeof ASSIGNABLE_USER_ROLES)[number],
   });
-  const [updatingRoleUserId, setUpdatingRoleUserId] = useState<
-    string | null
-  >(null);
 
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -266,36 +259,7 @@ export function AdminUsers() {
       street: "",
       postal_code: "",
       district: "",
-      role: UserRole.CLIENT,
     });
-  };
-
-  const handleChangeUserRole = async (
-    user: User,
-    nextRole: (typeof ASSIGNABLE_USER_ROLES)[number],
-  ) => {
-    if (!user.id || user.role === nextRole) return;
-    if (user.role === UserRole.ADMIN) return;
-
-    try {
-      setUpdatingRoleUserId(user.id);
-      const updated = await updateUser({
-        id: user.id,
-        role: nextRole,
-      });
-      setUsers((prevUsers) =>
-        prevUsers.map((u) =>
-          u.id === updated.id
-            ? { ...u, role: updated.role }
-            : u,
-        ),
-      );
-    } catch (error) {
-      console.error("Failed to update user role:", error);
-      alert("Failed to update user role. Please try again.");
-    } finally {
-      setUpdatingRoleUserId(null);
-    }
   };
 
   const handleAddNote = async () => {
@@ -446,7 +410,7 @@ export function AdminUsers() {
         address: fullAddress,
         postal_code: normalizedPostalCode || undefined,
         district: newUserData.district,
-        role: newUserData.role,
+        role: UserRole.CLIENT,
       });
 
       // Add the new user to the state
@@ -756,12 +720,6 @@ export function AdminUsers() {
                   className="text-left p-4"
                   style={{ color: "#3D3935" }}
                 >
-                  Role
-                </th>
-                <th
-                  className="text-left p-4"
-                  style={{ color: "#3D3935" }}
-                >
                   Contact
                 </th>
                 <th
@@ -831,49 +789,6 @@ export function AdminUsers() {
                         >
                           {user.full_name}
                         </p>
-                      </td>
-                      <td className="p-4">
-                        {user.role === UserRole.ADMIN ? (
-                          <span
-                            className="text-sm font-medium"
-                            style={{ color: "#3D3935" }}
-                          >
-                            {USER_ROLE_LABELS[UserRole.ADMIN]}
-                          </span>
-                        ) : (
-                          <select
-                            value={
-                              user.role === UserRole.ARTIST
-                                ? UserRole.ARTIST
-                                : UserRole.CLIENT
-                            }
-                            disabled={
-                              updatingRoleUserId === user.id
-                            }
-                            onChange={(e) =>
-                              handleChangeUserRole(
-                                user,
-                                e.target
-                                  .value as (typeof ASSIGNABLE_USER_ROLES)[number],
-                              )
-                            }
-                            className="p-2 border-2 text-sm focus:outline-none focus:border-gray-400 disabled:opacity-60"
-                            style={{
-                              borderColor: "#DCD4CD",
-                              color: "#3D3935",
-                              backgroundColor: "#FEFCFA",
-                            }}
-                            aria-label={`Role for ${user.full_name}`}
-                          >
-                            {ASSIGNABLE_USER_ROLES.map(
-                              (role) => (
-                                <option key={role} value={role}>
-                                  {USER_ROLE_LABELS[role]}
-                                </option>
-                              ),
-                            )}
-                          </select>
-                        )}
                       </td>
                       <td className="p-4">
                         <div className="space-y-1">
@@ -1016,7 +931,7 @@ export function AdminUsers() {
                         key={`${user.id}-history`}
                         style={{ backgroundColor: "#FAF7F5" }}
                       >
-                        <td colSpan={10} className="p-0">
+                        <td colSpan={9} className="p-0">
                           <div
                             className="border-b-2"
                             style={{ borderColor: "#DCD4CD" }}
@@ -2595,63 +2510,31 @@ export function AdminUsers() {
                   </div>
                 </div>
 
-                {/* Phone and Role */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label
-                      className="block text-sm mb-2 font-medium"
-                      style={{ color: "#3D3935" }}
-                    >
-                      Phone
-                    </label>
-                    <Input
-                      type="text"
-                      placeholder="e.g. 020 7946 1234"
-                      value={newUserData.phone}
-                      onChange={(e) =>
-                        setNewUserData({
-                          ...newUserData,
-                          phone: e.target.value,
-                        })
-                      }
-                      className="w-full p-3 border-2 focus:outline-none focus:border-gray-400"
-                      style={{
-                        borderColor: "#DCD4CD",
-                        color: "#3D3935",
-                        backgroundColor: "#FEFCFA",
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label
-                      className="block text-sm mb-2 font-medium"
-                      style={{ color: "#3D3935" }}
-                    >
-                      Role
-                    </label>
-                    <select
-                      value={newUserData.role}
-                      onChange={(e) =>
-                        setNewUserData({
-                          ...newUserData,
-                          role: e.target
-                            .value as (typeof ASSIGNABLE_USER_ROLES)[number],
-                        })
-                      }
-                      className="w-full p-3 border-2 focus:outline-none focus:border-gray-400"
-                      style={{
-                        borderColor: "#DCD4CD",
-                        color: "#3D3935",
-                        backgroundColor: "#FEFCFA",
-                      }}
-                    >
-                      {ASSIGNABLE_USER_ROLES.map((role) => (
-                        <option key={role} value={role}>
-                          {USER_ROLE_LABELS[role]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                {/* Phone */}
+                <div>
+                  <label
+                    className="block text-sm mb-2 font-medium"
+                    style={{ color: "#3D3935" }}
+                  >
+                    Phone
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. 020 7946 1234"
+                    value={newUserData.phone}
+                    onChange={(e) =>
+                      setNewUserData({
+                        ...newUserData,
+                        phone: e.target.value,
+                      })
+                    }
+                    className="w-full p-3 border-2 focus:outline-none focus:border-gray-400"
+                    style={{
+                      borderColor: "#DCD4CD",
+                      color: "#3D3935",
+                      backgroundColor: "#FEFCFA",
+                    }}
+                  />
                 </div>
 
                 {/* Address Section */}
