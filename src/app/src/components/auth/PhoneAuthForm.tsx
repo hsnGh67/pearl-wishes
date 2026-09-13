@@ -28,7 +28,7 @@ interface PhoneAuthFormProps {
   submitLabel?: string;
   defaultCountryCode?: string;
   defaultPhone?: string;
-  onSuccess?: (profile: User) => void;
+  onSuccess?: (profile: User | null) => void;
   redirectTo?: string;
   className?: string;
 }
@@ -105,13 +105,13 @@ export function PhoneAuthForm({
   const navigate = useNavigate();
   const { refreshProfile } = useAuth();
 
-  const handleSuccess = async (profile: User) => {
+  const handleSuccess = async (profile: User | null) => {
     await refreshProfile();
     onSuccess?.(profile);
 
     if (redirectTo) {
       const isAdminTarget = redirectTo.startsWith("/admin");
-      if (isAdminTarget && profile.role !== UserRole.ADMIN) {
+      if (isAdminTarget && profile?.role !== UserRole.ADMIN) {
         navigate("/", { replace: true });
         return;
       }

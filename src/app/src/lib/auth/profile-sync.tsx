@@ -85,7 +85,18 @@ async function normalizePlaceholderName(
 
 export async function syncProfile(
   authUser: AuthUser,
-): Promise<User> {
+): Promise<User | null> {
+  // Artist Auth accounts live in public.artists, not public.users.
+  // Do not auto-create a client users row for them.
+  const accountType =
+    (authUser.app_metadata as { account_type?: string } | undefined)
+      ?.account_type ??
+    (authUser.user_metadata as { account_type?: string } | undefined)
+      ?.account_type;
+  if (accountType === "artist") {
+    return null;
+  }
+
   const authId = authUser.id;
   const phone = authUser.phone
     ? normalizePhone(authUser.phone)

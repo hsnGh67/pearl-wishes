@@ -23,7 +23,7 @@ export type PhoneAuthStatus =
 interface UsePhoneAuthOptions {
   defaultCountryCode?: string;
   defaultPhone?: string;
-  onSuccess?: (profile: User) => void;
+  onSuccess?: (profile: User | null) => void;
 }
 
 export function usePhoneAuth(

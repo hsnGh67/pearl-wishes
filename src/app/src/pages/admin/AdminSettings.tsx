@@ -24,99 +24,38 @@ import {
   updateBusinessSettings,
   type BusinessSettings,
 } from "../../lib/db/business-settings";
+import {
+  getAllArtists,
+  updateArtist,
+  setArtistActive,
+} from "../../lib/db/artists";
+import {
+  adminCreateArtist,
+  adminDeleteArtist,
+  adminSetArtistPassword,
+  AdminArtistError,
+} from "../../lib/db/admin-artist";
+import { getActiveDistricts } from "../../lib/db/districts";
+import { getActiveServices } from "../../lib/db/services";
+import type { Artist } from "../../schema/artist.schema";
 import { supabase } from "../../config/supabase";
 
-// ─── Static mock data ────────────────────────────────────────────────────────
-
-type NailArtist = {
-  id: string;
-  firstName: string;
-  lastName: string;
-  phone: string;
-  email: string;
-  districts: string[];
-  services: string[];
-  username: string;
-  password: string;
-  notes: string;
-};
-
-const MOCK_ARTISTS: NailArtist[] = [
-  {
-    id: "1",
-    firstName: "Sara",
-    lastName: "Rossi",
-    phone: "+44 7700 900123",
-    email: "sara@nailstudio.co",
-    districts: ["District 1", "District 3"],
-    services: ["Gel Manicure", "Nail Art"],
-    username: "sara_nails",
-    password: "s3cur3p4ss",
-    notes: "Prefers morning appointments only.",
-  },
-  {
-    id: "2",
-    firstName: "Mia",
-    lastName: "Chen",
-    phone: "+44 7700 900456",
-    email: "mia@nailstudio.co",
-    districts: ["District 2"],
-    services: ["Pedicure", "Extensions"],
-    username: "mia_chen",
-    password: "m1ach3n99",
-    notes: "",
-  },
-  {
-    id: "3",
-    firstName: "Jade",
-    lastName: "Williams",
-    phone: "+44 7700 900789",
-    email: "jade@nailstudio.co",
-    districts: ["District 1", "District 2", "District 4"],
-    services: ["Gel Manicure", "Pedicure", "Nail Art"],
-    username: "jade_w",
-    password: "j4d3w1ll!",
-    notes: "Allergy to certain gel brands — check notes before booking.",
-  },
-  {
-    id: "4",
-    firstName: "Leah",
-    lastName: "Park",
-    phone: "+44 7700 900321",
-    email: "leah@nailstudio.co",
-    districts: ["District 3"],
-    services: ["Extensions", "Nail Art"],
-    username: "leah_park",
-    password: "le4hp4rk",
-    notes: "",
-  },
-];
-
-const ALL_DISTRICTS = [
-  "District 1",
-  "District 2",
-  "District 3",
-  "District 4",
-  "District 5",
-];
-
-const ALL_SERVICES = [
-  "Gel Manicure",
-  "Nail Art",
-  "Pedicure",
-  "Extensions",
-  "Gel Polish",
-  "Nail Repair",
-];
+type SelectOption = { id: string; name: string };
 
 const AVATAR_COLORS = ["#E9CFCA", "#DCD4CD", "#FCEAE0", "#D4C5C0", "#C8D4CC"];
 
-function getInitials(a: NailArtist) {
-  return `${a.firstName[0]}${a.lastName[0]}`.toUpperCase();
+function getInitials(a: Artist) {
+  const f = a.first_name?.[0] ?? "";
+  const l = a.last_name?.[0] ?? "";
+  return `${f}${l}`.toUpperCase() || "?";
 }
+
 function getAvatarColor(id: string) {
-  const idx = parseInt(id, 10) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[idx];
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash + id.charCodeAt(i) * (i + 1)) % AVATAR_COLORS.length;
+  }
+  return AVATAR_COLORS[hash];
 }
 
 // ─── Multi-select dropdown ───────────────────────────────────────────────────
@@ -128,12 +67,13 @@ function MultiSelectDropdown({
   onChange,
 }: {
   label: string;
-  options: string[];
+  options: SelectOption[];
   selected: string[];
   onChange: (next: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const nameById = Object.fromEntries(options.map((o) => [o.id, o.name]));
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -145,11 +85,11 @@ function MultiSelectDropdown({
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
-  const toggle = (opt: string) => {
+  const toggle = (id: string) => {
     onChange(
-      selected.includes(opt)
-        ? selected.filter((s) => s !== opt)
-        : [...selected, opt],
+      selected.includes(id)
+        ? selected.filter((s) => s !== id)
+        : [...selected, id],
     );
   };
 
@@ -173,19 +113,18 @@ function MultiSelectDropdown({
         <ChevronDown className="w-4 h-4 text-gray-400" />
       </button>
 
-      {/* Selected tags */}
       {selected.length > 0 && (
         <div className="flex flex-wrap gap-1 mt-2">
-          {selected.map((s) => (
+          {selected.map((id) => (
             <span
-              key={s}
+              key={id}
               className="inline-flex items-center gap-1 text-xs px-2 py-0.5 font-medium"
               style={{ backgroundColor: "#E9CFCA", color: "#3D3935" }}
             >
-              {s}
+              {nameById[id] ?? id}
               <button
                 type="button"
-                onClick={() => toggle(s)}
+                onClick={() => toggle(id)}
                 className="hover:opacity-60"
               >
                 <X className="w-2.5 h-2.5" />
@@ -197,39 +136,43 @@ function MultiSelectDropdown({
 
       {open && (
         <div
-          className="absolute z-50 mt-1 w-full border-2 shadow-md"
+          className="absolute z-50 mt-1 w-full border-2 shadow-md max-h-48 overflow-y-auto"
           style={{
             borderColor: "#DCD4CD",
             backgroundColor: "#FEFCFA",
           }}
         >
-          {options.map((opt) => {
-            const checked = selected.includes(opt);
-            return (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => toggle(opt)}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors hover:bg-[#FAF7F5]"
-                style={{ color: "#3D3935" }}
-              >
-                <span
-                  className="w-4 h-4 border-2 flex items-center justify-center shrink-0"
-                  style={{
-                    borderColor: checked ? "#3D3935" : "#DCD4CD",
-                    backgroundColor: checked ? "#3D3935" : "transparent",
-                  }}
+          {options.length === 0 ? (
+            <p className="px-3 py-2 text-sm text-gray-400">No options</p>
+          ) : (
+            options.map((opt) => {
+              const checked = selected.includes(opt.id);
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => toggle(opt.id)}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors hover:bg-[#FAF7F5]"
+                  style={{ color: "#3D3935" }}
                 >
-                  {checked && (
-                    <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 fill-white">
-                      <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  )}
-                </span>
-                {opt}
-              </button>
-            );
-          })}
+                  <span
+                    className="w-4 h-4 border-2 flex items-center justify-center shrink-0"
+                    style={{
+                      borderColor: checked ? "#3D3935" : "#DCD4CD",
+                      backgroundColor: checked ? "#3D3935" : "transparent",
+                    }}
+                  >
+                    {checked && (
+                      <svg viewBox="0 0 10 8" className="w-2.5 h-2.5 fill-white">
+                        <path d="M1 4l3 3 5-6" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
+                  {opt.name}
+                </button>
+              );
+            })
+          )}
         </div>
       )}
     </div>
@@ -242,10 +185,9 @@ function CredentialsModal({
   artist,
   onClose,
 }: {
-  artist: NailArtist;
+  artist: Artist;
   onClose: () => void;
 }) {
-  const [showPw, setShowPw] = useState(false);
   return (
     <>
       <div
@@ -273,23 +215,9 @@ function CredentialsModal({
                 {artist.username}
               </p>
             </div>
-            <div>
-              <p className="text-xs font-medium text-gray-400 mb-1 uppercase tracking-wide">Password</p>
-              <div className="flex items-center border-2" style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}>
-                <p className="flex-1 text-sm font-mono px-3 py-2" style={{ color: "#3D3935" }}>
-                  {showPw ? artist.password : "••••••••••"}
-                </p>
-                <button
-                  onClick={() => setShowPw((v) => !v)}
-                  className="px-2.5 hover:opacity-60 transition-opacity"
-                  title={showPw ? "Hide" : "Show"}
-                >
-                  {showPw
-                    ? <EyeOff className="w-3.5 h-3.5 text-gray-400" />
-                    : <Eye className="w-3.5 h-3.5 text-gray-400" />}
-                </button>
-              </div>
-            </div>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              Passwords are hashed and cannot be viewed. Use Edit Artist to set a new password.
+            </p>
           </div>
           <div className="flex justify-end mt-6">
             <button
@@ -378,7 +306,7 @@ function NoteModal({
   artist,
   onClose,
 }: {
-  artist: NailArtist;
+  artist: Artist;
   onClose: () => void;
 }) {
   return (
@@ -395,7 +323,7 @@ function NoteModal({
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-base" style={{ color: "#3D3935" }}>
-              Note — {artist.firstName} {artist.lastName}
+              Note — {artist.first_name} {artist.last_name}
             </h3>
             <button onClick={onClose} className="hover:opacity-60 transition-opacity">
               <X className="w-4 h-4" style={{ color: "#3D3935" }} />
@@ -428,32 +356,38 @@ const EMPTY_FORM = {
   email: "",
   username: "",
   password: "",
-  districts: [] as string[],
-  services: [] as string[],
+  districtIds: [] as string[],
+  serviceIds: [] as string[],
   notes: "",
 };
 
 function ArtistModal({
   editArtist,
+  districtOptions,
+  serviceOptions,
   onClose,
   onSave,
+  isSaving,
 }: {
-  editArtist: NailArtist | null;
+  editArtist: Artist | null;
+  districtOptions: SelectOption[];
+  serviceOptions: SelectOption[];
   onClose: () => void;
-  onSave: (form: typeof EMPTY_FORM) => void;
+  onSave: (form: typeof EMPTY_FORM) => void | Promise<void>;
+  isSaving: boolean;
 }) {
   const [form, setForm] = useState<typeof EMPTY_FORM>(
     editArtist
       ? {
-          firstName: editArtist.firstName,
-          lastName: editArtist.lastName,
-          phone: editArtist.phone,
+          firstName: editArtist.first_name,
+          lastName: editArtist.last_name,
+          phone: editArtist.phone ?? "",
           email: editArtist.email,
           username: editArtist.username,
-          password: editArtist.password,
-          districts: [...editArtist.districts],
-          services: [...editArtist.services],
-          notes: editArtist.notes,
+          password: "",
+          districtIds: editArtist.districts.map((d: { id: string }) => d.id),
+          serviceIds: editArtist.services.map((s: { id: string }) => s.id),
+          notes: editArtist.notes ?? "",
         }
       : { ...EMPTY_FORM },
   );
@@ -483,7 +417,6 @@ function ArtistModal({
           style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
           <div
             className="flex items-center justify-between px-6 py-4 border-b-2"
             style={{ borderColor: "#DCD4CD" }}
@@ -496,9 +429,7 @@ function ArtistModal({
             </button>
           </div>
 
-          {/* Body */}
           <div className="px-6 py-5 space-y-5">
-            {/* Row: First + Last name */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "#3D3935" }}>
@@ -528,7 +459,6 @@ function ArtistModal({
               </div>
             </div>
 
-            {/* Row: Phone + Email */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "#3D3935" }}>
@@ -558,7 +488,6 @@ function ArtistModal({
               </div>
             </div>
 
-            {/* Panel credentials */}
             <div
               className="p-4 border-2 space-y-4"
               style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
@@ -582,14 +511,14 @@ function ArtistModal({
                 </div>
                 <div>
                   <label className="block text-xs font-medium mb-1.5" style={{ color: "#3D3935" }}>
-                    Password
+                    {editArtist ? "New Password (optional)" : "Password"}
                   </label>
                   <div className="relative">
                     <input
                       type={showPw ? "text" : "password"}
                       value={form.password}
                       onChange={(e) => set("password", e.target.value)}
-                      placeholder="••••••••"
+                      placeholder={editArtist ? "Leave blank to keep" : "••••••••"}
                       className={`${inputClass} font-mono pr-9`}
                       style={inputStyle}
                     />
@@ -609,33 +538,30 @@ function ArtistModal({
               </div>
             </div>
 
-            {/* Districts */}
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: "#3D3935" }}>
                 Districts Covered
               </label>
               <MultiSelectDropdown
                 label="districts"
-                options={ALL_DISTRICTS}
-                selected={form.districts}
-                onChange={(v) => set("districts", v)}
+                options={districtOptions}
+                selected={form.districtIds}
+                onChange={(v) => set("districtIds", v)}
               />
             </div>
 
-            {/* Services */}
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: "#3D3935" }}>
                 Services Offered
               </label>
               <MultiSelectDropdown
                 label="services"
-                options={ALL_SERVICES}
-                selected={form.services}
-                onChange={(v) => set("services", v)}
+                options={serviceOptions}
+                selected={form.serviceIds}
+                onChange={(v) => set("serviceIds", v)}
               />
             </div>
 
-            {/* Notes */}
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: "#3D3935" }}>
                 Notes
@@ -651,13 +577,13 @@ function ArtistModal({
             </div>
           </div>
 
-          {/* Footer */}
           <div
             className="flex items-center justify-end gap-3 px-6 py-4 border-t-2"
             style={{ borderColor: "#DCD4CD" }}
           >
             <button
               onClick={onClose}
+              disabled={isSaving}
               className="px-4 py-2 text-sm border-2 transition-colors hover:bg-gray-50"
               style={{ borderColor: "#DCD4CD", color: "#3D3935" }}
             >
@@ -665,6 +591,7 @@ function ArtistModal({
             </button>
             <Button
               onClick={() => onSave(form)}
+              disabled={isSaving}
               className="border-2 px-5"
               style={{
                 backgroundColor: "#3D3935",
@@ -672,7 +599,11 @@ function ArtistModal({
                 color: "#FEFCFA",
               }}
             >
-              {editArtist ? "Save Changes" : "Save Nail Artist"}
+              {isSaving
+                ? "Saving…"
+                : editArtist
+                  ? "Save Changes"
+                  : "Save Nail Artist"}
             </Button>
           </div>
         </Card>
@@ -790,64 +721,163 @@ export function AdminSettings() {
   const [artistsOpen, setArtistsOpen] = useState(false);
 
   // ── Nail Artists state ──
-  const [artists, setArtists] = useState<NailArtist[]>(MOCK_ARTISTS);
+  const [artists, setArtists] = useState<Artist[]>([]);
+  const [districtOptions, setDistrictOptions] = useState<SelectOption[]>([]);
+  const [serviceOptions, setServiceOptions] = useState<SelectOption[]>([]);
+  const [artistsLoading, setArtistsLoading] = useState(true);
+  const [artistSaving, setArtistSaving] = useState(false);
   const [artistSearch, setArtistSearch] = useState("");
-  const [viewNoteArtist, setViewNoteArtist] = useState<NailArtist | null>(null);
-  const [credentialsArtist, setCredentialsArtist] = useState<NailArtist | null>(null);
+  const [viewNoteArtist, setViewNoteArtist] = useState<Artist | null>(null);
+  const [credentialsArtist, setCredentialsArtist] = useState<Artist | null>(null);
   const [artistModal, setArtistModal] = useState<{
     open: boolean;
-    editArtist: NailArtist | null;
+    editArtist: Artist | null;
   }>({ open: false, editArtist: null });
+
+  useEffect(() => {
+    const loadArtistsData = async () => {
+      try {
+        setArtistsLoading(true);
+        const [artistsData, districtsData, servicesData] = await Promise.all([
+          getAllArtists(),
+          getActiveDistricts(),
+          getActiveServices(),
+        ]);
+        setArtists(artistsData);
+        setDistrictOptions(
+          districtsData
+            .filter((d) => d.id)
+            .map((d) => ({ id: d.id!, name: d.name })),
+        );
+        setServiceOptions(
+          servicesData
+            .filter((s) => s.id && !s.is_add_on)
+            .map((s) => ({ id: s.id!, name: s.name })),
+        );
+      } catch (err) {
+        console.error("Failed to load artists data:", err);
+        toast.error("Failed to load nail artists");
+      } finally {
+        setArtistsLoading(false);
+      }
+    };
+    void loadArtistsData();
+  }, []);
 
   const filteredArtists = artists.filter((a) => {
     if (!artistSearch) return true;
     const q = artistSearch.toLowerCase();
     return (
-      `${a.firstName} ${a.lastName}`.toLowerCase().includes(q) ||
+      `${a.first_name} ${a.last_name}`.toLowerCase().includes(q) ||
       a.email.toLowerCase().includes(q) ||
       a.username.toLowerCase().includes(q)
     );
   });
 
-  const handleSaveArtist = (form: typeof EMPTY_FORM) => {
-    if (artistModal.editArtist) {
-      setArtists((prev) =>
-        prev.map((a) =>
-          a.id === artistModal.editArtist!.id
-            ? { ...a, ...form }
-            : a,
-        ),
-      );
-      toast.success("Artist updated");
-    } else {
-      const newArtist: NailArtist = {
-        ...form,
-        id: String(Date.now()),
-      };
-      setArtists((prev) => [...prev, newArtist]);
-      toast.success("Nail artist added");
+  const handleSaveArtist = async (form: typeof EMPTY_FORM) => {
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      toast.error("First and last name are required");
+      return;
     }
-    setArtistModal({ open: false, editArtist: null });
-  };
+    if (!form.email.trim()) {
+      toast.error("Email is required");
+      return;
+    }
+    if (!form.username.trim()) {
+      toast.error("Username is required");
+      return;
+    }
+    if (!artistModal.editArtist && !form.password) {
+      toast.error("Password is required for new artists");
+      return;
+    }
+    if (form.password && form.password.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
 
-  const handleDeleteArtist = (id: string) => {
-    setArtists((prev) => prev.filter((a) => a.id !== id));
-    toast.success("Artist removed");
-  };
-
-  const [deactivatedIds, setDeactivatedIds] = useState<Set<string>>(new Set());
-  const toggleActive = (id: string) => {
-    setDeactivatedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-        toast.success("Artist reactivated");
+    setArtistSaving(true);
+    try {
+      if (artistModal.editArtist) {
+        const id = artistModal.editArtist.id;
+        const updated = await updateArtist({
+          id,
+          first_name: form.firstName.trim(),
+          last_name: form.lastName.trim(),
+          phone: form.phone.trim() || null,
+          email: form.email.trim().toLowerCase(),
+          username: form.username.trim(),
+          notes: form.notes,
+          district_ids: form.districtIds,
+          service_ids: form.serviceIds,
+        });
+        if (form.password) {
+          await adminSetArtistPassword(id, form.password);
+        }
+        setArtists((prev) =>
+          prev.map((a) => (a.id === id ? updated : a)),
+        );
+        toast.success("Artist updated");
       } else {
-        next.add(id);
-        toast("Artist deactivated");
+        const created = await adminCreateArtist({
+          first_name: form.firstName.trim(),
+          last_name: form.lastName.trim(),
+          phone: form.phone.trim() || null,
+          email: form.email.trim().toLowerCase(),
+          username: form.username.trim(),
+          password: form.password,
+          notes: form.notes,
+          district_ids: form.districtIds,
+          service_ids: form.serviceIds,
+        });
+        setArtists((prev) => [created, ...prev]);
+        toast.success("Nail artist added");
       }
-      return next;
-    });
+      setArtistModal({ open: false, editArtist: null });
+    } catch (err) {
+      console.error("Failed to save artist:", err);
+      const message =
+        err instanceof AdminArtistError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Failed to save artist";
+      toast.error(message);
+    } finally {
+      setArtistSaving(false);
+    }
+  };
+
+  const handleDeleteArtist = async (id: string) => {
+    if (!window.confirm("Delete this nail artist? This cannot be undone.")) {
+      return;
+    }
+    try {
+      await adminDeleteArtist(id);
+      setArtists((prev) => prev.filter((a) => a.id !== id));
+      toast.success("Artist removed");
+    } catch (err) {
+      console.error("Failed to delete artist:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to delete artist",
+      );
+    }
+  };
+
+  const toggleActive = async (artist: Artist) => {
+    const next = !artist.is_active;
+    try {
+      const updated = await setArtistActive(artist.id, next);
+      setArtists((prev) =>
+        prev.map((a) => (a.id === artist.id ? updated : a)),
+      );
+      toast.success(next ? "Artist reactivated" : "Artist deactivated");
+    } catch (err) {
+      console.error("Failed to toggle artist:", err);
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update status",
+      );
+    }
   };
 
   return (
@@ -1134,19 +1164,36 @@ export function AdminSettings() {
               </tr>
             </thead>
             <tbody>
-              {filteredArtists.length === 0 ? (
+              {artistsLoading ? (
                 <tr>
                   <td
                     colSpan={8}
                     className="px-4 py-10 text-center text-sm text-gray-400"
                   >
-                    No artists match your search.
+                    Loading artists…
+                  </td>
+                </tr>
+              ) : filteredArtists.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={8}
+                    className="px-4 py-10 text-center text-sm text-gray-400"
+                  >
+                    {artistSearch
+                      ? "No artists match your search."
+                      : "No nail artists yet. Add one to get started."}
                   </td>
                 </tr>
               ) : (
                 filteredArtists.map((artist, idx) => {
                   const isLast = idx === filteredArtists.length - 1;
-                  const isActive = !deactivatedIds.has(artist.id);
+                  const isActive = artist.is_active;
+                  const districtNames = artist.districts.map(
+                    (d: { name: string }) => d.name,
+                  );
+                  const serviceNames = artist.services.map(
+                    (s: { name: string }) => s.name,
+                  );
                   return (
                     <tr
                       key={artist.id}
@@ -1156,7 +1203,6 @@ export function AdminSettings() {
                         opacity: isActive ? 1 : 0.45,
                       }}
                     >
-                      {/* Artist */}
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
                           <span
@@ -1172,26 +1218,24 @@ export function AdminSettings() {
                             className="text-sm font-medium whitespace-nowrap"
                             style={{ color: "#3D3935" }}
                           >
-                            {artist.firstName} {artist.lastName}
+                            {artist.first_name} {artist.last_name}
                           </span>
                         </div>
                       </td>
 
-                      {/* Contact */}
                       <td className="px-4 py-4">
                         <p className="text-sm" style={{ color: "#3D3935" }}>
-                          {artist.phone}
+                          {artist.phone || "—"}
                         </p>
                         <p className="text-xs text-gray-400 mt-0.5">
                           {artist.email}
                         </p>
                       </td>
 
-                      {/* Districts — count badge + popover */}
                       <td className="px-4 py-4">
                         <CountPopover
-                          items={artist.districts}
-                          total={ALL_DISTRICTS.length}
+                          items={districtNames}
+                          total={districtOptions.length || districtNames.length || 1}
                           singularLabel="district"
                           pluralLabel="districts"
                           allLabel="All districts"
@@ -1200,11 +1244,10 @@ export function AdminSettings() {
                         />
                       </td>
 
-                      {/* Services — count badge + popover */}
                       <td className="px-4 py-4">
                         <CountPopover
-                          items={artist.services}
-                          total={ALL_SERVICES.length}
+                          items={serviceNames}
+                          total={serviceOptions.length || serviceNames.length || 1}
                           singularLabel="service"
                           pluralLabel="services"
                           allLabel="All services"
@@ -1213,7 +1256,6 @@ export function AdminSettings() {
                         />
                       </td>
 
-                      {/* Panel Credentials — key icon → modal */}
                       <td className="px-4 py-4 text-center">
                         <button
                           onClick={() => setCredentialsArtist(artist)}
@@ -1225,7 +1267,6 @@ export function AdminSettings() {
                         </button>
                       </td>
 
-                      {/* Notes */}
                       <td className="px-4 py-4">
                         <button
                           onClick={() => setViewNoteArtist(artist)}
@@ -1239,10 +1280,9 @@ export function AdminSettings() {
                         ><FileText className="w-2.5 h-2.5" strokeWidth={1.5} />View</button>
                       </td>
 
-                      {/* Status toggle */}
                       <td className="px-4 py-4">
                         <button
-                          onClick={() => toggleActive(artist.id)}
+                          onClick={() => toggleActive(artist)}
                           title={isActive ? "Deactivate artist" : "Reactivate artist"}
                           className="relative inline-flex items-center shrink-0 w-9 h-5 border-2 transition-colors focus:outline-none"
                           style={{
@@ -1262,7 +1302,6 @@ export function AdminSettings() {
                         </button>
                       </td>
 
-                      {/* Actions */}
                       <td className="px-4 py-4">
                         <div className="flex items-center justify-end gap-1">
                           <button
@@ -1370,8 +1409,11 @@ export function AdminSettings() {
       {artistModal.open && (
         <ArtistModal
           editArtist={artistModal.editArtist}
+          districtOptions={districtOptions}
+          serviceOptions={serviceOptions}
           onClose={() => setArtistModal({ open: false, editArtist: null })}
           onSave={handleSaveArtist}
+          isSaving={artistSaving}
         />
       )}
 

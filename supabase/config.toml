@@ -1,7 +1,7 @@
 # Supabase local/CLI config.
-# Auth is verified inside dynamic-endpoint (admin role check).
+# Auth is verified inside the function (admin role check).
 # Disabling gateway JWT avoids 401 responses without CORS headers,
 # which browsers report as "Failed to send a request to the Edge Function".
 
-[functions.dynamic-endpoint]
+[functions.hyper-service]
 verify_jwt = false

@@ -13,7 +13,7 @@ interface PhoneAuthDialogProps {
   onOpenChange: (open: boolean) => void;
   title?: string;
   description?: string;
-  onSuccess?: (profile: User) => void;
+  onSuccess?: (profile: User | null) => void;
 }
 
 export function PhoneAuthDialog({
