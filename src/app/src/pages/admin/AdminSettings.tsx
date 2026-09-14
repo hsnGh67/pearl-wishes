@@ -39,6 +39,7 @@ import { getActiveDistricts } from "../../lib/db/districts";
 import { getActiveServices } from "../../lib/db/services";
 import type { Artist } from "../../schema/artist.schema";
 import { supabase } from "../../config/supabase";
+import { updateAuthPassword } from "../../lib/auth/phone-auth";
 
 type SelectOption = { id: string; name: string };
 
@@ -627,6 +628,12 @@ export function AdminSettings() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [latestBookingDate, setLatestBookingDate] = useState<string | null>(null);
 
+  const [accountPassword, setAccountPassword] = useState("");
+  const [accountPasswordConfirm, setAccountPasswordConfirm] = useState("");
+  const [showAccountPassword, setShowAccountPassword] = useState(false);
+  const [isSavingAccountPassword, setIsSavingAccountPassword] =
+    useState(false);
+
   const localToday = (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -688,6 +695,33 @@ export function AdminSettings() {
       return;
     }
     setShowConfirm(true);
+  };
+
+  const handleSaveAccountPassword = async () => {
+    if (!accountPassword || accountPassword.length < 6) {
+      toast.error("Password must be at least 6 characters");
+      return;
+    }
+    if (accountPassword !== accountPasswordConfirm) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    setIsSavingAccountPassword(true);
+    try {
+      await updateAuthPassword(accountPassword);
+      setAccountPassword("");
+      setAccountPasswordConfirm("");
+      toast.success("Password updated", {
+        description: "You can now sign in with phone and password.",
+      });
+    } catch (err) {
+      toast.error("Failed to update password", {
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setIsSavingAccountPassword(false);
+    }
   };
 
   const handleConfirmSave = async () => {
@@ -904,6 +938,115 @@ export function AdminSettings() {
           </p>
         </div>
       )}
+
+      {/* ── Account password ── */}
+      <Card
+        className="border-2 mb-6 max-w-3xl"
+        style={{ borderColor: "#DCD4CD" }}
+      >
+        <div className="px-6 py-5" style={{ borderBottom: "2px solid #DCD4CD" }}>
+          <h2 className="text-base font-semibold" style={{ color: "#3D3935" }}>
+            Account password
+          </h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            Set or change the password for your admin phone login. Passwords are
+            hashed and cannot be viewed.
+          </p>
+        </div>
+        <div className="space-y-4 px-6 py-5">
+          <div>
+            <label
+              className="flex items-center gap-2 text-sm font-medium mb-2"
+              style={{ color: "#3D3935" }}
+            >
+              <KeyRound className="w-4 h-4" />
+              New password
+            </label>
+            <div className="relative max-w-sm">
+              <input
+                type={showAccountPassword ? "text" : "password"}
+                value={accountPassword}
+                onChange={(e) => setAccountPassword(e.target.value)}
+                autoComplete="new-password"
+                className="w-full px-3 py-2 pr-10 border-2 text-sm outline-none focus:border-[#3D3935] transition-colors"
+                style={{
+                  borderColor: "#DCD4CD",
+                  backgroundColor: "#FEFCFA",
+                  color: "#3D3935",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowAccountPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                aria-label={
+                  showAccountPassword ? "Hide password" : "Show password"
+                }
+              >
+                {showAccountPassword ? (
+                  <EyeOff className="w-4 h-4" />
+                ) : (
+                  <Eye className="w-4 h-4" />
+                )}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label
+              className="text-sm font-medium mb-2 block"
+              style={{ color: "#3D3935" }}
+            >
+              Confirm password
+            </label>
+            <input
+              type={showAccountPassword ? "text" : "password"}
+              value={accountPasswordConfirm}
+              onChange={(e) => setAccountPasswordConfirm(e.target.value)}
+              autoComplete="new-password"
+              className="w-full max-w-sm px-3 py-2 border-2 text-sm outline-none focus:border-[#3D3935] transition-colors"
+              style={{
+                borderColor: "#DCD4CD",
+                backgroundColor: "#FEFCFA",
+                color: "#3D3935",
+              }}
+            />
+          </div>
+          <p className="text-xs text-gray-400">
+            Minimum 6 characters. After saving, use phone + password on the admin
+            login screen.
+          </p>
+          <Button
+            type="button"
+            onClick={handleSaveAccountPassword}
+            disabled={
+              isSavingAccountPassword ||
+              !accountPassword ||
+              !accountPasswordConfirm
+            }
+            className="border-2 px-6"
+            style={{
+              backgroundColor:
+                accountPassword && accountPasswordConfirm
+                  ? "#3D3935"
+                  : "#DCD4CD",
+              borderColor:
+                accountPassword && accountPasswordConfirm
+                  ? "#3D3935"
+                  : "#DCD4CD",
+              color:
+                accountPassword && accountPasswordConfirm
+                  ? "#FEFCFA"
+                  : "#9CA3AF",
+              cursor:
+                accountPassword && accountPasswordConfirm
+                  ? "pointer"
+                  : "not-allowed",
+            }}
+          >
+            {isSavingAccountPassword ? "Saving…" : "Update password"}
+          </Button>
+        </div>
+      </Card>
 
       {/* ── Section 1: Booking & Schedule Preferences ── */}
       <Card

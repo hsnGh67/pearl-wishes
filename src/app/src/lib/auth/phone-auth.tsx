@@ -29,6 +29,36 @@ export async function verifyPhoneOtp(
   return data;
 }
 
+export async function signInWithPhonePassword(
+  phone: string,
+  password: string,
+) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    phone,
+    password,
+  });
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function updateAuthPassword(
+  password: string,
+): Promise<void> {
+  if (!password || password.length < 6) {
+    throw new Error("Password must be at least 6 characters");
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
 
