@@ -72,6 +72,11 @@ import {
   getWorkshopTimesForDate,
 } from "../../lib/db/workshop-bookings";
 import { createBookingWithTreatments } from "../../lib/db/booking-with-treatments";
+import { ArtistSelectionSection } from "../booking/ArtistSelectionSection";
+import {
+  formatArtistDisplayName,
+} from "../../lib/db/available-artists";
+import { getArtistById } from "../../lib/db/artists";
 import {
   validatePromoCode,
   recordPromoCodeUsage,
@@ -104,7 +109,9 @@ interface TreatmentSelection {
 }
 
 type AdminCreateBookingDraft = {
-  currentStep: "user" | "treatments" | "schedule" | "review";
+  currentStep: "user" | "treatments" | "schedule" | "artist" | "review";
+  selectedArtistId: string;
+  selectedArtistName: string;
   selectedUserId: string;
   showNewUserForm: boolean;
   newUser: {
@@ -205,6 +212,7 @@ export function AdminBookingForm({
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const { setDebounce } = useDebounce();
   let originalTreatments = useRef([]);
+  const skipArtistResetRef = useRef(false);
 
   const [newUser, setNewUser] = useState({
     fullName: "",
@@ -224,6 +232,9 @@ export function AdminBookingForm({
     Date | undefined
   >(undefined);
   const [selectedTime, setSelectedTime] = useState("");
+  const [selectedArtistId, setSelectedArtistId] = useState("");
+  const [selectedArtistName, setSelectedArtistName] =
+    useState("");
   const [paymentStatus, setPaymentStatus] =
     useState<PaymentStatus>(PaymentStatus.UNPAID);
   const [totalAmount, setTotalAmount] = useState(0);
@@ -255,7 +266,7 @@ export function AdminBookingForm({
 
   const [loading, setLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState<
-    "user" | "treatments" | "schedule" | "review"
+    "user" | "treatments" | "schedule" | "artist" | "review"
   >("user");
 
   const [promoCodeInput, setPromoCodeInput] = useState("");
@@ -281,6 +292,8 @@ export function AdminBookingForm({
       numberOfPeople,
       selectedDate,
       selectedTime,
+      selectedArtistId,
+      selectedArtistName,
       paymentStatus,
       notes,
       treatments,
@@ -297,6 +310,8 @@ export function AdminBookingForm({
       numberOfPeople,
       selectedDate,
       selectedTime,
+      selectedArtistId,
+      selectedArtistName,
       paymentStatus,
       notes,
       treatments,
@@ -328,6 +343,8 @@ export function AdminBookingForm({
               : undefined,
         );
         setSelectedTime(draft.selectedTime || "");
+        setSelectedArtistId(draft.selectedArtistId || "");
+        setSelectedArtistName(draft.selectedArtistName || "");
         if (draft.paymentStatus) {
           setPaymentStatus(draft.paymentStatus);
         }
@@ -434,6 +451,7 @@ export function AdminBookingForm({
   const loadExistingBookingData = async () => {
     if (!existingBooking) return;
 
+    skipArtistResetRef.current = true;
     console.log("existingBooking ==>", existingBooking);
     setSelectedUserId(existingBooking.user_id);
     setSelectedDate(
@@ -478,6 +496,22 @@ export function AdminBookingForm({
     } catch (error) {
       console.error("Failed to load treatments:", error);
     }
+
+    if (existingBooking.artist_id) {
+      setSelectedArtistId(existingBooking.artist_id);
+      try {
+        const artist = await getArtistById(existingBooking.artist_id);
+        if (artist) {
+          setSelectedArtistName(formatArtistDisplayName(artist));
+        }
+      } catch {
+        setSelectedArtistName("");
+      }
+    }
+
+    window.setTimeout(() => {
+      skipArtistResetRef.current = false;
+    }, 0);
   };
 
   const getTimeSlots = async () => {
@@ -591,6 +625,24 @@ export function AdminBookingForm({
     if (!selectedDate) return;
     getTimeSlots();
   }, [selectedDate]);
+
+  const treatmentServiceIdsKey = treatments
+    .map((t) => t.serviceId)
+    .filter(Boolean)
+    .sort()
+    .join(",");
+
+  useEffect(() => {
+    if (skipArtistResetRef.current) return;
+    setSelectedArtistId("");
+    setSelectedArtistName("");
+  }, [selectedDate, address.district, treatmentServiceIdsKey]);
+
+  useEffect(() => {
+    if (skipArtistResetRef.current) return;
+    setSelectedArtistId("");
+    setSelectedArtistName("");
+  }, [selectedTime]);
 
   const handleServiceClick = (
     serviceName: string,
@@ -843,6 +895,11 @@ export function AdminBookingForm({
       return;
     }
 
+    if (!selectedArtistId) {
+      alert("Please select an artist");
+      return;
+    }
+
     console.log("✅ All validations passed");
     setLoading(true);
     let bookingId = null;
@@ -880,6 +937,7 @@ export function AdminBookingForm({
             id: existingBooking.id!,
             appointment_date: formatDate(selectedDate),
             appointment_time: selectedTime,
+            artist_id: selectedArtistId,
             total_amount: totalAmount,
             notes: notes,
             payment_status: paymentStatus,
@@ -920,6 +978,7 @@ export function AdminBookingForm({
             promo_code_code: appliedPromo.code,
             promo_code_discount: appliedPromo.discountAmount,
           }),
+          artist_id: selectedArtistId,
         };
         for (const treatment of treatments) {
           const treatmentData = {
@@ -1122,7 +1181,7 @@ export function AdminBookingForm({
             className="flex items-center justify-between border-b-2 pb-4"
             style={{ borderColor: "#DCD4CD" }}
           >
-            {["user", "treatments", "schedule", "review"].map(
+            {["user", "treatments", "schedule", "artist", "review"].map(
               (step, index) => (
                 <div
                   key={step}
@@ -1567,13 +1626,53 @@ export function AdminBookingForm({
                     borderColor: "#3D3935",
                     color: "#3D3935",
                   }}
-                  onClick={() => setCurrentStep("review")}
+                  onClick={() => setCurrentStep("artist")}
                 >
-                  Continue to Review
+                  Continue to Artist
                 </Button>
               </div>
             </div>
           )}
+
+          {currentStep === "artist" &&
+            selectedDate &&
+            selectedTime && (
+              <div className="space-y-4">
+                <h3
+                  className="font-semibold"
+                  style={{ color: "#3D3935" }}
+                >
+                  Select Artist
+                </h3>
+                <ArtistSelectionSection
+                  districtName={address.district}
+                  serviceIds={treatments
+                    .map((t) => t.serviceId)
+                    .filter(Boolean)}
+                  date={selectedDate}
+                  time={selectedTime}
+                  durationMinutes={totalDuration || 60}
+                  bufferMinutes={activeBuffer}
+                  excludeBookingId={
+                    mode === "reschedule" && existingBooking?.id
+                      ? existingBooking.id
+                      : undefined
+                  }
+                  selectedArtistId={selectedArtistId}
+                  onSelect={(artistId, artist) => {
+                    setSelectedArtistId(artistId);
+                    setSelectedArtistName(
+                      artist
+                        ? formatArtistDisplayName(artist)
+                        : "",
+                    );
+                  }}
+                  onBack={() => setCurrentStep("schedule")}
+                  onContinue={() => setCurrentStep("review")}
+                  continueLabel="Continue to Review"
+                />
+              </div>
+            )}
 
           {currentStep === "treatments" && (
             <div className="space-y-4">
@@ -2178,6 +2277,12 @@ export function AdminBookingForm({
                     </span>
                   </div>
                   <div className="flex justify-between">
+                    <span className="text-gray-600">Artist:</span>
+                    <span style={{ color: "#3D3935" }}>
+                      {selectedArtistName || "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
                     <span className="text-gray-600">
                       Number of People:
                     </span>
@@ -2471,7 +2576,7 @@ export function AdminBookingForm({
                     borderColor: "#3D3935",
                     color: "#3D3935",
                   }}
-                  onClick={() => setCurrentStep("schedule")}
+                  onClick={() => setCurrentStep("artist")}
                 >
                   Back
                 </Button>

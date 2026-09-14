@@ -78,6 +78,8 @@ import {
   GAP_MINUTES_PER_SERVICE,
 } from "../src/components/admin/AdminBookingForm";
 import { getBusinessSettings } from "../src/lib/db/business-settings";
+import { ArtistSelectionSection } from "../src/components/booking/ArtistSelectionSection";
+import { formatArtistDisplayName } from "../src/lib/db/available-artists";
 
 interface BookingFlowProps {
   open: boolean;
@@ -92,6 +94,7 @@ type BookingStep =
   | "service"
   | "date"
   | "time"
+  | "artist"
   | "confirmation"
   | "voucher"
   | "payment"
@@ -127,6 +130,7 @@ interface BookingData {
   totalDuration: number;
   date: Date | undefined;
   timeSlot: string;
+  artistId: string;
   voucherCode: string;
   discount: number;
   finalPrice: number;
@@ -206,6 +210,7 @@ export function BookingFlow({
     totalDuration: 0,
     date: undefined,
     timeSlot: "",
+    artistId: "",
     voucherCode: "",
     discount: 0,
     finalPrice: 0,
@@ -255,6 +260,8 @@ export function BookingFlow({
   >([]);
   const [isServicesLoading, setIsServicesLoading] =
     useState(false);
+  const [selectedArtistName, setSelectedArtistName] =
+    useState("");
 
   const prefillFromProfile = useCallback(
     (userProfile: AppUser) => {
@@ -488,9 +495,24 @@ export function BookingFlow({
 
   useEffect(() => {
     if (bookingData.date) {
-      setBookingData((prev) => ({ ...prev, timeSlot: "" }));
+      setBookingData((prev) => ({
+        ...prev,
+        timeSlot: "",
+        artistId: "",
+      }));
+      setSelectedArtistName("");
     }
   }, [bookingData.date]);
+
+  const serviceIdsKey = bookingData.services
+    .map((s) => s.id)
+    .sort()
+    .join(",");
+
+  useEffect(() => {
+    setBookingData((prev) => ({ ...prev, artistId: "" }));
+    setSelectedArtistName("");
+  }, [bookingData.district, serviceIdsKey]);
 
   const getDistricts = async () => {
     try {
@@ -548,7 +570,12 @@ export function BookingFlow({
   };
 
   const handleDistrictSelect = (district: string) => {
-    setBookingData((prev) => ({ ...prev, district }));
+    setBookingData((prev) => ({
+      ...prev,
+      district,
+      artistId: "",
+    }));
+    setSelectedArtistName("");
   };
 
   const handleAddressSubmit = async (e: React.FormEvent) => {
@@ -828,7 +855,12 @@ export function BookingFlow({
   };
 
   const handleTimeSelect = (time: string) => {
-    setBookingData({ ...bookingData, timeSlot: time });
+    setBookingData({
+      ...bookingData,
+      timeSlot: time,
+      artistId: "",
+    });
+    setSelectedArtistName("");
   };
 
   const handleConfirmBooking = () => {
@@ -921,6 +953,10 @@ export function BookingFlow({
         throw new Error("No services selected");
       }
 
+      if (!bookingData.artistId) {
+        throw new Error("No artist selected");
+      }
+
       // Use first service as the booking's service_id (required field)
       // In a production app, you might use a "booking" service type or handle this differently
 
@@ -969,6 +1005,7 @@ export function BookingFlow({
             total_amount:
               bookingData.servicePrice - bookingData.discount,
             notes: `${bookingData.numberOfPeople} person(s). Services: ${bookingData.services.map((s) => s.name).join(", ")}. ${bookingData.voucherCode ? `Voucher: ${bookingData.voucherCode}` : ""}`,
+            artist_id: bookingData.artistId,
           },
           treatments,
         });
@@ -1020,6 +1057,7 @@ export function BookingFlow({
       totalDuration: 0,
       date: undefined,
       timeSlot: "",
+      artistId: "",
       voucherCode: "",
       discount: 0,
       finalPrice: 0,
@@ -1030,6 +1068,7 @@ export function BookingFlow({
     setVoucherError("");
     setVoucherSuccess("");
     setAppliedVoucherCode("");
+    setSelectedArtistName("");
     onOpenChange(false);
   };
 
@@ -2367,7 +2406,7 @@ export function BookingFlow({
                   Back
                 </Button>
                 <Button
-                  onClick={() => setStep("voucher")}
+                  onClick={() => setStep("artist")}
                   disabled={!bookingData.timeSlot}
                   className="flex-1 transition-all"
                   style={{
@@ -2423,7 +2462,46 @@ export function BookingFlow({
           </>
         )}
 
-        {/* Step 7: Gift Voucher */}
+        {/* Step 7: Artist Selection */}
+        {step === "artist" &&
+          bookingData.date &&
+          bookingData.timeSlot && (
+            <>
+              <DialogHeader>
+                <DialogTitle>Select Artist</DialogTitle>
+                <DialogDescription>
+                  Choose an available artist for your appointment
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                <ArtistSelectionSection
+                  districtName={bookingData.district}
+                  serviceIds={bookingData.services.map((s) => s.id)}
+                  date={bookingData.date}
+                  time={bookingData.timeSlot}
+                  durationMinutes={bookingData.totalDuration || 60}
+                  bufferMinutes={activeBuffer}
+                  selectedArtistId={bookingData.artistId}
+                  onSelect={(artistId, artist) => {
+                    setBookingData((prev) => ({
+                      ...prev,
+                      artistId,
+                    }));
+                    setSelectedArtistName(
+                      artist
+                        ? formatArtistDisplayName(artist)
+                        : "",
+                    );
+                  }}
+                  onBack={() => setStep("time")}
+                  onContinue={() => setStep("voucher")}
+                  continueLabel="Continue to Voucher"
+                />
+              </div>
+            </>
+          )}
+
+        {/* Step 8: Gift Voucher */}
         {step === "voucher" && (
           <>
             <DialogHeader>
@@ -2542,7 +2620,7 @@ export function BookingFlow({
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => setStep("time")}
+                  onClick={() => setStep("artist")}
                   className="flex-1 hover:bg-[#DCD4CD]"
                 >
                   Back
@@ -2739,6 +2817,26 @@ export function BookingFlow({
                         style={{ color: "#3D3935" }}
                       >
                         {bookingData.timeSlot}
+                      </span>
+                    </div>
+                    <Separator
+                      style={{ backgroundColor: "#DCD4CD" }}
+                    />
+                    <div className="flex justify-between items-center">
+                      <span
+                        className="text-sm"
+                        style={{
+                          color: "#3D3935",
+                          opacity: 0.7,
+                        }}
+                      >
+                        Artist
+                      </span>
+                      <span
+                        className="font-medium"
+                        style={{ color: "#3D3935" }}
+                      >
+                        {selectedArtistName || "—"}
                       </span>
                     </div>
                     <Separator
@@ -3212,6 +3310,12 @@ export function BookingFlow({
                         "en-GB",
                       )}{" "}
                       at {bookingData.timeSlot}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Artist</span>
+                    <span className="text-gray-800">
+                      {selectedArtistName || "—"}
                     </span>
                   </div>
                   <div className="flex justify-between">
