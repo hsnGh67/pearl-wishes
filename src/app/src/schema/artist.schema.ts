@@ -52,7 +52,10 @@ export type Artist = z.infer<typeof ArtistSchema>;
 export const ArtistCreateSchema = z.object({
   first_name: z.string().min(1).max(100),
   last_name: z.string().min(1).max(100),
-  phone: z.string().optional().nullable(),
+  phone: z
+    .string()
+    .min(8, "Phone is required")
+    .transform((v) => v.trim()),
   email: z.string().email(),
   username: z
     .string()

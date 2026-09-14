@@ -33,6 +33,7 @@ import {
   adminCreateArtist,
   adminDeleteArtist,
   adminSetArtistPassword,
+  adminSyncArtistAuthPhone,
   AdminArtistError,
 } from "../../lib/db/admin-artist";
 import { getActiveDistricts } from "../../lib/db/districts";
@@ -463,7 +464,7 @@ function ArtistModal({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "#3D3935" }}>
-                  Phone Number
+                  Phone Number (required for panel login)
                 </label>
                 <input
                   type="tel"
@@ -821,6 +822,10 @@ export function AdminSettings() {
       toast.error("Username is required");
       return;
     }
+    if (!form.phone.trim()) {
+      toast.error("Phone is required for panel login");
+      return;
+    }
     if (!artistModal.editArtist && !form.password) {
       toast.error("Password is required for new artists");
       return;
@@ -834,11 +839,12 @@ export function AdminSettings() {
     try {
       if (artistModal.editArtist) {
         const id = artistModal.editArtist.id;
+        const phone = form.phone.trim();
         const updated = await updateArtist({
           id,
           first_name: form.firstName.trim(),
           last_name: form.lastName.trim(),
-          phone: form.phone.trim() || null,
+          phone,
           email: form.email.trim().toLowerCase(),
           username: form.username.trim(),
           notes: form.notes,
@@ -847,6 +853,11 @@ export function AdminSettings() {
         });
         if (form.password) {
           await adminSetArtistPassword(id, form.password);
+        } else if (
+          phone &&
+          phone !== (artistModal.editArtist.phone ?? "").trim()
+        ) {
+          await adminSyncArtistAuthPhone(id, phone);
         }
         setArtists((prev) =>
           prev.map((a) => (a.id === id ? updated : a)),
@@ -856,7 +867,7 @@ export function AdminSettings() {
         const created = await adminCreateArtist({
           first_name: form.firstName.trim(),
           last_name: form.lastName.trim(),
-          phone: form.phone.trim() || null,
+          phone: form.phone.trim(),
           email: form.email.trim().toLowerCase(),
           username: form.username.trim(),
           password: form.password,

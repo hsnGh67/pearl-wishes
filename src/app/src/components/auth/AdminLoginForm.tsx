@@ -16,9 +16,8 @@ import {
   toE164,
 } from "../../lib/constants/country-codes";
 import { signInWithPhonePassword } from "../../lib/auth/phone-auth";
-import { syncProfile } from "../../lib/auth/profile-sync";
+import { resolvePanelStaff } from "../../lib/auth/panel-staff";
 import { useAuth } from "../../hooks/useAuth";
-import { UserRole } from "../../schema/user.schema";
 import { PhoneAuthForm } from "./PhoneAuthForm";
 
 type AdminLoginMode = "password" | "otp";
@@ -117,10 +116,10 @@ export function AdminLoginForm({ redirectTo }: AdminLoginFormProps) {
         throw new Error("Sign in succeeded but no session was created.");
       }
 
-      const profile = await syncProfile(session.user);
+      const staff = await resolvePanelStaff(session.user);
       await refreshProfile();
 
-      if (profile?.role !== UserRole.ADMIN) {
+      if (!staff.canAccessAdmin) {
         navigate("/", { replace: true });
         return;
       }

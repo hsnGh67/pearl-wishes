@@ -10,16 +10,19 @@ import {
 } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../config/supabase";
-import { syncProfile } from "../lib/auth/profile-sync";
+import { resolvePanelStaff } from "../lib/auth/panel-staff";
 import { signOut as authSignOut } from "../lib/auth/phone-auth";
 import { User, UserRole } from "../schema/user.schema";
+import type { Artist } from "../schema/artist.schema";
 
 interface AuthContextValue {
   session: Session | null;
   profile: User | null;
+  artist: Artist | null;
   role: UserRole | null;
   isAuthenticated: boolean;
   isAdmin: boolean;
+  canAccessAdmin: boolean;
   isLoading: boolean;
   refreshProfile: () => Promise<void>;
   signOut: () => Promise<void>;
@@ -36,6 +39,7 @@ export function AuthProvider({
 }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<User | null>(null);
+  const [artist, setArtist] = useState<Artist | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const profileLoadRef = useRef<Promise<void> | null>(null);
   const profileLoadAuthIdRef = useRef<string | null>(null);
@@ -44,6 +48,7 @@ export function AuthProvider({
     async (nextSession: Session | null) => {
       if (!nextSession?.user) {
         setProfile(null);
+        setArtist(null);
         profileLoadRef.current = null;
         profileLoadAuthIdRef.current = null;
         return;
@@ -61,10 +66,9 @@ export function AuthProvider({
       }
 
       const loadPromise = (async () => {
-        const syncedProfile = await syncProfile(
-          nextSession.user,
-        );
-        setProfile(syncedProfile);
+        const staff = await resolvePanelStaff(nextSession.user);
+        setProfile(staff.profile);
+        setArtist(staff.artist);
       })();
 
       profileLoadAuthIdRef.current = authId;
@@ -119,6 +123,7 @@ export function AuthProvider({
             await loadProfile(nextSession);
           } else {
             setProfile(null);
+            setArtist(null);
           }
         } finally {
           if (isMounted) {
@@ -138,20 +143,36 @@ export function AuthProvider({
     await authSignOut();
     setSession(null);
     setProfile(null);
+    setArtist(null);
   }, []);
+
+  const isAdmin = profile?.role === UserRole.ADMIN;
+  const canAccessAdmin =
+    isAdmin || Boolean(artist?.is_active);
 
   const value = useMemo<AuthContextValue>(
     () => ({
       session,
       profile,
+      artist,
       role: profile?.role ?? null,
       isAuthenticated: Boolean(session),
-      isAdmin: profile?.role === UserRole.ADMIN,
+      isAdmin,
+      canAccessAdmin,
       isLoading,
       refreshProfile,
       signOut,
     }),
-    [session, profile, isLoading, refreshProfile, signOut],
+    [
+      session,
+      profile,
+      artist,
+      isAdmin,
+      canAccessAdmin,
+      isLoading,
+      refreshProfile,
+      signOut,
+    ],
   );
 
   return (

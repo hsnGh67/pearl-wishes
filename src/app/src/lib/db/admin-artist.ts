@@ -159,7 +159,7 @@ export const adminCreateArtist = async (
     action: "artist_create",
     first_name: validated.first_name.trim(),
     last_name: validated.last_name.trim(),
-    phone: validated.phone?.trim() || null,
+    phone: validated.phone.trim(),
     email: validated.email.trim().toLowerCase(),
     username: validated.username.trim(),
     password: validated.password,
@@ -180,6 +180,7 @@ export const adminCreateArtist = async (
 
 /**
  * Reset / set Auth password for an artist (cannot retrieve current password).
+ * Also syncs phone onto Auth when the artists row has a phone.
  */
 export const adminSetArtistPassword = async (
   artistId: string,
@@ -193,6 +194,25 @@ export const adminSetArtistPassword = async (
     action: "artist_set_password",
     artist_id: artistId,
     password,
+  });
+};
+
+/**
+ * Sync artist phone onto the linked Auth user (for phone + password panel login).
+ */
+export const adminSyncArtistAuthPhone = async (
+  artistId: string,
+  phone: string,
+): Promise<void> => {
+  const trimmed = phone?.trim() ?? "";
+  if (!trimmed) {
+    throw new AdminArtistError("Phone is required", 400);
+  }
+
+  await callAdminArtist({
+    action: "artist_sync_auth_phone",
+    artist_id: artistId,
+    phone: trimmed,
   });
 };
 

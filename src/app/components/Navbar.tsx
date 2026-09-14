@@ -23,7 +23,7 @@ export function Navbar() {
     useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const navigate = useNavigate();
-  const { isAuthenticated, isAdmin, profile, signOut } =
+  const { isAuthenticated, canAccessAdmin, profile, artist, signOut } =
     useAuth();
 
   useEffect(() => {
@@ -141,7 +141,7 @@ export function Navbar() {
                 "Sign In"
               )}
             </Button>
-            {isAdmin && (
+            {canAccessAdmin && (
               <Button
                 variant="outline"
                 size="icon"
@@ -240,7 +240,7 @@ export function Navbar() {
             >
               Workshops
             </a>
-            {isAdmin && (
+            {canAccessAdmin && (
               <a
                 href="/admin"
                 className="block px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 rounded-md"

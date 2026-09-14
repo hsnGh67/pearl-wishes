@@ -2,11 +2,10 @@ import { Navigate, Outlet, useLocation } from "react-router";
 import { useAuth } from "../../hooks/useAuth";
 
 export function AdminRoute() {
-  const { isLoading, isAuthenticated, isAdmin, profile } =
-    useAuth();
+  const { isLoading, isAuthenticated, canAccessAdmin } = useAuth();
   const location = useLocation();
 
-  if (isLoading || (isAuthenticated && !profile)) {
+  if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#FEFCFA]">
         <p style={{ color: "#3D3935" }}>Loading...</p>
@@ -24,7 +23,7 @@ export function AdminRoute() {
     );
   }
 
-  if (!isAdmin) {
+  if (!canAccessAdmin) {
     return <Navigate to="/" replace />;
   }
 

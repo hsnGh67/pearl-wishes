@@ -142,6 +142,40 @@ export const getArtistById = async (
 };
 
 /**
+ * Get artist linked to a Supabase Auth user id
+ */
+export const getArtistByAuthId = async (
+  authId: string,
+): Promise<Artist | null> => {
+  try {
+    dbLogger.info("Fetching artist by auth_id", {
+      table: "artists",
+      data: { authId },
+    });
+
+    const { data, error } = await supabase
+      .from("artists")
+      .select(ARTIST_SELECT)
+      .eq("auth_id", authId)
+      .maybeSingle();
+
+    if (error) {
+      dbLogger.error("Failed to fetch artist by auth_id", {
+        table: "artists",
+        error,
+      });
+      throw error;
+    }
+
+    if (!data) return null;
+    return mapArtistRow(data as ArtistJoinRow);
+  } catch (error) {
+    dbLogger.error("Error in getArtistByAuthId", { error });
+    throw error;
+  }
+};
+
+/**
  * Replace district assignments for an artist
  */
 export const setArtistDistricts = async (

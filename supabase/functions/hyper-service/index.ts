@@ -3,13 +3,13 @@
  *
  * Handles:
  *   - Create client/artist users in public.users (phone Auth, no password)
- *   - Nail artist actions (email+password Auth + public.artists):
- *       action: artist_create | artist_set_password | artist_delete
+ *   - Nail artist actions (email+phone+password Auth + public.artists):
+ *       action: artist_create | artist_set_password | artist_sync_auth_phone | artist_delete
  *
  * Live URL: https://xqanbblitsqasnkbbana.supabase.co/functions/v1/hyper-service
  *
  * Dashboard: turn OFF "Verify JWT with legacy secret" / Enforce JWT — we verify
- * the Bearer token + admin role here.
+ * the Bearer token + panel staff (admin or active artist) here.
  */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
@@ -26,6 +26,7 @@ type AssignableRole = "client" | "artist";
 type ArtistAction =
   | "artist_create"
   | "artist_set_password"
+  | "artist_sync_auth_phone"
   | "artist_delete";
 
 interface RequestBody {
@@ -114,8 +115,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Unauthorized" }, 401);
     }
 
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
     const { data: callerProfile, error: callerProfileError } =
-      await callerClient
+      await adminClient
         .from("users")
         .select("id, role")
         .eq("auth_id", callerAuth.id)
@@ -127,16 +132,38 @@ Deno.serve(async (req) => {
         callerProfileError,
       );
       return jsonResponse(
-        { error: "Failed to verify admin" },
+        { error: "Failed to verify panel access" },
         500,
       );
     }
 
-    if (!callerProfile || callerProfile.role !== "admin") {
-      return jsonResponse(
-        { error: "Forbidden: admin only" },
-        403,
-      );
+    const isAdmin = callerProfile?.role === "admin";
+
+    if (!isAdmin) {
+      const { data: callerArtist, error: callerArtistError } =
+        await adminClient
+          .from("artists")
+          .select("id, is_active")
+          .eq("auth_id", callerAuth.id)
+          .maybeSingle();
+
+      if (callerArtistError) {
+        console.error(
+          "caller artist lookup failed",
+          callerArtistError,
+        );
+        return jsonResponse(
+          { error: "Failed to verify panel access" },
+          500,
+        );
+      }
+
+      if (!callerArtist?.is_active) {
+        return jsonResponse(
+          { error: "Forbidden: panel staff only" },
+          403,
+        );
+      }
     }
 
     let body: RequestBody;
@@ -146,16 +173,13 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: "Invalid JSON body" }, 400);
     }
 
-    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-
     const action = body.action;
 
     // ── Artist actions ──────────────────────────────────────────────────────
     if (
       action === "artist_create" ||
       action === "artist_set_password" ||
+      action === "artist_sync_auth_phone" ||
       action === "artist_delete"
     ) {
       if (action === "artist_create") {
@@ -194,7 +218,13 @@ Deno.serve(async (req) => {
 
         const phone = phoneRaw
           ? normalizePhoneE164(phoneRaw)
-          : null;
+          : "";
+        if (!phone || phone.length < 8) {
+          return jsonResponse(
+            { error: "phone is required" },
+            400,
+          );
+        }
 
         const { data: existingEmail } = await adminClient
           .from("artists")
@@ -226,6 +256,8 @@ Deno.serve(async (req) => {
           await adminClient.auth.admin.createUser({
             email,
             password,
+            phone,
+            phone_confirm: true,
             email_confirm: true,
             app_metadata: { account_type: "artist" },
             user_metadata: {
@@ -362,6 +394,83 @@ Deno.serve(async (req) => {
         const { data: artist, error: fetchError } =
           await adminClient
             .from("artists")
+            .select("id, auth_id, phone")
+            .eq("id", artistId)
+            .maybeSingle();
+
+        if (fetchError) {
+          return jsonResponse(
+            { error: "Failed to load artist" },
+            500,
+          );
+        }
+        if (!artist) {
+          return jsonResponse({ error: "Artist not found" }, 404);
+        }
+        if (!artist.auth_id) {
+          return jsonResponse(
+            { error: "Artist has no linked auth account" },
+            400,
+          );
+        }
+
+        const updatePayload: {
+          password: string;
+          phone?: string;
+          phone_confirm?: boolean;
+        } = { password };
+
+        const artistPhone = artist.phone
+          ? normalizePhoneE164(String(artist.phone))
+          : "";
+        if (artistPhone && artistPhone.length >= 8) {
+          updatePayload.phone = artistPhone;
+          updatePayload.phone_confirm = true;
+        }
+
+        const { error: pwError } =
+          await adminClient.auth.admin.updateUserById(
+            artist.auth_id,
+            updatePayload,
+          );
+
+        if (pwError) {
+          return jsonResponse(
+            {
+              error:
+                pwError.message ?? "Failed to update password",
+            },
+            400,
+          );
+        }
+
+        return jsonResponse({ ok: true }, 200);
+      }
+
+      if (action === "artist_sync_auth_phone") {
+        const artistId = body.artist_id?.trim() ?? "";
+        const phoneRaw = body.phone?.trim() || null;
+
+        if (!artistId) {
+          return jsonResponse(
+            { error: "artist_id is required" },
+            400,
+          );
+        }
+
+        const phone = phoneRaw
+          ? normalizePhoneE164(phoneRaw)
+          : "";
+        if (!phone || phone.length < 8) {
+          return jsonResponse(
+            { error: "phone is required" },
+            400,
+          );
+        }
+
+        const { data: artist, error: fetchError } =
+          await adminClient
+            .from("artists")
             .select("id, auth_id")
             .eq("id", artistId)
             .maybeSingle();
@@ -382,17 +491,18 @@ Deno.serve(async (req) => {
           );
         }
 
-        const { error: pwError } =
+        const { error: phoneError } =
           await adminClient.auth.admin.updateUserById(
             artist.auth_id,
-            { password },
+            { phone, phone_confirm: true },
           );
 
-        if (pwError) {
+        if (phoneError) {
           return jsonResponse(
             {
               error:
-                pwError.message ?? "Failed to update password",
+                phoneError.message ??
+                "Failed to sync phone to auth",
             },
             400,
           );

@@ -19,7 +19,9 @@ import {
 import { COUNTRY_CODES } from "../../lib/constants/country-codes";
 import { usePhoneAuth } from "../../hooks/usePhoneAuth";
 import { useAuth } from "../../hooks/useAuth";
-import { User, UserRole } from "../../schema/user.schema";
+import { resolvePanelStaff } from "../../lib/auth/panel-staff";
+import { supabase } from "../../config/supabase";
+import { User } from "../../schema/user.schema";
 
 interface PhoneAuthFormProps {
   variant?: "page" | "embedded" | "dialog";
@@ -111,9 +113,18 @@ export function PhoneAuthForm({
 
     if (redirectTo) {
       const isAdminTarget = redirectTo.startsWith("/admin");
-      if (isAdminTarget && profile?.role !== UserRole.ADMIN) {
-        navigate("/", { replace: true });
-        return;
+      if (isAdminTarget) {
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.user) {
+          const staff = await resolvePanelStaff(data.session.user);
+          if (!staff.canAccessAdmin) {
+            navigate("/", { replace: true });
+            return;
+          }
+        } else {
+          navigate("/", { replace: true });
+          return;
+        }
       }
       navigate(redirectTo, { replace: true });
     }

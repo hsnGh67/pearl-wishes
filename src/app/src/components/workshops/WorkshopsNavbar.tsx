@@ -31,7 +31,7 @@ export function WorkshopsNavbar() {
     useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const navigate = useNavigate();
-  const { isAuthenticated, isAdmin, profile, signOut } =
+  const { isAuthenticated, canAccessAdmin, profile, artist, signOut } =
     useAuth();
 
   useEffect(() => {
@@ -143,7 +143,7 @@ export function WorkshopsNavbar() {
                 Sign Out
               </Button>
             )}
-            {(!isAuthenticated || isAdmin) && (
+            {(!isAuthenticated || canAccessAdmin) && (
               <Button
                 variant="outline"
                 size="icon"
@@ -163,13 +163,13 @@ export function WorkshopsNavbar() {
                     "linear-gradient(to right, #FCEAE0, #EACAB8)";
                 }}
                 onClick={() =>
-                  isAdmin
+                  canAccessAdmin
                     ? navigate("/admin")
                     : setLoginOpen(true)
                 }
-                title={isAdmin ? "Admin Panel" : "Sign In"}
+                title={canAccessAdmin ? "Admin Panel" : "Sign In"}
               >
-                {isAdmin ? (
+                {canAccessAdmin ? (
                   <Settings className="h-5 w-5" />
                 ) : (
                   <LogIn className="h-5 w-5" />
@@ -244,7 +244,7 @@ export function WorkshopsNavbar() {
             >
               Workshops
             </a>
-            {isAdmin && (
+            {canAccessAdmin && (
               <a
                 href="/admin"
                 className="block px-3 py-2 text-gray-700 hover:text-[#3D3935] hover:bg-gray-50 rounded-md"
@@ -275,13 +275,19 @@ export function WorkshopsNavbar() {
                 }}
               >
                 Sign Out
-                {profile?.full_name &&
-                !isPlaceholderFullName(
-                  profile.full_name,
-                  profile.phone,
-                )
-                  ? ` (${profile.full_name})`
-                  : ""}
+                {(() => {
+                  const displayName =
+                    profile?.full_name &&
+                    !isPlaceholderFullName(
+                      profile.full_name,
+                      profile.phone,
+                    )
+                      ? profile.full_name
+                      : artist
+                        ? `${artist.first_name} ${artist.last_name}`.trim()
+                        : "";
+                  return displayName ? ` (${displayName})` : "";
+                })()}
               </button>
             )}
             <div className="pt-2">
