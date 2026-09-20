@@ -87,6 +87,76 @@ export const getAllUsers = async (
 };
 
 /**
+ * Clients who have at least one booking with the given artist (paginated).
+ * Nested bookings are scoped to that artist; workshops are omitted.
+ */
+export const getClientsForArtist = async (
+  artistId: string,
+  options?: { page?: number; limit?: number },
+): Promise<{ data: User[]; totalCount: number }> => {
+  const limit = options?.limit ?? 50;
+  const page = options?.page ?? 1;
+  const from = (page - 1) * limit;
+  const to = page * limit - 1;
+
+  try {
+    dbLogger.info("Fetching clients for artist", {
+      table: "users",
+      data: { artistId, page, limit },
+    });
+
+    const { data, error, count } = await supabase
+      .from("users")
+      .select(
+        "*, user_notes(*), bookings!bookings_user_id_fkey!inner(*)",
+        { count: "exact" },
+      )
+      .eq("bookings.artist_id", artistId)
+      .order("created_at", { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      dbLogger.error("Failed to fetch clients for artist", {
+        table: "users",
+        error,
+        data: { artistId },
+      });
+      throw error;
+    }
+
+    const validatedUsers =
+      data?.map((user) => {
+        const { user_notes, ...rest } = user as Record<
+          string,
+          unknown
+        > & {
+          user_notes?: unknown[];
+          bookings?: unknown[];
+        };
+        return validateUser({
+          ...rest,
+          notes: user_notes ?? [],
+          bookings: rest.bookings ?? [],
+          workshops: [],
+        });
+      }) || [];
+
+    dbLogger.info("Successfully fetched clients for artist", {
+      table: "users",
+      data: { artistId, count: validatedUsers.length, totalCount: count },
+    });
+
+    return {
+      data: validatedUsers,
+      totalCount: count ?? validatedUsers.length,
+    };
+  } catch (error) {
+    dbLogger.error("Error in getClientsForArtist", { error });
+    throw error;
+  }
+};
+
+/**
  * Get all users
  */
 export const findUserByNameOrEmailOrPhone = async (

@@ -41,6 +41,7 @@ import {
 import { GAP_MINUTES_PER_SERVICE } from "../../lib/booking-schedule";
 import { BookingStatus } from "../../schema/booking.schema";
 import { BookingTreatmentStatus } from "../../schema/booking-treatment.schema";
+import { ClientHistoryView } from "../../components/artist/ClientHistoryView";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1772,19 +1773,33 @@ export function ArtistPanel() {
         )}
 
         {activeTab === "history" && (
-          <div className="p-8" style={{ maxWidth: 950 }}>
-            <div className="mb-1 flex items-center gap-1 text-xs" style={{ color: "#3D3935", opacity: 0.45 }}>
+          <div className="p-8">
+            <div className="mb-4 flex items-center gap-1 text-xs" style={{ color: "#3D3935", opacity: 0.45 }}>
               <span>Artist Panel</span>
               <span>/</span>
               <span style={{ fontWeight: 600 }}>Client History</span>
             </div>
-            <Card
-              className="p-12 border-2 flex flex-col items-center gap-3 mt-8"
-              style={{ borderColor: "#DCD4CD" }}
-            >
-              <Users className="w-10 h-10" style={{ color: "#DCD4CD" }} />
-              <p className="text-sm" style={{ color: "#9C9088" }}>Client history — coming soon.</p>
-            </Card>
+            {artistId ? (
+              <ClientHistoryView
+                artistId={artistId}
+                artistDisplayName={
+                  [artist?.first_name, artist?.last_name]
+                    .filter(Boolean)
+                    .join(" ")
+                    .trim() || "Artist"
+                }
+              />
+            ) : (
+              <Card
+                className="p-12 border-2 flex flex-col items-center gap-3 mt-8"
+                style={{ borderColor: "#DCD4CD" }}
+              >
+                <Users className="w-10 h-10" style={{ color: "#DCD4CD" }} />
+                <p className="text-sm" style={{ color: "#9C9088" }}>
+                  No artist profile linked.
+                </p>
+              </Card>
+            )}
           </div>
         )}
       </main>
