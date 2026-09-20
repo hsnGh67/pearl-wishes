@@ -94,6 +94,10 @@ import {
   getFreeTimesForServices,
   monthDateRange,
 } from "../../lib/db/booking-schedule";
+import {
+  isValidPostalCode,
+  normalizePostalCode,
+} from "../../lib/utils";
 
 export {
   GAP_MINUTES,
@@ -144,6 +148,7 @@ type AdminCreateBookingDraft = {
     email: string;
     phone: string;
     address: string;
+    postal_code: string;
     district: string;
   };
   address: {
@@ -215,6 +220,7 @@ export function AdminBookingForm({
     email: "",
     phone: "",
     address: "",
+    postal_code: "",
     district: "",
   });
 
@@ -847,12 +853,24 @@ export function AdminBookingForm({
       return;
     }
 
+    const normalizedPostalCode = normalizePostalCode(
+      newUser.postal_code,
+    );
+    if (
+      normalizedPostalCode &&
+      !isValidPostalCode(normalizedPostalCode)
+    ) {
+      alert("Invalid postcode format (e.g. SW1A 1AA).");
+      return;
+    }
+
     try {
       const createdUser = await createUser({
         full_name: newUser.fullName,
         email: newUser.email,
         phone: newUser.phone,
         address: newUser.address,
+        postal_code: normalizedPostalCode || undefined,
         district: newUser.district,
         role: UserRole.CLIENT,
       });
@@ -870,6 +888,7 @@ export function AdminBookingForm({
         email: "",
         phone: "",
         address: "",
+        postal_code: "",
         district: "",
       });
     } catch (error) {
@@ -1143,6 +1162,7 @@ export function AdminBookingForm({
       email: "",
       phone: "",
       address: "",
+      postal_code: "",
       district: "",
     });
     setAddress({ fullAddress: "", district: "" });
@@ -1530,6 +1550,23 @@ export function AdminBookingForm({
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label style={{ color: "#3D3935" }}>
+                          Postal Code
+                        </Label>
+                        <Input
+                          value={newUser.postal_code}
+                          onChange={(e) =>
+                            setNewUser({
+                              ...newUser,
+                              postal_code: e.target.value,
+                            })
+                          }
+                          placeholder="e.g. SW1A 1AA"
+                          className="border-2"
+                          style={{ borderColor: "#DCD4CD" }}
+                        />
+                      </div>
                       <div>
                         <Label style={{ color: "#3D3935" }}>
                           District
