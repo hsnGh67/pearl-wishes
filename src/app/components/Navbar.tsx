@@ -23,8 +23,13 @@ export function Navbar() {
     useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const navigate = useNavigate();
-  const { isAuthenticated, canAccessAdmin, profile, artist, signOut } =
-    useAuth();
+  const {
+    isAuthenticated,
+    canAccessAdmin,
+    profile,
+    artist,
+    signOut,
+  } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {

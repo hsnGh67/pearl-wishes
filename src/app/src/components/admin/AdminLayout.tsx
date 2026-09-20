@@ -27,7 +27,7 @@ export function AdminLayout() {
 
   const menuItems = [
     {
-      path: "/admin",
+      path: "/admin/dashboard",
       label: "Dashboard",
       icon: LayoutDashboard,
     },
@@ -74,12 +74,9 @@ export function AdminLayout() {
     },
   ];
 
-  const isActive = (path: string) => {
-    if (path === "/admin") {
-      return location.pathname === "/admin";
-    }
-    return location.pathname.startsWith(path);
-  };
+  const isActive = (path: string) =>
+    location.pathname === path ||
+    (path !== "/admin/dashboard" && location.pathname.startsWith(path));
 
   return (
     <div

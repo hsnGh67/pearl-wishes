@@ -4,12 +4,18 @@ import { getArtistByAuthId } from "../db/artists";
 import { User, UserRole } from "../../schema/user.schema";
 import type { Artist } from "../../schema/artist.schema";
 
-function getAccountType(authUser: AuthUser): string | undefined {
+function getAccountType(
+  authUser: AuthUser,
+): string | undefined {
   return (
-    (authUser.app_metadata as { account_type?: string } | undefined)
-      ?.account_type ??
-    (authUser.user_metadata as { account_type?: string } | undefined)
-      ?.account_type
+    (
+      authUser.app_metadata as
+        { account_type?: string } | undefined
+    )?.account_type ??
+    (
+      authUser.user_metadata as
+        { account_type?: string } | undefined
+    )?.account_type
   );
 }
 

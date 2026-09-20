@@ -2470,16 +2470,21 @@ export function BookingFlow({
               <DialogHeader>
                 <DialogTitle>Select Artist</DialogTitle>
                 <DialogDescription>
-                  Choose an available artist for your appointment
+                  Choose an available artist for your
+                  appointment
                 </DialogDescription>
               </DialogHeader>
               <div className="py-4">
                 <ArtistSelectionSection
                   districtName={bookingData.district}
-                  serviceIds={bookingData.services.map((s) => s.id)}
+                  serviceIds={bookingData.services.map(
+                    (s) => s.id,
+                  )}
                   date={bookingData.date}
                   time={bookingData.timeSlot}
-                  durationMinutes={bookingData.totalDuration || 60}
+                  durationMinutes={
+                    bookingData.totalDuration || 60
+                  }
                   bufferMinutes={activeBuffer}
                   selectedArtistId={bookingData.artistId}
                   onSelect={(artistId, artist) => {
@@ -3313,7 +3318,9 @@ export function BookingFlow({
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Artist</span>
+                    <span className="text-gray-600">
+                      Artist
+                    </span>
                     <span className="text-gray-800">
                       {selectedArtistName || "—"}
                     </span>

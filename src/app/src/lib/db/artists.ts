@@ -49,8 +49,9 @@ function mapArtistRow(row: ArtistJoinRow): Artist {
           ? { id: ad.districts.id, name: ad.districts.name }
           : null,
       )
-      .filter((d): d is { id: string; name: string } => d !== null) ??
-    [];
+      .filter(
+        (d): d is { id: string; name: string } => d !== null,
+      ) ?? [];
 
   const services =
     row.artist_services
@@ -59,10 +60,15 @@ function mapArtistRow(row: ArtistJoinRow): Artist {
           ? { id: as.services.id, name: as.services.name }
           : null,
       )
-      .filter((s): s is { id: string; name: string } => s !== null) ??
-    [];
+      .filter(
+        (s): s is { id: string; name: string } => s !== null,
+      ) ?? [];
 
-  const { artist_districts: _ad, artist_services: _as, ...rest } = row;
+  const {
+    artist_districts: _ad,
+    artist_services: _as,
+    ...rest
+  } = row;
 
   return validateArtist({
     ...rest,
@@ -260,7 +266,8 @@ export const updateArtist = async (
 ): Promise<Artist> => {
   try {
     const validated = validateArtistUpdate(input);
-    const { id, district_ids, service_ids, ...fields } = validated;
+    const { id, district_ids, service_ids, ...fields } =
+      validated;
 
     dbLogger.info("Updating artist", {
       table: "artists",

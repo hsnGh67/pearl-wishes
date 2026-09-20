@@ -73,9 +73,7 @@ import {
 } from "../../lib/db/workshop-bookings";
 import { createBookingWithTreatments } from "../../lib/db/booking-with-treatments";
 import { ArtistSelectionSection } from "../booking/ArtistSelectionSection";
-import {
-  formatArtistDisplayName,
-} from "../../lib/db/available-artists";
+import { formatArtistDisplayName } from "../../lib/db/available-artists";
 import { getArtistById } from "../../lib/db/artists";
 import {
   validatePromoCode,
@@ -109,7 +107,8 @@ interface TreatmentSelection {
 }
 
 type AdminCreateBookingDraft = {
-  currentStep: "user" | "treatments" | "schedule" | "artist" | "review";
+  currentStep:
+    "user" | "treatments" | "schedule" | "artist" | "review";
   selectedArtistId: string;
   selectedArtistName: string;
   selectedUserId: string;
@@ -500,9 +499,13 @@ export function AdminBookingForm({
     if (existingBooking.artist_id) {
       setSelectedArtistId(existingBooking.artist_id);
       try {
-        const artist = await getArtistById(existingBooking.artist_id);
+        const artist = await getArtistById(
+          existingBooking.artist_id,
+        );
         if (artist) {
-          setSelectedArtistName(formatArtistDisplayName(artist));
+          setSelectedArtistName(
+            formatArtistDisplayName(artist),
+          );
         }
       } catch {
         setSelectedArtistName("");
@@ -1181,34 +1184,38 @@ export function AdminBookingForm({
             className="flex items-center justify-between border-b-2 pb-4"
             style={{ borderColor: "#DCD4CD" }}
           >
-            {["user", "treatments", "schedule", "artist", "review"].map(
-              (step, index) => (
+            {[
+              "user",
+              "treatments",
+              "schedule",
+              "artist",
+              "review",
+            ].map((step, index) => (
+              <div
+                key={step}
+                className={`flex items-center gap-2 ${currentStep === step ? "opacity-100" : "opacity-50"}`}
+              >
                 <div
-                  key={step}
-                  className={`flex items-center gap-2 ${currentStep === step ? "opacity-100" : "opacity-50"}`}
+                  className="w-8 h-8 rounded-full flex items-center justify-center border-2"
+                  style={{
+                    backgroundColor:
+                      currentStep === step
+                        ? "#E9CFCA"
+                        : "transparent",
+                    borderColor: "#3D3935",
+                    color: "#3D3935",
+                  }}
                 >
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center border-2"
-                    style={{
-                      backgroundColor:
-                        currentStep === step
-                          ? "#E9CFCA"
-                          : "transparent",
-                      borderColor: "#3D3935",
-                      color: "#3D3935",
-                    }}
-                  >
-                    {index + 1}
-                  </div>
-                  <span
-                    className="text-sm font-medium capitalize"
-                    style={{ color: "#3D3935" }}
-                  >
-                    {step}
-                  </span>
+                  {index + 1}
                 </div>
-              ),
-            )}
+                <span
+                  className="text-sm font-medium capitalize"
+                  style={{ color: "#3D3935" }}
+                >
+                  {step}
+                </span>
+              </div>
+            ))}
           </div>
 
           {currentStep === "user" && (
@@ -2277,7 +2284,9 @@ export function AdminBookingForm({
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Artist:</span>
+                    <span className="text-gray-600">
+                      Artist:
+                    </span>
                     <span style={{ color: "#3D3935" }}>
                       {selectedArtistName || "—"}
                     </span>

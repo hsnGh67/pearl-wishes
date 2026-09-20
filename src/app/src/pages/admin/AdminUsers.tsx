@@ -28,11 +28,7 @@ import {
   deleteUserNote,
 } from "../../lib/db/users";
 import { adminCreateUser } from "../../lib/db/admin-create-user";
-import {
-  User,
-  UserRole,
-  Note,
-} from "../../schema/user.schema";
+import { User, UserRole, Note } from "../../schema/user.schema";
 import {
   Booking,
   BookingStatus,

@@ -31,8 +31,13 @@ export function WorkshopsNavbar() {
     useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const navigate = useNavigate();
-  const { isAuthenticated, canAccessAdmin, profile, artist, signOut } =
-    useAuth();
+  const {
+    isAuthenticated,
+    canAccessAdmin,
+    profile,
+    artist,
+    signOut,
+  } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -167,7 +172,9 @@ export function WorkshopsNavbar() {
                     ? navigate("/admin")
                     : setLoginOpen(true)
                 }
-                title={canAccessAdmin ? "Admin Panel" : "Sign In"}
+                title={
+                  canAccessAdmin ? "Admin Panel" : "Sign In"
+                }
               >
                 {canAccessAdmin ? (
                   <Settings className="h-5 w-5" />
@@ -236,7 +243,7 @@ export function WorkshopsNavbar() {
             >
               About
             </a>
-            
+
             <a
               href="/workshops"
               className="block px-3 py-2 text-gray-700 hover:text-[#3D3935] hover:bg-gray-50 rounded-md"

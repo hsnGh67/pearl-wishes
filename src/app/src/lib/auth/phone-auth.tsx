@@ -33,10 +33,11 @@ export async function signInWithPhonePassword(
   phone: string,
   password: string,
 ) {
-  const { data, error } = await supabase.auth.signInWithPassword({
-    phone,
-    password,
-  });
+  const { data, error } =
+    await supabase.auth.signInWithPassword({
+      phone,
+      password,
+    });
 
   if (error) {
     throw error;
@@ -52,7 +53,9 @@ export async function updateAuthPassword(
     throw new Error("Password must be at least 6 characters");
   }
 
-  const { error } = await supabase.auth.updateUser({ password });
+  const { error } = await supabase.auth.updateUser({
+    password,
+  });
 
   if (error) {
     throw error;

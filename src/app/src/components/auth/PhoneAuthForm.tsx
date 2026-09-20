@@ -116,7 +116,9 @@ export function PhoneAuthForm({
       if (isAdminTarget) {
         const { data } = await supabase.auth.getSession();
         if (data.session?.user) {
-          const staff = await resolvePanelStaff(data.session.user);
+          const staff = await resolvePanelStaff(
+            data.session.user,
+          );
           if (!staff.canAccessAdmin) {
             navigate("/", { replace: true });
             return;

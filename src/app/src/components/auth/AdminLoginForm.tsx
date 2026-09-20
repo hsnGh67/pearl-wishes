@@ -17,6 +17,7 @@ import {
 } from "../../lib/constants/country-codes";
 import { signInWithPhonePassword } from "../../lib/auth/phone-auth";
 import { resolvePanelStaff } from "../../lib/auth/panel-staff";
+import { UserRole } from "../../schema/user.schema";
 import { useAuth } from "../../hooks/useAuth";
 import { PhoneAuthForm } from "./PhoneAuthForm";
 
@@ -64,7 +65,8 @@ function GradientSubmitButton({
       {isActive ? (
         <span
           style={{
-            background: "linear-gradient(to right, #FCEAE0, #EACAB8)",
+            background:
+              "linear-gradient(to right, #FCEAE0, #EACAB8)",
             WebkitBackgroundClip: "text",
             backgroundClip: "text",
             WebkitTextFillColor: "transparent",
@@ -80,7 +82,9 @@ function GradientSubmitButton({
   );
 }
 
-export function AdminLoginForm({ redirectTo }: AdminLoginFormProps) {
+export function AdminLoginForm({
+  redirectTo,
+}: AdminLoginFormProps) {
   const navigate = useNavigate();
   const { refreshProfile } = useAuth();
 
@@ -110,10 +114,15 @@ export function AdminLoginForm({ redirectTo }: AdminLoginFormProps) {
 
     try {
       const phone = toE164(countryCodeId, phoneNumber);
-      const { session } = await signInWithPhonePassword(phone, password);
+      const { session } = await signInWithPhonePassword(
+        phone,
+        password,
+      );
 
       if (!session?.user) {
-        throw new Error("Sign in succeeded but no session was created.");
+        throw new Error(
+          "Sign in succeeded but no session was created.",
+        );
       }
 
       const staff = await resolvePanelStaff(session.user);
@@ -124,7 +133,16 @@ export function AdminLoginForm({ redirectTo }: AdminLoginFormProps) {
         return;
       }
 
-      navigate(redirectTo, { replace: true });
+      const isAdmin = staff.profile?.role === UserRole.ADMIN;
+      if (isAdmin) {
+        // Honor deep-links into the super-admin area; fall back to dashboard
+        const dest =
+          redirectTo.startsWith("/admin/") ? redirectTo : "/admin/dashboard";
+        navigate(dest, { replace: true });
+      } else {
+        // Nail artist — always lands on their panel
+        navigate("/admin", { replace: true });
+      }
     } catch (err) {
       setError(
         err instanceof Error
@@ -183,7 +201,10 @@ export function AdminLoginForm({ redirectTo }: AdminLoginFormProps) {
         </div>
       )}
 
-      <form onSubmit={handlePasswordSubmit} className="space-y-6 py-2">
+      <form
+        onSubmit={handlePasswordSubmit}
+        className="space-y-6 py-2"
+      >
         <div className="space-y-2">
           <Label htmlFor="admin-phone">Phone Number</Label>
           <div className="flex gap-2">

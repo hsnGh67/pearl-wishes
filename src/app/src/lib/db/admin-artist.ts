@@ -1,4 +1,8 @@
-import { supabase, supabaseUrl, supabaseAnonKey } from "../../config/supabase";
+import {
+  supabase,
+  supabaseUrl,
+  supabaseAnonKey,
+} from "../../config/supabase";
 import {
   Artist,
   ArtistCreate,
@@ -32,18 +36,30 @@ function mapArtistFromPayload(row: ArtistJoinPayload): Artist {
   const districts =
     row.artist_districts
       ?.map((ad) =>
-        ad.districts ? { id: ad.districts.id, name: ad.districts.name } : null,
+        ad.districts
+          ? { id: ad.districts.id, name: ad.districts.name }
+          : null,
       )
-      .filter((d): d is { id: string; name: string } => d !== null) ?? [];
+      .filter(
+        (d): d is { id: string; name: string } => d !== null,
+      ) ?? [];
 
   const services =
     row.artist_services
       ?.map((as) =>
-        as.services ? { id: as.services.id, name: as.services.name } : null,
+        as.services
+          ? { id: as.services.id, name: as.services.name }
+          : null,
       )
-      .filter((s): s is { id: string; name: string } => s !== null) ?? [];
+      .filter(
+        (s): s is { id: string; name: string } => s !== null,
+      ) ?? [];
 
-  const { artist_districts: _ad, artist_services: _as, ...rest } = row;
+  const {
+    artist_districts: _ad,
+    artist_services: _as,
+    ...rest
+  } = row;
 
   return validateArtist({
     ...rest,
@@ -175,7 +191,9 @@ export const adminCreateArtist = async (
     );
   }
 
-  return mapArtistFromPayload(payload.artist as ArtistJoinPayload);
+  return mapArtistFromPayload(
+    payload.artist as ArtistJoinPayload,
+  );
 };
 
 /**
@@ -187,7 +205,10 @@ export const adminSetArtistPassword = async (
   password: string,
 ): Promise<void> => {
   if (!password || password.length < 6) {
-    throw new AdminArtistError("Password must be at least 6 characters", 400);
+    throw new AdminArtistError(
+      "Password must be at least 6 characters",
+      400,
+    );
   }
 
   await callAdminArtist({
@@ -219,7 +240,9 @@ export const adminSyncArtistAuthPhone = async (
 /**
  * Delete Auth user and artists row (junctions cascade).
  */
-export const adminDeleteArtist = async (artistId: string): Promise<void> => {
+export const adminDeleteArtist = async (
+  artistId: string,
+): Promise<void> => {
   await callAdminArtist({
     action: "artist_delete",
     artist_id: artistId,

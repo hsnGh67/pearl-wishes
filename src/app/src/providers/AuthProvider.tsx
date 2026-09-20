@@ -147,8 +147,7 @@ export function AuthProvider({
   }, []);
 
   const isAdmin = profile?.role === UserRole.ADMIN;
-  const canAccessAdmin =
-    isAdmin || Boolean(artist?.is_active);
+  const canAccessAdmin = isAdmin || Boolean(artist?.is_active);
 
   const value = useMemo<AuthContextValue>(
     () => ({

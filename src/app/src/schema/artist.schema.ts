@@ -13,8 +13,12 @@ export const ArtistServiceRefSchema = z.object({
   name: z.string(),
 });
 
-export type ArtistDistrictRef = z.infer<typeof ArtistDistrictRefSchema>;
-export type ArtistServiceRef = z.infer<typeof ArtistServiceRefSchema>;
+export type ArtistDistrictRef = z.infer<
+  typeof ArtistDistrictRefSchema
+>;
+export type ArtistServiceRef = z.infer<
+  typeof ArtistServiceRefSchema
+>;
 
 /**
  * Zod Schema for Artist Validation
@@ -24,7 +28,11 @@ export const ArtistSchema = z.object({
   auth_id: z.string().uuid().nullable().optional(),
   first_name: z.string().min(1).max(100),
   last_name: z.string().min(1).max(100),
-  phone: z.string().nullable().optional().transform((v) => v || ""),
+  phone: z
+    .string()
+    .nullable()
+    .optional()
+    .transform((v) => v || ""),
   email: z
     .string()
     .regex(
@@ -41,8 +49,14 @@ export const ArtistSchema = z.object({
     ),
   notes: z.string().optional().default(""),
   is_active: z.boolean().default(true),
-  districts: z.array(ArtistDistrictRefSchema).optional().default([]),
-  services: z.array(ArtistServiceRefSchema).optional().default([]),
+  districts: z
+    .array(ArtistDistrictRefSchema)
+    .optional()
+    .default([]),
+  services: z
+    .array(ArtistServiceRefSchema)
+    .optional()
+    .default([]),
   created_at: z.string().or(z.date()).optional(),
   updated_at: z.string().or(z.date()).optional(),
 });
@@ -62,11 +76,19 @@ export const ArtistCreateSchema = z.object({
     .min(2)
     .max(50)
     .regex(/^[a-zA-Z0-9._-]+$/),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z
+    .string()
+    .min(6, "Password must be at least 6 characters"),
   notes: z.string().optional().default(""),
   is_active: z.boolean().optional().default(true),
-  district_ids: z.array(z.string().uuid()).optional().default([]),
-  service_ids: z.array(z.string().uuid()).optional().default([]),
+  district_ids: z
+    .array(z.string().uuid())
+    .optional()
+    .default([]),
+  service_ids: z
+    .array(z.string().uuid())
+    .optional()
+    .default([]),
 });
 
 export type ArtistCreate = z.infer<typeof ArtistCreateSchema>;
@@ -95,10 +117,14 @@ export const validateArtist = (data: unknown): Artist => {
   return ArtistSchema.parse(data);
 };
 
-export const validateArtistCreate = (data: unknown): ArtistCreate => {
+export const validateArtistCreate = (
+  data: unknown,
+): ArtistCreate => {
   return ArtistCreateSchema.parse(data);
 };
 
-export const validateArtistUpdate = (data: unknown): ArtistUpdate => {
+export const validateArtistUpdate = (
+  data: unknown,
+): ArtistUpdate => {
   return ArtistUpdateSchema.parse(data);
 };
