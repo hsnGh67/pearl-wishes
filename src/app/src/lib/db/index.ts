@@ -8,6 +8,7 @@ export * from "./testimonials";
 export * from "./users";
 export * from "./artists";
 export * from "./admin-artist";
+export * from "./artist-availability";
 export * from "./bookings";
 export * from "./booking-treatments";
 export * from "./booking-with-treatments";

@@ -8,6 +8,7 @@ export * from "./service.schema";
 export * from "./testimonial.schema";
 export * from "./user.schema";
 export * from "./artist.schema";
+export * from "./artist-availability.schema";
 export * from "./booking.schema";
 export * from "./booking-treatment.schema";
 export * from "./content.schema";

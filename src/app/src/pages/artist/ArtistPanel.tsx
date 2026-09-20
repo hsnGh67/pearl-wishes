@@ -1,4 +1,4 @@
-import { useState, useMemo, ReactNode } from "react";
+import { useState, useMemo, useEffect, ReactNode } from "react";
 import {
   CalendarDays,
   Clock,
@@ -14,12 +14,26 @@ import {
   Mail,
   X,
   MapPin,
+  Unlock,
 } from "lucide-react";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Link } from "react-router";
 import { toast } from "sonner";
 import { Toaster } from "../../../components/ui/sonner";
+import { useAuthContext } from "../../providers/AuthProvider";
+import type { WeeklyRhythmDay } from "../../schema/artist-availability.schema";
+import {
+  getArtistAvailability,
+  upsertArtistWeeklyRhythm,
+  upsertArtistMonthWeeklyRhythm,
+  upsertArtistDayOverride,
+  deleteArtistDayOverride,
+  applyRhythmToMonth,
+  submitArtistMonth,
+  unlockArtistMonth,
+  toYearMonth,
+} from "../../lib/db/artist-availability";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -120,16 +134,16 @@ const INITIAL_RHYTHM: WeeklyDay[] = [
   { dow: 0, dayName: "Sunday",    dayAbbr: "Sun", isWorking: false, startTime: "10:00", endTime: "18:00" },
 ];
 
-const OCTOBER_DAYS: DayEntry[] = Array.from({ length: 31 }, (_, i) => {
-  const d = i + 1;
-  return {
-    key:     `2026-10-${String(d).padStart(2, "0")}`,
-    dateNum: d,
-    dow:     new Date(2026, 9, d).getDay(),
-  };
-});
+const DOW_META: Record<number, { dayName: string; dayAbbr: string }> = {
+  0: { dayName: "Sunday",    dayAbbr: "Sun" },
+  1: { dayName: "Monday",    dayAbbr: "Mon" },
+  2: { dayName: "Tuesday",   dayAbbr: "Tue" },
+  3: { dayName: "Wednesday", dayAbbr: "Wed" },
+  4: { dayName: "Thursday",  dayAbbr: "Thu" },
+  5: { dayName: "Friday",    dayAbbr: "Fri" },
+  6: { dayName: "Saturday",  dayAbbr: "Sat" },
+};
 
-const ARTIST    = { name: "Sara Rossi", initials: "SR", role: "Nail Artist" };
 const AVATAR_BG = "#E9CFCA";
 
 const NAV_ITEMS: { id: NavTab; label: string; icon: typeof CalendarDays }[] = [
@@ -139,6 +153,63 @@ const NAV_ITEMS: { id: NavTab; label: string; icon: typeof CalendarDays }[] = [
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function buildMonthDays(year: number, month: number): DayEntry[] {
+  const last = new Date(year, month + 1, 0).getDate();
+  return Array.from({ length: last }, (_, i) => {
+    const d = i + 1;
+    const date = new Date(year, month, d);
+    return {
+      key: dateKey(date),
+      dateNum: d,
+      dow: date.getDay(),
+    };
+  });
+}
+
+function rhythmFromApi(days: WeeklyRhythmDay[]): WeeklyDay[] {
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  return order.map((dow) => {
+    const meta = DOW_META[dow];
+    const row = days.find((d) => d.dow === dow);
+    return {
+      dow,
+      dayName: meta.dayName,
+      dayAbbr: meta.dayAbbr,
+      isWorking: row?.is_working ?? false,
+      startTime: row?.start_time ?? "10:00",
+      endTime: row?.end_time ?? "18:00",
+    };
+  });
+}
+
+function rhythmToApi(days: WeeklyDay[]): WeeklyRhythmDay[] {
+  return days.map((d) => ({
+    dow: d.dow,
+    is_working: d.isWorking,
+    start_time: d.startTime,
+    end_time: d.endTime,
+  }));
+}
+
+function overridesFromApi(
+  rows: Array<{
+    work_date: string;
+    status: string;
+    start_time?: string | null;
+    end_time?: string | null;
+  }>,
+): Record<string, Override> {
+  const map: Record<string, Override> = {};
+  for (const row of rows) {
+    map[row.work_date] = {
+      status: row.status === "working" ? "working" : "off",
+      startTime: row.start_time ?? "10:00",
+      endTime: row.end_time ?? "18:00",
+    };
+  }
+  return map;
+}
 
 function resolveDay(
   entry:     DayEntry,
@@ -168,10 +239,10 @@ function groupByWeek(days: DayEntry[]): DayEntry[][] {
   return weeks;
 }
 
-function weekLabel(week: DayEntry[]): string {
+function weekLabel(week: DayEntry[], monthAbbr: string): string {
   const first = week[0];
   const last  = week[week.length - 1];
-  return `Oct ${first.dateNum}–${last.dateNum}`;
+  return `${monthAbbr} ${first.dateNum}–${last.dateNum}`;
 }
 
 function dateKey(d: Date): string {
@@ -806,67 +877,270 @@ function ScheduleView() {
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export function ArtistPanel() {
-  const [activeTab,  setActiveTab]  = useState<NavTab>("availability");
-  const [rhythm,     setRhythm]     = useState<WeeklyDay[]>(INITIAL_RHYTHM);
-  const [overrides,  setOverrides]  = useState<Record<string, Override>>({});
-  const [submitted,  setSubmitted]  = useState(false);
+  const { artist, isLoading: authLoading, signOut } = useAuthContext();
+
+  const [activeTab, setActiveTab] = useState<NavTab>("availability");
+  const [viewMonth, setViewMonth] = useState(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1);
+  });
+  const [rhythm, setRhythm] = useState<WeeklyDay[]>(INITIAL_RHYTHM);
+  const [defaultRhythm, setDefaultRhythm] = useState<WeeklyDay[]>(INITIAL_RHYTHM);
+  const [hasMonthRhythm, setHasMonthRhythm] = useState(false);
+  const [overrides, setOverrides] = useState<Record<string, Override>>({});
+  const [submitted, setSubmitted] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
-  const [editDraft,  setEditDraft]  = useState<EditDraft | null>(null);
+  const [editDraft, setEditDraft] = useState<EditDraft | null>(null);
+  const [loadingAvail, setLoadingAvail] = useState(false);
+  const [saving, setSaving] = useState(false);
 
-  const weekGroups = useMemo(() => groupByWeek(OCTOBER_DAYS), []);
+  const artistId = artist?.id ?? null;
+  const artistName = artist
+    ? `${artist.first_name} ${artist.last_name}`.trim()
+    : "Artist";
+  const artistInitials = artist
+    ? `${artist.first_name.charAt(0)}${artist.last_name.charAt(0)}`.toUpperCase()
+    : "PW";
 
-  // ── Rhythm ───────────────────────────────────────────────────────────────────
+  const monthDays = useMemo(
+    () => buildMonthDays(viewMonth.getFullYear(), viewMonth.getMonth()),
+    [viewMonth],
+  );
+  const weekGroups = useMemo(() => groupByWeek(monthDays), [monthDays]);
+  const monthTitle = viewMonth.toLocaleDateString("en-GB", {
+    month: "long",
+    year: "numeric",
+  });
+  const monthAbbr = viewMonth.toLocaleDateString("en-GB", { month: "short" });
+  const yearMonthKey = toYearMonth(viewMonth);
+
+  useEffect(() => {
+    if (!artistId) return;
+
+    let cancelled = false;
+    setLoadingAvail(true);
+    setEditingKey(null);
+    setEditDraft(null);
+
+    (async () => {
+      try {
+        const bundle = await getArtistAvailability(artistId, yearMonthKey);
+        if (cancelled) return;
+        const defaults = rhythmFromApi(bundle.rhythm);
+        setDefaultRhythm(defaults);
+        const customized = Boolean(
+          bundle.has_month_rhythm && (bundle.month_rhythm?.length ?? 0) > 0,
+        );
+        setHasMonthRhythm(customized);
+        setRhythm(
+          customized
+            ? rhythmFromApi(bundle.month_rhythm ?? [])
+            : defaults,
+        );
+        setOverrides(overridesFromApi(bundle.overrides));
+        setSubmitted(bundle.month.status === "submitted");
+      } catch (error) {
+        if (cancelled) return;
+        console.error(error);
+        toast.error("Failed to load availability.");
+      } finally {
+        if (!cancelled) setLoadingAvail(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [artistId, yearMonthKey]);
+
+  const shiftMonth = (dir: -1 | 1) => {
+    setViewMonth(
+      (prev) => new Date(prev.getFullYear(), prev.getMonth() + dir, 1),
+    );
+  };
 
   const updateRhythmDay = (dow: number, patch: Partial<WeeklyDay>) => {
-    setRhythm((prev) => prev.map((d) => (d.dow === dow ? { ...d, ...patch } : d)));
+    if (submitted || !artistId) return;
+    setRhythm((prev) => {
+      const next = prev.map((d) => (d.dow === dow ? { ...d, ...patch } : d));
+      // Month-scoped override — never clobber global defaults
+      void upsertArtistMonthWeeklyRhythm(
+        artistId,
+        yearMonthKey,
+        rhythmToApi(next),
+      )
+        .then(() => setHasMonthRhythm(true))
+        .catch(() => {
+          toast.error("Failed to save month weekly rhythm.");
+        });
+      return next;
+    });
   };
 
-  const applyToOctober = () => {
-    setOverrides({});
-    if (editingKey) { setEditingKey(null); setEditDraft(null); }
-    toast.success("Weekly rhythm applied to October 2026.");
+  /** Clear month custom week + day overrides; fall back to global defaults. */
+  const resetMonthToDefault = async () => {
+    if (!artistId || submitted) return;
+    setSaving(true);
+    try {
+      await applyRhythmToMonth(artistId, yearMonthKey);
+      setRhythm(defaultRhythm);
+      setHasMonthRhythm(false);
+      setOverrides({});
+      if (editingKey) {
+        setEditingKey(null);
+        setEditDraft(null);
+      }
+      toast.success(`${monthTitle} reset to default weekly rhythm.`);
+    } catch {
+      toast.error("Failed to reset month to defaults.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // ── Row editing ──────────────────────────────────────────────────────────────
+  /** Persist current editor hours into the global default template (other months unchanged). */
+  const saveAsDefaultRhythm = async () => {
+    if (!artistId || submitted) return;
+    setSaving(true);
+    try {
+      await upsertArtistWeeklyRhythm(artistId, rhythmToApi(rhythm));
+      setDefaultRhythm(rhythm);
+      toast.success("Saved as default weekly rhythm for months without a custom week.");
+    } catch {
+      toast.error("Failed to save default rhythm.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const startEdit = (entry: DayEntry) => {
     if (submitted) return;
     const resolved = resolveDay(entry, rhythm, overrides);
     setEditingKey(entry.key);
-    setEditDraft({ status: resolved.status, startTime: resolved.startTime, endTime: resolved.endTime });
+    setEditDraft({
+      status: resolved.status,
+      startTime: resolved.startTime,
+      endTime: resolved.endTime,
+    });
   };
 
-  const cancelEdit = () => { setEditingKey(null); setEditDraft(null); };
-
-  const saveEdit = (key: string) => {
-    if (!editDraft) return;
-    setOverrides((prev) => ({ ...prev, [key]: { ...editDraft } }));
+  const cancelEdit = () => {
     setEditingKey(null);
     setEditDraft(null);
-    toast.success("Day updated.");
   };
 
-  const resetOverride = (key: string) => {
-    setOverrides((prev) => { const n = { ...prev }; delete n[key]; return n; });
-    toast.success("Reset to weekly default.");
+  const saveEdit = async (key: string) => {
+    if (!editDraft || !artistId || submitted) return;
+    setSaving(true);
+    try {
+      await upsertArtistDayOverride({
+        artistId,
+        workDate: key,
+        status: editDraft.status,
+        startTime: editDraft.startTime,
+        endTime: editDraft.endTime,
+      });
+      setOverrides((prev) => ({ ...prev, [key]: { ...editDraft } }));
+      setEditingKey(null);
+      setEditDraft(null);
+      toast.success("Day updated.");
+    } catch {
+      toast.error("Failed to save day override.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // ── Submit ───────────────────────────────────────────────────────────────────
-
-  const handleSubmit = () => {
-    const count = OCTOBER_DAYS.filter(
-      (d) => resolveDay(d, rhythm, overrides).status === "working",
-    ).length;
-    setSubmitted(true);
-    toast.success(`Schedule submitted — ${count} working days locked for October 2026.`);
+  const resetOverride = async (key: string) => {
+    if (!artistId || submitted) return;
+    setSaving(true);
+    try {
+      await deleteArtistDayOverride(artistId, key);
+      setOverrides((prev) => {
+        const n = { ...prev };
+        delete n[key];
+        return n;
+      });
+      toast.success("Reset to weekly default.");
+    } catch {
+      toast.error("Failed to reset day.");
+    } finally {
+      setSaving(false);
+    }
   };
 
-  // ─────────────────────────────────────────────────────────────────────────────
+  const handleSubmit = async () => {
+    if (!artistId || submitted) return;
+    setSaving(true);
+    try {
+      // Persist the week shown for this month as a month override if customized
+      // or if the editor differs from defaults (first submit with edits).
+      await upsertArtistMonthWeeklyRhythm(
+        artistId,
+        yearMonthKey,
+        rhythmToApi(rhythm),
+      );
+      setHasMonthRhythm(true);
+      await submitArtistMonth(artistId, yearMonthKey);
+      const count = monthDays.filter(
+        (d) => resolveDay(d, rhythm, overrides).status === "working",
+      ).length;
+      setSubmitted(true);
+      setEditingKey(null);
+      setEditDraft(null);
+      toast.success(
+        `Schedule submitted for ${monthTitle} — ${count} working days.`,
+      );
+    } catch {
+      toast.error("Failed to submit schedule.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUnlock = async () => {
+    if (!artistId || !submitted) return;
+    setSaving(true);
+    try {
+      await unlockArtistMonth(artistId, yearMonthKey);
+      setSubmitted(false);
+      toast.success(`${monthTitle} unlocked for editing.`);
+    } catch {
+      toast.error("Failed to unlock month.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div
+        className="h-screen flex items-center justify-center"
+        style={{ backgroundColor: "#FEFCFA", color: "#9C9088" }}
+      >
+        Loading…
+      </div>
+    );
+  }
+
+  if (!artist) {
+    return (
+      <div
+        className="h-screen flex flex-col items-center justify-center gap-3"
+        style={{ backgroundColor: "#FEFCFA" }}
+      >
+        <p className="text-sm" style={{ color: "#9C9088" }}>
+          No artist profile linked to this account.
+        </p>
+        <Link to="/" className="text-sm underline" style={{ color: "#3D3935" }}>
+          Back to Website
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex overflow-hidden" style={{ backgroundColor: "#FEFCFA" }}>
-
-      {/* ── Sidebar ───────────────────────────────────────────────────────────── */}
       <aside
         className="w-64 border-r-2 flex flex-col shrink-0 h-screen"
         style={{ borderColor: "#3D3935", backgroundColor: "#FAF7F5" }}
@@ -892,11 +1166,11 @@ export function ArtistPanel() {
               className="w-10 h-10 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0"
               style={{ backgroundColor: AVATAR_BG, color: "#3D3935" }}
             >
-              {ARTIST.initials}
+              {artistInitials}
             </div>
             <div className="min-w-0">
-              <div className="font-semibold text-sm truncate" style={{ color: "#3D3935" }}>{ARTIST.name}</div>
-              <div className="text-xs" style={{ color: "#3D3935", opacity: 0.55 }}>{ARTIST.role}</div>
+              <div className="font-semibold text-sm truncate" style={{ color: "#3D3935" }}>{artistName}</div>
+              <div className="text-xs" style={{ color: "#3D3935", opacity: 0.55 }}>Nail Artist</div>
             </div>
           </div>
         </div>
@@ -911,9 +1185,9 @@ export function ArtistPanel() {
                 onClick={() => setActiveTab(id)}
                 className="w-full flex items-center gap-3 px-4 py-3 border-2 transition-all text-left"
                 style={{
-                  borderColor:     active ? "#3D3935" : "#DCD4CD",
+                  borderColor: active ? "#3D3935" : "#DCD4CD",
                   backgroundColor: active ? "#3D3935" : "transparent",
-                  color:           active ? "#FEFCFA" : "#3D3935",
+                  color: active ? "#FEFCFA" : "#3D3935",
                 }}
               >
                 <Icon className="w-5 h-5 flex-shrink-0" />
@@ -926,6 +1200,7 @@ export function ArtistPanel() {
         <div className="p-4 border-t-2 space-y-2" style={{ borderColor: "#3D3935" }}>
           <button
             type="button"
+            onClick={() => void signOut()}
             className="flex w-full items-center gap-3 px-4 py-3 border-2 transition-all"
             style={{ borderColor: "#DCD4CD", color: "#3D3935" }}
           >
@@ -942,10 +1217,7 @@ export function ArtistPanel() {
         </div>
       </aside>
 
-      {/* ── Main ──────────────────────────────────────────────────────────────── */}
       <main className="flex-1 h-screen overflow-y-auto">
-
-        {/* ── Availability tab ──────────────────────────────────────────────── */}
         {activeTab === "availability" && (
           <div className="p-8" style={{ maxWidth: 950 }}>
             <div className="mb-1 flex items-center gap-1 text-xs" style={{ color: "#3D3935", opacity: 0.45 }}>
@@ -956,22 +1228,24 @@ export function ArtistPanel() {
 
             <div className="flex items-center justify-between mb-6">
               <h1 className="text-xl font-semibold" style={{ color: "#3D3935" }}>
-                October 2026 Availability
+                {monthTitle} Availability
               </h1>
               <div className="flex items-center gap-2">
                 <div className="flex items-center border" style={{ borderColor: "#DCD4CD" }}>
                   <button
                     type="button"
+                    onClick={() => shiftMonth(-1)}
                     className="w-8 h-8 flex items-center justify-center border-r"
                     style={{ borderColor: "#DCD4CD", color: "#3D3935" }}
                   >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <span className="px-3 text-sm font-medium" style={{ color: "#3D3935" }}>
-                    October 2026
+                    {monthTitle}
                   </span>
                   <button
                     type="button"
+                    onClick={() => shiftMonth(1)}
                     className="w-8 h-8 flex items-center justify-center border-l"
                     style={{ borderColor: "#DCD4CD", color: "#3D3935" }}
                   >
@@ -979,15 +1253,31 @@ export function ArtistPanel() {
                   </button>
                 </div>
 
+                {submitted && (
+                  <Button
+                    type="button"
+                    onClick={() => void handleUnlock()}
+                    disabled={saving}
+                    className="text-sm h-8 border-2 flex items-center gap-1.5 px-3"
+                    style={{
+                      backgroundColor: "transparent",
+                      color: "#3D3935",
+                      borderColor: "#DCD4CD",
+                    }}
+                  >
+                    <Unlock className="w-3.5 h-3.5" /> Unlock
+                  </Button>
+                )}
+
                 <Button
                   type="button"
-                  onClick={handleSubmit}
-                  disabled={submitted}
+                  onClick={() => void handleSubmit()}
+                  disabled={submitted || saving || loadingAvail}
                   className="text-sm h-8 border-2 flex items-center gap-1.5 px-4"
                   style={{
                     backgroundColor: submitted ? "#DCD4CD" : "#3D3935",
-                    color:           submitted ? "#3D3935" : "#FEFCFA",
-                    borderColor:     submitted ? "#DCD4CD" : "#3D3935",
+                    color: submitted ? "#3D3935" : "#FEFCFA",
+                    borderColor: submitted ? "#DCD4CD" : "#3D3935",
                   }}
                 >
                   {submitted ? (
@@ -999,330 +1289,354 @@ export function ArtistPanel() {
               </div>
             </div>
 
-            <Card className="border-2 overflow-hidden" style={{ borderColor: "#DCD4CD" }}>
-
-              {/* Section 1: Default Weekly Rhythm */}
-              <div className="border-b-2" style={{ borderColor: "#DCD4CD" }}>
-                <div
-                  className="flex items-center justify-between px-5 py-3 border-b"
-                  style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
-                >
-                  <div>
-                    <span className="text-sm font-semibold" style={{ color: "#3D3935" }}>
-                      Default Weekly Rhythm
-                    </span>
-                    <span className="text-xs ml-2" style={{ color: "#9C9088" }}>
-                      Set your standard week pattern
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={applyToOctober}
-                    disabled={submitted}
-                    className="text-xs px-3 py-1.5 border-2 font-medium transition-all"
-                    style={{
-                      borderColor:     submitted ? "#DCD4CD" : "#3D3935",
-                      color:           submitted ? "#9C9088" : "#3D3935",
-                      backgroundColor: "transparent",
-                    }}
+            {loadingAvail ? (
+              <p className="text-sm" style={{ color: "#9C9088" }}>Loading availability…</p>
+            ) : (
+              <Card className="border-2 overflow-hidden" style={{ borderColor: "#DCD4CD" }}>
+                <div className="border-b-2" style={{ borderColor: "#DCD4CD" }}>
+                  <div
+                    className="flex items-center justify-between px-5 py-3 border-b"
+                    style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
                   >
-                    Apply to October
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-7 divide-x" style={{ borderColor: "#DCD4CD" }}>
-                  {rhythm.map((day) => (
-                    <div
-                      key={day.dow}
-                      className="p-3 flex flex-col gap-2"
-                      style={{
-                        borderColor:     "#DCD4CD",
-                        backgroundColor: day.isWorking ? "#FEFCFA" : "#FAF7F5",
-                      }}
-                    >
-                      <label
-                        className="flex items-center justify-between cursor-pointer"
-                        style={{ opacity: submitted ? 0.6 : 1 }}
+                    <div>
+                      <span className="text-sm font-semibold" style={{ color: "#3D3935" }}>
+                        Weekly Rhythm
+                      </span>
+                      <span className="text-xs ml-2" style={{ color: "#9C9088" }}>
+                        {hasMonthRhythm
+                          ? `Custom for ${monthAbbr}`
+                          : "Using studio default"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void saveAsDefaultRhythm()}
+                        disabled={submitted || saving}
+                        className="text-xs px-3 py-1.5 border-2 font-medium transition-all"
+                        style={{
+                          borderColor: submitted ? "#DCD4CD" : "#DCD4CD",
+                          color: submitted ? "#9C9088" : "#3D3935",
+                          backgroundColor: "transparent",
+                        }}
                       >
-                        <span
-                          className="text-xs font-semibold"
-                          style={{ color: day.isWorking ? "#3D3935" : "#9C9088" }}
+                        Save as default
+                      </button>
+                      {hasMonthRhythm && (
+                        <button
+                          type="button"
+                          onClick={() => void resetMonthToDefault()}
+                          disabled={submitted || saving}
+                          className="text-xs px-3 py-1.5 border-2 font-medium transition-all"
+                          style={{
+                            borderColor: submitted ? "#DCD4CD" : "#3D3935",
+                            color: submitted ? "#9C9088" : "#3D3935",
+                            backgroundColor: "transparent",
+                          }}
                         >
-                          {day.dayAbbr}
-                        </span>
-                        <input
-                          type="checkbox"
-                          checked={day.isWorking}
-                          disabled={submitted}
-                          onChange={(e) => updateRhythmDay(day.dow, { isWorking: e.target.checked })}
-                          className="w-3.5 h-3.5 accent-[#3D3935] cursor-pointer"
-                        />
-                      </label>
-
-                      {day.isWorking ? (
-                        <div className="space-y-1.5">
-                          <input
-                            type="time"
-                            value={day.startTime}
-                            disabled={submitted}
-                            onChange={(e) => updateRhythmDay(day.dow, { startTime: e.target.value })}
-                            className="w-full text-xs border px-1.5 py-1"
-                            style={{
-                              borderColor:     "#DCD4CD",
-                              color:           "#3D3935",
-                              backgroundColor: "#FEFCFA",
-                              outline:         "none",
-                            }}
-                          />
-                          <input
-                            type="time"
-                            value={day.endTime}
-                            disabled={submitted}
-                            onChange={(e) => updateRhythmDay(day.dow, { endTime: e.target.value })}
-                            className="w-full text-xs border px-1.5 py-1"
-                            style={{
-                              borderColor:     "#DCD4CD",
-                              color:           "#3D3935",
-                              backgroundColor: "#FEFCFA",
-                              outline:         "none",
-                            }}
-                          />
-                        </div>
-                      ) : (
-                        <span className="text-xs text-center py-1" style={{ color: "#C4BAB3" }}>
-                          Off
-                        </span>
+                          Reset to default
+                        </button>
                       )}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
 
-              {/* Section 2: October Schedule Feed */}
-              <div>
-                <div
-                  className="flex items-center justify-between px-5 py-3 border-b"
-                  style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
-                >
-                  <span className="text-sm font-semibold" style={{ color: "#3D3935" }}>
-                    October Schedule
-                  </span>
-                  <span className="text-xs" style={{ color: "#9C9088" }}>
-                    {OCTOBER_DAYS.filter((d) => resolveDay(d, rhythm, overrides).status === "working").length} working days
-                    {Object.keys(overrides).length > 0 && (
-                      <span className="ml-2" style={{ color: "#E9CFCA" }}>
-                        · {Object.keys(overrides).length} override{Object.keys(overrides).length !== 1 ? "s" : ""}
-                      </span>
-                    )}
-                  </span>
-                </div>
-
-                <div className="divide-y" style={{ borderColor: "#DCD4CD" }}>
-                  {weekGroups.map((week, wi) => (
-                    <div key={wi}>
+                  <div className="grid grid-cols-7 divide-x" style={{ borderColor: "#DCD4CD" }}>
+                    {rhythm.map((day) => (
                       <div
-                        className="px-5 py-1.5 flex items-center gap-2"
-                        style={{ backgroundColor: "#FAF7F5", borderBottom: "1px solid #DCD4CD" }}
+                        key={day.dow}
+                        className="p-3 flex flex-col gap-2"
+                        style={{
+                          borderColor: "#DCD4CD",
+                          backgroundColor: day.isWorking ? "#FEFCFA" : "#FAF7F5",
+                        }}
                       >
-                        <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#9C9088" }}>
-                          Week {wi + 1}
-                        </span>
-                        <span className="text-xs" style={{ color: "#C4BAB3" }}>
-                          — {weekLabel(week)}
-                        </span>
-                      </div>
-
-                      {week.map((entry) => {
-                        const resolved   = resolveDay(entry, rhythm, overrides);
-                        const isWorking  = resolved.status === "working";
-                        const isModified = Boolean(overrides[entry.key]);
-                        const isExpanded = editingKey === entry.key;
-
-                        return (
-                          <div
-                            key={entry.key}
-                            style={{
-                              borderBottom:    "1px solid #DCD4CD",
-                              backgroundColor: isModified
-                                ? "#FDF5F0"
-                                : isExpanded
-                                ? "#FAF7F5"
-                                : "#FEFCFA",
-                            }}
+                        <label
+                          className="flex items-center justify-between cursor-pointer"
+                          style={{ opacity: submitted ? 0.6 : 1 }}
+                        >
+                          <span
+                            className="text-xs font-semibold"
+                            style={{ color: day.isWorking ? "#3D3935" : "#9C9088" }}
                           >
-                            <div className="flex items-center gap-4 px-5 py-3">
-                              <span
-                                className="text-sm font-medium w-28 flex-shrink-0"
-                                style={{ color: "#3D3935" }}
-                              >
-                                {DOW_ABBR[entry.dow]}, Oct {entry.dateNum}
-                              </span>
+                            {day.dayAbbr}
+                          </span>
+                          <input
+                            type="checkbox"
+                            checked={day.isWorking}
+                            disabled={submitted || saving}
+                            onChange={(e) => updateRhythmDay(day.dow, { isWorking: e.target.checked })}
+                            className="w-3.5 h-3.5 accent-[#3D3935] cursor-pointer"
+                          />
+                        </label>
 
-                              <span
-                                className="text-sm flex-shrink-0 w-32"
-                                style={{ color: isWorking ? "#3D3935" : "#9C9088" }}
-                              >
-                                {isWorking
-                                  ? `${resolved.startTime}–${resolved.endTime}`
-                                  : "Off"}
-                              </span>
+                        {day.isWorking ? (
+                          <div className="space-y-1.5">
+                            <input
+                              type="time"
+                              value={day.startTime}
+                              disabled={submitted || saving}
+                              onChange={(e) => updateRhythmDay(day.dow, { startTime: e.target.value })}
+                              className="w-full text-xs border px-1.5 py-1"
+                              style={{
+                                borderColor: "#DCD4CD",
+                                color: "#3D3935",
+                                backgroundColor: "#FEFCFA",
+                                outline: "none",
+                              }}
+                            />
+                            <input
+                              type="time"
+                              value={day.endTime}
+                              disabled={submitted || saving}
+                              onChange={(e) => updateRhythmDay(day.dow, { endTime: e.target.value })}
+                              className="w-full text-xs border px-1.5 py-1"
+                              style={{
+                                borderColor: "#DCD4CD",
+                                color: "#3D3935",
+                                backgroundColor: "#FEFCFA",
+                                outline: "none",
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <span className="text-xs text-center py-1" style={{ color: "#C4BAB3" }}>
+                            Off
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
 
-                              <span
-                                className="text-xs px-2 py-0.5 font-medium flex-shrink-0"
-                                style={{
-                                  backgroundColor: isModified ? "#FCEAE0" : "#EDE8E3",
-                                  color:           isModified ? "#3D3935" : "#9C9088",
-                                }}
-                              >
-                                {isModified ? "Modified" : "Default"}
-                              </span>
+                <div>
+                  <div
+                    className="flex items-center justify-between px-5 py-3 border-b"
+                    style={{ borderColor: "#DCD4CD", backgroundColor: "#FAF7F5" }}
+                  >
+                    <span className="text-sm font-semibold" style={{ color: "#3D3935" }}>
+                      {monthAbbr} Schedule
+                    </span>
+                    <span className="text-xs" style={{ color: "#9C9088" }}>
+                      {monthDays.filter((d) => resolveDay(d, rhythm, overrides).status === "working").length} working days
+                      {Object.keys(overrides).length > 0 && (
+                        <span className="ml-2" style={{ color: "#E9CFCA" }}>
+                          · {Object.keys(overrides).length} override{Object.keys(overrides).length !== 1 ? "s" : ""}
+                        </span>
+                      )}
+                    </span>
+                  </div>
 
-                              <div className="flex-1" />
+                  <div className="divide-y" style={{ borderColor: "#DCD4CD" }}>
+                    {weekGroups.map((week, wi) => (
+                      <div key={wi}>
+                        <div
+                          className="px-5 py-1.5 flex items-center gap-2"
+                          style={{ backgroundColor: "#FAF7F5", borderBottom: "1px solid #DCD4CD" }}
+                        >
+                          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#9C9088" }}>
+                            Week {wi + 1}
+                          </span>
+                          <span className="text-xs" style={{ color: "#C4BAB3" }}>
+                            — {weekLabel(week, monthAbbr)}
+                          </span>
+                        </div>
 
-                              <div className="flex items-center gap-2 flex-shrink-0">
-                                {isModified && !isExpanded && (
-                                  <button
-                                    type="button"
-                                    onClick={() => resetOverride(entry.key)}
-                                    disabled={submitted}
-                                    className="flex items-center gap-1 text-xs py-1 px-2 border"
-                                    style={{
-                                      borderColor:     "#DCD4CD",
-                                      color:           "#9C9088",
-                                      backgroundColor: "transparent",
-                                    }}
-                                  >
-                                    <RotateCcw className="w-3 h-3" />
-                                    Reset
-                                  </button>
-                                )}
+                        {week.map((entry) => {
+                          const resolved = resolveDay(entry, rhythm, overrides);
+                          const isWorking = resolved.status === "working";
+                          const isModified = Boolean(overrides[entry.key]);
+                          const isExpanded = editingKey === entry.key;
 
-                                {!submitted && (
-                                  <button
-                                    type="button"
-                                    onClick={() => isExpanded ? cancelEdit() : startEdit(entry)}
-                                    className="flex items-center gap-1 text-xs py-1 px-2.5 border-2 font-medium transition-all"
-                                    style={{
-                                      borderColor:     isExpanded ? "#3D3935" : "#DCD4CD",
-                                      color:           isExpanded ? "#FEFCFA" : "#3D3935",
-                                      backgroundColor: isExpanded ? "#3D3935" : "transparent",
-                                    }}
-                                  >
-                                    {isExpanded ? (
-                                      "Cancel"
-                                    ) : (
-                                      <><Pencil className="w-3 h-3" /> Edit</>
-                                    )}
-                                  </button>
-                                )}
-                              </div>
-                            </div>
+                          return (
+                            <div
+                              key={entry.key}
+                              style={{
+                                borderBottom: "1px solid #DCD4CD",
+                                backgroundColor: isModified
+                                  ? "#FDF5F0"
+                                  : isExpanded
+                                    ? "#FAF7F5"
+                                    : "#FEFCFA",
+                              }}
+                            >
+                              <div className="flex items-center gap-4 px-5 py-3">
+                                <span
+                                  className="text-sm font-medium w-28 flex-shrink-0"
+                                  style={{ color: "#3D3935" }}
+                                >
+                                  {DOW_ABBR[entry.dow]}, {monthAbbr} {entry.dateNum}
+                                </span>
 
-                            {isExpanded && editDraft && (
-                              <div
-                                className="px-5 py-4 border-t"
-                                style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
-                              >
-                                <div className="flex items-start gap-6 flex-wrap">
-                                  <div className="flex flex-col gap-1.5">
-                                    <span className="text-xs font-medium" style={{ color: "#9C9088" }}>
-                                      Status
-                                    </span>
-                                    <div className="flex">
-                                      {(["working", "off"] as DayStatus[]).map((s) => (
-                                        <button
-                                          key={s}
-                                          type="button"
-                                          onClick={() =>
-                                            setEditDraft((d) => d ? { ...d, status: s } : d)
-                                          }
-                                          className="px-3 py-1.5 text-xs font-medium border-2 first:border-r-0 transition-all"
-                                          style={{
-                                            borderColor:     editDraft.status === s ? "#3D3935" : "#DCD4CD",
-                                            backgroundColor: editDraft.status === s ? "#3D3935" : "transparent",
-                                            color:           editDraft.status === s ? "#FEFCFA" : "#3D3935",
-                                          }}
-                                        >
-                                          {s === "working" ? "Working" : "Day Off"}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
+                                <span
+                                  className="text-sm flex-shrink-0 w-32"
+                                  style={{ color: isWorking ? "#3D3935" : "#9C9088" }}
+                                >
+                                  {isWorking
+                                    ? `${resolved.startTime}–${resolved.endTime}`
+                                    : "Off"}
+                                </span>
 
-                                  {editDraft.status === "working" && (
-                                    <div className="flex items-end gap-3">
-                                      <div className="flex flex-col gap-1.5">
-                                        <span className="text-xs font-medium" style={{ color: "#9C9088" }}>
-                                          Start time
-                                        </span>
-                                        <input
-                                          type="time"
-                                          value={editDraft.startTime}
-                                          onChange={(e) =>
-                                            setEditDraft((d) => d ? { ...d, startTime: e.target.value } : d)
-                                          }
-                                          className="border text-sm px-2 py-1.5 w-32"
-                                          style={{
-                                            borderColor:     "#DCD4CD",
-                                            color:           "#3D3935",
-                                            backgroundColor: "#FEFCFA",
-                                            outline:         "none",
-                                          }}
-                                        />
-                                      </div>
-                                      <span className="pb-2 text-xs" style={{ color: "#9C9088" }}>to</span>
-                                      <div className="flex flex-col gap-1.5">
-                                        <span className="text-xs font-medium" style={{ color: "#9C9088" }}>
-                                          End time
-                                        </span>
-                                        <input
-                                          type="time"
-                                          value={editDraft.endTime}
-                                          onChange={(e) =>
-                                            setEditDraft((d) => d ? { ...d, endTime: e.target.value } : d)
-                                          }
-                                          className="border text-sm px-2 py-1.5 w-32"
-                                          style={{
-                                            borderColor:     "#DCD4CD",
-                                            color:           "#3D3935",
-                                            backgroundColor: "#FEFCFA",
-                                            outline:         "none",
-                                          }}
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
+                                <span
+                                  className="text-xs px-2 py-0.5 font-medium flex-shrink-0"
+                                  style={{
+                                    backgroundColor: isModified ? "#FCEAE0" : "#EDE8E3",
+                                    color: isModified ? "#3D3935" : "#9C9088",
+                                  }}
+                                >
+                                  {isModified ? "Modified" : "Default"}
+                                </span>
 
-                                  <div className="flex items-end">
-                                    <Button
+                                <div className="flex-1" />
+
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  {isModified && !isExpanded && (
+                                    <button
                                       type="button"
-                                      onClick={() => saveEdit(entry.key)}
-                                      className="text-sm h-9 px-4 border-2"
+                                      onClick={() => void resetOverride(entry.key)}
+                                      disabled={submitted || saving}
+                                      className="flex items-center gap-1 text-xs py-1 px-2 border"
                                       style={{
-                                        backgroundColor: "#3D3935",
-                                        color:           "#FEFCFA",
-                                        borderColor:     "#3D3935",
+                                        borderColor: "#DCD4CD",
+                                        color: "#9C9088",
+                                        backgroundColor: "transparent",
                                       }}
                                     >
-                                      Save
-                                    </Button>
-                                  </div>
+                                      <RotateCcw className="w-3 h-3" />
+                                      Reset
+                                    </button>
+                                  )}
+
+                                  {!submitted && (
+                                    <button
+                                      type="button"
+                                      onClick={() => (isExpanded ? cancelEdit() : startEdit(entry))}
+                                      disabled={saving}
+                                      className="flex items-center gap-1 text-xs py-1 px-2.5 border-2 font-medium transition-all"
+                                      style={{
+                                        borderColor: isExpanded ? "#3D3935" : "#DCD4CD",
+                                        color: isExpanded ? "#FEFCFA" : "#3D3935",
+                                        backgroundColor: isExpanded ? "#3D3935" : "transparent",
+                                      }}
+                                    >
+                                      {isExpanded ? (
+                                        "Cancel"
+                                      ) : (
+                                        <><Pencil className="w-3 h-3" /> Edit</>
+                                      )}
+                                    </button>
+                                  )}
                                 </div>
                               </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              </div>
 
-            </Card>
+                              {isExpanded && editDraft && (
+                                <div
+                                  className="px-5 py-4 border-t"
+                                  style={{ borderColor: "#DCD4CD", backgroundColor: "#FEFCFA" }}
+                                >
+                                  <div className="flex items-start gap-6 flex-wrap">
+                                    <div className="flex flex-col gap-1.5">
+                                      <span className="text-xs font-medium" style={{ color: "#9C9088" }}>
+                                        Status
+                                      </span>
+                                      <div className="flex">
+                                        {(["working", "off"] as DayStatus[]).map((s) => (
+                                          <button
+                                            key={s}
+                                            type="button"
+                                            onClick={() =>
+                                              setEditDraft((d) => (d ? { ...d, status: s } : d))
+                                            }
+                                            className="px-3 py-1.5 text-xs font-medium border-2 first:border-r-0 transition-all"
+                                            style={{
+                                              borderColor: editDraft.status === s ? "#3D3935" : "#DCD4CD",
+                                              backgroundColor: editDraft.status === s ? "#3D3935" : "transparent",
+                                              color: editDraft.status === s ? "#FEFCFA" : "#3D3935",
+                                            }}
+                                          >
+                                            {s === "working" ? "Working" : "Day Off"}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    {editDraft.status === "working" && (
+                                      <div className="flex items-end gap-3">
+                                        <div className="flex flex-col gap-1.5">
+                                          <span className="text-xs font-medium" style={{ color: "#9C9088" }}>
+                                            Start time
+                                          </span>
+                                          <input
+                                            type="time"
+                                            value={editDraft.startTime}
+                                            onChange={(e) =>
+                                              setEditDraft((d) =>
+                                                d ? { ...d, startTime: e.target.value } : d,
+                                              )
+                                            }
+                                            className="border text-sm px-2 py-1.5 w-32"
+                                            style={{
+                                              borderColor: "#DCD4CD",
+                                              color: "#3D3935",
+                                              backgroundColor: "#FEFCFA",
+                                              outline: "none",
+                                            }}
+                                          />
+                                        </div>
+                                        <span className="pb-2 text-xs" style={{ color: "#9C9088" }}>to</span>
+                                        <div className="flex flex-col gap-1.5">
+                                          <span className="text-xs font-medium" style={{ color: "#9C9088" }}>
+                                            End time
+                                          </span>
+                                          <input
+                                            type="time"
+                                            value={editDraft.endTime}
+                                            onChange={(e) =>
+                                              setEditDraft((d) =>
+                                                d ? { ...d, endTime: e.target.value } : d,
+                                              )
+                                            }
+                                            className="border text-sm px-2 py-1.5 w-32"
+                                            style={{
+                                              borderColor: "#DCD4CD",
+                                              color: "#3D3935",
+                                              backgroundColor: "#FEFCFA",
+                                              outline: "none",
+                                            }}
+                                          />
+                                        </div>
+                                      </div>
+                                    )}
+
+                                    <div className="flex items-end">
+                                      <Button
+                                        type="button"
+                                        onClick={() => void saveEdit(entry.key)}
+                                        disabled={saving}
+                                        className="text-sm h-9 px-4 border-2"
+                                        style={{
+                                          backgroundColor: "#3D3935",
+                                          color: "#FEFCFA",
+                                          borderColor: "#3D3935",
+                                        }}
+                                      >
+                                        Save
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Card>
+            )}
           </div>
         )}
 
-        {/* ── Schedule tab ──────────────────────────────────────────────────── */}
         {activeTab === "schedule" && (
           <div className="p-8">
             <div className="mb-4 flex items-center gap-1 text-xs" style={{ color: "#3D3935", opacity: 0.45 }}>
@@ -1334,7 +1648,6 @@ export function ArtistPanel() {
           </div>
         )}
 
-        {/* ── Client History tab ────────────────────────────────────────────── */}
         {activeTab === "history" && (
           <div className="p-8" style={{ maxWidth: 950 }}>
             <div className="mb-1 flex items-center gap-1 text-xs" style={{ color: "#3D3935", opacity: 0.45 }}>
@@ -1351,7 +1664,6 @@ export function ArtistPanel() {
             </Card>
           </div>
         )}
-
       </main>
 
       <Toaster position="bottom-right" richColors />
