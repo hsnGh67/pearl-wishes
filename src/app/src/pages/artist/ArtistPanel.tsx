@@ -34,6 +34,13 @@ import {
   unlockArtistMonth,
   toYearMonth,
 } from "../../lib/db/artist-availability";
+import {
+  getBookingsForArtist,
+  type ArtistScheduleBooking,
+} from "../../lib/db/bookings";
+import { GAP_MINUTES_PER_SERVICE } from "../../lib/booking-schedule";
+import { BookingStatus } from "../../schema/booking.schema";
+import { BookingTreatmentStatus } from "../../schema/booking-treatment.schema";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,18 +76,19 @@ interface EditDraft {
   endTime:   string;
 }
 
-interface MockAppt {
-  id:          string;
-  date:        string;
-  startTime:   string;
-  endTime:     string;
-  durationMin: number;
-  clientName:  string;
+interface ScheduleAppt {
+  id:            string;
+  date:          string;
+  startTime:     string;
+  endTime:       string;
+  durationMin:   number;
+  clientName:    string;
   clientPhone:   string;
   clientEmail:   string;
   clientAddress: string;
   service:       string;
-  status:      ApptStatus;
+  status:        ApptStatus;
+  notes:         string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -98,31 +106,6 @@ const STATUS_CFG: Record<ApptStatus, { label: string; bg: string; accent: string
   pending:   { label: "Pending",   bg: "#F1DFC0", accent: "#C4883A", dotBg: "#C4883A" },
   completed: { label: "Completed", bg: "#DCD4CD", accent: "#9C9088", dotBg: "#9C9088" },
 };
-
-const MOCK_APPOINTMENTS: MockAppt[] = [
-  { id: "a1",  date: "2026-10-01", startTime: "10:00", endTime: "12:00", durationMin: 120, clientName: "Emma Laurent",    clientPhone: "+44 7123 456789", clientEmail: "emma.laurent@email.com", clientAddress: "14 Primrose Hill Road, London, NW3 3AD",       service: "Gel Extensions", status: "completed" },
-  { id: "a2",  date: "2026-10-01", startTime: "13:00", endTime: "14:00", durationMin:  60, clientName: "Sofia Marchetti", clientPhone: "+44 7234 567890", clientEmail: "sofia.m@email.com",      clientAddress: "7 King Street, London, WC2E 8HN",              service: "Gel Manicure",   status: "completed" },
-  { id: "a3",  date: "2026-10-01", startTime: "15:00", endTime: "15:30", durationMin:  30, clientName: "Isabelle Dubois", clientPhone: "+44 7345 678901", clientEmail: "i.dubois@email.com",     clientAddress: "22 Montague Place, London, WC1B 5BL",          service: "Polish Change",  status: "completed" },
-  { id: "a4",  date: "2026-10-02", startTime: "10:00", endTime: "11:30", durationMin:  90, clientName: "Chloe Bernard",   clientPhone: "+44 7456 789012", clientEmail: "chloe.b@email.com",      clientAddress: "5 Elgin Avenue, London, W9 3QP",               service: "Nail Art",       status: "completed" },
-  { id: "a5",  date: "2026-10-02", startTime: "12:30", endTime: "13:30", durationMin:  60, clientName: "Natasha Volkov",  clientPhone: "+44 7567 890123", clientEmail: "n.volkov@email.com",     clientAddress: "38 Kensington Park Road, London, W11 2EU",     service: "French Tips",    status: "completed" },
-  { id: "a6",  date: "2026-10-05", startTime: "10:00", endTime: "11:15", durationMin:  75, clientName: "Priya Sharma",    clientPhone: "+44 7678 901234", clientEmail: "priya.s@email.com",      clientAddress: "91 Brick Lane, London, E1 6QL",                service: "Acrylic Fill",   status: "completed" },
-  { id: "a7",  date: "2026-10-05", startTime: "12:00", endTime: "14:00", durationMin: 120, clientName: "Amara Okafor",    clientPhone: "+44 7789 012345", clientEmail: "a.okafor@email.com",     clientAddress: "3 Coldharbour Lane, London, SE5 9NR",          service: "Gel Extensions", status: "completed" },
-  { id: "a8",  date: "2026-10-06", startTime: "10:00", endTime: "11:00", durationMin:  60, clientName: "Lucia Romano",    clientPhone: "+44 7890 123456", clientEmail: "l.romano@email.com",     clientAddress: "55 Battersea Park Road, London, SW11 4LR",     service: "Gel Manicure",   status: "completed" },
-  { id: "a9",  date: "2026-10-06", startTime: "14:00", endTime: "15:30", durationMin:  90, clientName: "Emma Laurent",    clientPhone: "+44 7123 456789", clientEmail: "emma.laurent@email.com", clientAddress: "14 Primrose Hill Road, London, NW3 3AD",       service: "Nail Art",       status: "completed" },
-  { id: "a10", date: "2026-10-07", startTime: "10:30", endTime: "12:00", durationMin:  90, clientName: "Sofia Marchetti", clientPhone: "+44 7234 567890", clientEmail: "sofia.m@email.com",      clientAddress: "7 King Street, London, WC2E 8HN",              service: "SNS Dip Powder", status: "completed" },
-  { id: "a11", date: "2026-10-07", startTime: "14:00", endTime: "15:00", durationMin:  60, clientName: "Chloe Bernard",   clientPhone: "+44 7456 789012", clientEmail: "chloe.b@email.com",      clientAddress: "5 Elgin Avenue, London, W9 3QP",               service: "Gel Pedicure",   status: "completed" },
-  { id: "a12", date: "2026-10-08", startTime: "10:00", endTime: "12:00", durationMin: 120, clientName: "Isabelle Dubois", clientPhone: "+44 7345 678901", clientEmail: "i.dubois@email.com",     clientAddress: "22 Montague Place, London, WC1B 5BL",          service: "Gel Extensions", status: "completed" },
-  { id: "a13", date: "2026-10-09", startTime: "10:00", endTime: "11:00", durationMin:  60, clientName: "Natasha Volkov",  clientPhone: "+44 7567 890123", clientEmail: "n.volkov@email.com",     clientAddress: "38 Kensington Park Road, London, W11 2EU",     service: "French Tips",    status: "completed" },
-  { id: "a14", date: "2026-10-09", startTime: "12:00", endTime: "12:30", durationMin:  30, clientName: "Priya Sharma",    clientPhone: "+44 7678 901234", clientEmail: "priya.s@email.com",      clientAddress: "91 Brick Lane, London, E1 6QL",                service: "Nail Repair",    status: "completed" },
-  { id: "a15", date: "2026-10-09", startTime: "14:30", endTime: "15:30", durationMin:  60, clientName: "Amara Okafor",    clientPhone: "+44 7789 012345", clientEmail: "a.okafor@email.com",     clientAddress: "3 Coldharbour Lane, London, SE5 9NR",          service: "Gel Manicure",   status: "completed" },
-  { id: "a16", date: "2026-10-12", startTime: "10:00", endTime: "10:30", durationMin:  30, clientName: "Lucia Romano",    clientPhone: "+44 7890 123456", clientEmail: "l.romano@email.com",     clientAddress: "55 Battersea Park Road, London, SW11 4LR",     service: "Polish Change",  status: "confirmed" },
-  { id: "a17", date: "2026-10-12", startTime: "11:00", endTime: "12:30", durationMin:  90, clientName: "Emma Laurent",    clientPhone: "+44 7123 456789", clientEmail: "emma.laurent@email.com", clientAddress: "14 Primrose Hill Road, London, NW3 3AD",       service: "Nail Art",       status: "confirmed" },
-  { id: "a18", date: "2026-10-13", startTime: "10:00", endTime: "11:15", durationMin:  75, clientName: "Sofia Marchetti", clientPhone: "+44 7234 567890", clientEmail: "sofia.m@email.com",      clientAddress: "7 King Street, London, WC2E 8HN",              service: "Acrylic Fill",   status: "confirmed" },
-  { id: "a19", date: "2026-10-13", startTime: "14:00", endTime: "16:00", durationMin: 120, clientName: "Chloe Bernard",   clientPhone: "+44 7456 789012", clientEmail: "chloe.b@email.com",      clientAddress: "5 Elgin Avenue, London, W9 3QP",               service: "Gel Extensions", status: "pending"   },
-  { id: "a20", date: "2026-10-14", startTime: "10:00", endTime: "11:00", durationMin:  60, clientName: "Natasha Volkov",  clientPhone: "+44 7567 890123", clientEmail: "n.volkov@email.com",     clientAddress: "38 Kensington Park Road, London, W11 2EU",     service: "Gel Manicure",   status: "confirmed" },
-  { id: "a21", date: "2026-10-15", startTime: "11:00", endTime: "12:30", durationMin:  90, clientName: "Isabelle Dubois", clientPhone: "+44 7345 678901", clientEmail: "i.dubois@email.com",     clientAddress: "22 Montague Place, London, WC1B 5BL",          service: "SNS Dip Powder", status: "pending"   },
-  { id: "a22", date: "2026-10-16", startTime: "10:00", endTime: "11:30", durationMin:  90, clientName: "Priya Sharma",    clientPhone: "+44 7678 901234", clientEmail: "priya.s@email.com",      clientAddress: "91 Brick Lane, London, E1 6QL",                service: "Nail Art",       status: "pending"   },
-];
 
 const INITIAL_RHYTHM: WeeklyDay[] = [
   { dow: 1, dayName: "Monday",    dayAbbr: "Mon", isWorking: true,  startTime: "10:00", endTime: "18:00" },
@@ -260,6 +243,85 @@ function getWeekStart(d: Date): Date {
   return result;
 }
 
+function scheduleRangeForView(view: CalView, date: Date): { from: Date; to: Date } {
+  if (view === "day") {
+    const day = new Date(date);
+    day.setHours(0, 0, 0, 0);
+    return { from: day, to: day };
+  }
+  if (view === "week") {
+    const from = getWeekStart(date);
+    const to = new Date(from);
+    to.setDate(from.getDate() + 6);
+    return { from, to };
+  }
+  const from = new Date(date.getFullYear(), date.getMonth(), 1);
+  const to = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+  return { from, to };
+}
+
+function addMinutesToTime(startTime: string, durationMin: number): string {
+  const [h, m] = startTime.slice(0, 5).split(":").map(Number);
+  const total = (h || 0) * 60 + (m || 0) + durationMin;
+  const hh = Math.floor(total / 60) % 24;
+  const mm = total % 60;
+  return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
+}
+
+function mapBookingStatus(status: string | undefined): ApptStatus | null {
+  switch (status) {
+    case BookingStatus.PENDING:
+      return "pending";
+    case BookingStatus.CONFIRMED:
+    case BookingStatus.IN_PROGRESS:
+      return "confirmed";
+    case BookingStatus.COMPLETED:
+      return "completed";
+    default:
+      return null;
+  }
+}
+
+function mapBookingToScheduleAppt(booking: ArtistScheduleBooking): ScheduleAppt | null {
+  const status = mapBookingStatus(booking.status);
+  if (!status || !booking.id) return null;
+
+  const activeTreatments = (booking.services ?? []).filter(
+    (t) => !t.status || t.status === BookingTreatmentStatus.ACTIVE,
+  );
+  const durationMin =
+    activeTreatments.length === 0
+      ? 60
+      : activeTreatments.reduce((sum, t) => sum + (Number(t.duration) || 0), 0) +
+        Math.max(activeTreatments.length - 1, 0) * GAP_MINUTES_PER_SERVICE;
+
+  const startTime = String(booking.appointment_time).slice(0, 5);
+  const dateRaw = booking.appointment_date;
+  const date =
+    typeof dateRaw === "string"
+      ? dateRaw.slice(0, 10)
+      : dateKey(new Date(dateRaw));
+
+  return {
+    id: booking.id,
+    date,
+    startTime,
+    endTime: addMinutesToTime(startTime, durationMin),
+    durationMin,
+    clientName: booking.user?.full_name?.trim() || "Client",
+    clientPhone: booking.user?.phone?.trim() || "—",
+    clientEmail: booking.user?.email?.trim() || "—",
+    clientAddress: booking.address || "—",
+    service:
+      activeTreatments
+        .map((t) => t.service_name)
+        .filter(Boolean)
+        .join(" · ") || "Service",
+    status,
+    notes: booking.notes?.trim() || "",
+  };
+}
+
 function buildMonthCells(year: number, month: number): { date: Date; isCurrentMonth: boolean }[] {
   const firstDay = new Date(year, month, 1);
   const lastDay  = new Date(year, month + 1, 0);
@@ -306,7 +368,7 @@ function AppointmentDrawer({
   onNotesChange,
   onClose,
 }: {
-  appt:          MockAppt;
+  appt:          ScheduleAppt;
   notes:         string;
   onNotesChange: (v: string) => void;
   onClose:       () => void;
@@ -433,8 +495,8 @@ function ArtistDayView({
   onSelect,
 }: {
   date:         Date;
-  appointments: MockAppt[];
-  onSelect:     (a: MockAppt) => void;
+  appointments: ScheduleAppt[];
+  onSelect:     (a: ScheduleAppt) => void;
 }) {
   const totalH   = (CLOSE_HOUR - OPEN_HOUR) * HOUR_H_DAY;
   const hours    = Array.from({ length: CLOSE_HOUR - OPEN_HOUR }, (_, i) => OPEN_HOUR + i);
@@ -524,8 +586,8 @@ function ArtistWeekView({
   onSelect,
 }: {
   date:         Date;
-  appointments: MockAppt[];
-  onSelect:     (a: MockAppt) => void;
+  appointments: ScheduleAppt[];
+  onSelect:     (a: ScheduleAppt) => void;
 }) {
   const weekStart = getWeekStart(date);
   const days      = Array.from({ length: 7 }, (_, i) => {
@@ -661,8 +723,8 @@ function ArtistMonthView({
   onSelect,
 }: {
   date:         Date;
-  appointments: MockAppt[];
-  onSelect:     (a: MockAppt) => void;
+  appointments: ScheduleAppt[];
+  onSelect:     (a: ScheduleAppt) => void;
 }) {
   const cells    = buildMonthCells(date.getFullYear(), date.getMonth());
   const todayStr = dateKey(new Date());
@@ -748,11 +810,64 @@ function ArtistMonthView({
 
 // ─── Schedule View (tab root) ─────────────────────────────────────────────────
 
-function ScheduleView() {
+function ScheduleView({ artistId }: { artistId: string | null }) {
   const [view,     setView]     = useState<CalView>("week");
-  const [date,     setDate]     = useState(new Date(2026, 9, 5)); // Mon Oct 5
-  const [selected, setSelected] = useState<MockAppt | null>(null);
+  const [date,     setDate]     = useState(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return today;
+  });
+  const [selected, setSelected] = useState<ScheduleAppt | null>(null);
   const [notes,    setNotes]    = useState<Record<string, string>>({});
+  const [appointments, setAppointments] = useState<ScheduleAppt[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const { from: rangeFrom, to: rangeTo } = useMemo(
+    () => scheduleRangeForView(view, date),
+    [view, date],
+  );
+  const rangeKey = `${dateKey(rangeFrom)}_${dateKey(rangeTo)}`;
+
+  useEffect(() => {
+    if (!artistId) {
+      setAppointments([]);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+
+    (async () => {
+      try {
+        const rows = await getBookingsForArtist(artistId, rangeFrom, rangeTo);
+        if (cancelled) return;
+        const mapped = rows
+          .map(mapBookingToScheduleAppt)
+          .filter((a): a is ScheduleAppt => a !== null);
+        setAppointments(mapped);
+        setNotes((prev) => {
+          const next = { ...prev };
+          for (const appt of mapped) {
+            if (next[appt.id] === undefined && appt.notes) {
+              next[appt.id] = appt.notes;
+            }
+          }
+          return next;
+        });
+      } catch {
+        if (!cancelled) {
+          setAppointments([]);
+          toast.error("Failed to load schedule bookings");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [artistId, rangeKey, rangeFrom, rangeTo]);
 
   const navigate = (dir: -1 | 1) => {
     setDate((d) => {
@@ -836,15 +951,23 @@ function ScheduleView() {
       </div>
 
       {/* Calendar card */}
-      <Card className="border-2 overflow-hidden" style={{ borderColor: "#DCD4CD" }}>
+      <Card className="border-2 overflow-hidden relative" style={{ borderColor: "#DCD4CD" }}>
+        {loading && (
+          <div
+            className="absolute inset-0 z-10 flex items-center justify-center text-sm"
+            style={{ backgroundColor: "rgba(254,252,250,0.7)", color: "#9C9088" }}
+          >
+            Loading schedule…
+          </div>
+        )}
         {view === "day"   && (
-          <ArtistDayView   date={date} appointments={MOCK_APPOINTMENTS} onSelect={setSelected} />
+          <ArtistDayView   date={date} appointments={appointments} onSelect={setSelected} />
         )}
         {view === "week"  && (
-          <ArtistWeekView  date={date} appointments={MOCK_APPOINTMENTS} onSelect={setSelected} />
+          <ArtistWeekView  date={date} appointments={appointments} onSelect={setSelected} />
         )}
         {view === "month" && (
-          <ArtistMonthView date={date} appointments={MOCK_APPOINTMENTS} onSelect={setSelected} />
+          <ArtistMonthView date={date} appointments={appointments} onSelect={setSelected} />
         )}
       </Card>
 
@@ -865,7 +988,7 @@ function ScheduleView() {
       {selected && (
         <AppointmentDrawer
           appt={selected}
-          notes={notes[selected.id] ?? ""}
+          notes={notes[selected.id] ?? selected.notes ?? ""}
           onNotesChange={(v) => setNotes((n) => ({ ...n, [selected!.id]: v }))}
           onClose={() => setSelected(null)}
         />
@@ -1644,7 +1767,7 @@ export function ArtistPanel() {
               <span>/</span>
               <span style={{ fontWeight: 600 }}>Schedule</span>
             </div>
-            <ScheduleView />
+            <ScheduleView artistId={artistId} />
           </div>
         )}
 

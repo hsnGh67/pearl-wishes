@@ -128,6 +128,78 @@ export const getBookingsByStatus = async (
   }
 };
 
+export type ArtistScheduleBookingTreatment = {
+  id?: string;
+  service_name?: string;
+  duration?: number;
+  status?: string;
+};
+
+export type ArtistScheduleBookingUser = {
+  full_name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+};
+
+/** Booking row for artist schedule UI (keeps nested treatments + client). */
+export type ArtistScheduleBooking = Booking & {
+  services?: ArtistScheduleBookingTreatment[] | null;
+  user?: ArtistScheduleBookingUser | null;
+  notes?: string | null;
+};
+
+/**
+ * Bookings assigned to an artist within an inclusive appointment-date range.
+ */
+export const getBookingsForArtist = async (
+  artistId: string,
+  fromDate: Date,
+  toDate: Date,
+): Promise<ArtistScheduleBooking[]> => {
+  const from = formatDate(fromDate);
+  const to = formatDate(toDate);
+
+  try {
+    dbLogger.info("Fetching bookings for artist schedule", {
+      table: "bookings",
+      data: { artistId, from, to },
+    });
+
+    const { data, error } = await supabase
+      .from("bookings")
+      .select(
+        `*, services:booking_treatments (*), user:users!bookings_user_id_fkey (full_name, phone, email)`,
+      )
+      .eq("artist_id", artistId)
+      .gte("appointment_date", from)
+      .lte("appointment_date", to)
+      .neq("status", BookingStatus.CANCELLED)
+      .neq("status", BookingStatus.NO_SHOW)
+      .order("appointment_date", { ascending: true })
+      .order("appointment_time", { ascending: true });
+
+    if (error) {
+      dbLogger.error("Failed to fetch artist schedule bookings", {
+        table: "bookings",
+        error,
+      });
+      throw error;
+    }
+
+    const rows = (data ?? []) as ArtistScheduleBooking[];
+
+    dbLogger.info("Successfully fetched artist schedule bookings", {
+      table: "bookings",
+      data: { artistId, count: rows.length },
+    });
+
+    return rows;
+  } catch (error) {
+    dbLogger.error("Error in getBookingsForArtist", { error });
+    throw error;
+  }
+};
+
 /**
  * Booked time slot for a specific date, including estimated duration from booking treatments
  */
