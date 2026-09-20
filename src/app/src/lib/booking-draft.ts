@@ -3,7 +3,7 @@
  * Survives refresh / soft dialog dismiss; cleared on successful booking.
  */
 
-export const BOOKING_DRAFT_VERSION = 2;
+export const BOOKING_DRAFT_VERSION = 3;
 
 export const BookingDraftKeys = {
   appointment: "pws:booking-draft:appointment",

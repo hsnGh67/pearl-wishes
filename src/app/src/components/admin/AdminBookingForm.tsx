@@ -32,7 +32,6 @@ import { Calendar } from "../../../components/ui/calendar";
 import {
   Booking,
   BookingStatus,
-  getBusinessHoursForDate,
   PaymentStatus,
 } from "../../schema/booking.schema";
 import {
@@ -47,10 +46,8 @@ import {
 } from "../../lib/db/users";
 import { getAllServices } from "../../lib/db/services";
 import {
-  BookedTimeSlot,
   createBooking,
   deleteBooking,
-  getBookedTimesForDate,
   getBookingById,
   updateBooking,
 } from "../../lib/db/bookings";
@@ -67,10 +64,6 @@ import { Separator } from "../../../components/ui/separator";
 import useDebounce from "../../utils/useDebounce";
 import { getAllDistricts } from "../../lib/db/districts";
 import { formatDate } from "../../utils/formatDate";
-import {
-  getWorkshopBookingById,
-  getWorkshopTimesForDate,
-} from "../../lib/db/workshop-bookings";
 import { createBookingWithTreatments } from "../../lib/db/booking-with-treatments";
 import { ArtistSelectionSection } from "../booking/ArtistSelectionSection";
 import { formatArtistDisplayName } from "../../lib/db/available-artists";
@@ -83,6 +76,29 @@ import { PromoValidationResult } from "../../schema/promo-code.schema";
 import { useBookingDraft } from "../../hooks/useBookingDraft";
 import { BookingDraftKeys } from "../../lib/booking-draft";
 import { getBusinessSettings } from "../../lib/db/business-settings";
+import {
+  GAP_MINUTES,
+  GAP_MINUTES_PER_PEOPLE,
+  GAP_MINUTES_PER_SERVICE,
+  isDateDisabledByBookableSet,
+  resolveActiveBuffer,
+  toDateKeySet,
+  type SchedulePreference,
+} from "../../lib/booking-schedule";
+import {
+  assignArtistForSlot,
+  getBookableDatesForArtist,
+  getBookableDatesForServices,
+  getFreeTimesForArtist,
+  getFreeTimesForServices,
+  monthDateRange,
+} from "../../lib/db/booking-schedule";
+
+export {
+  GAP_MINUTES,
+  GAP_MINUTES_PER_PEOPLE,
+  GAP_MINUTES_PER_SERVICE,
+};
 
 interface AdminBookingFormProps {
   open: boolean;
@@ -106,9 +122,18 @@ interface TreatmentSelection {
   }>;
 }
 
+type AdminStep =
+  | "user"
+  | "treatments"
+  | "preference"
+  | "artist"
+  | "date"
+  | "time"
+  | "review";
+
 type AdminCreateBookingDraft = {
-  currentStep:
-    "user" | "treatments" | "schedule" | "artist" | "review";
+  currentStep: AdminStep;
+  schedulePreference: SchedulePreference | null;
   selectedArtistId: string;
   selectedArtistName: string;
   selectedUserId: string;
@@ -138,49 +163,7 @@ type AdminCreateBookingDraft = {
     discountAmount: number;
     finalTotal: number;
   } | null;
-};
-
-export const GAP_MINUTES = 30;
-export const GAP_MINUTES_PER_PEOPLE = 10;
-export const GAP_MINUTES_PER_SERVICE = 5;
-
-const generateTimeSlots = (
-  totalDurationMinutes: number,
-  selectedDate: Date | undefined,
-  gapMinutes = GAP_MINUTES,
-) => {
-  const slots = [];
-
-  // Get business hours for the selected date
-  const date = selectedDate || new Date();
-  const {
-    startHour: businessOpenHour,
-    endHour: businessCloseHour,
-  } = getBusinessHoursForDate(date);
-
-  // Latest valid start: service must finish by closing time
-  const businessCloseMinutes = businessCloseHour * 60;
-  const latestStartMinutes =
-    businessCloseMinutes - totalDurationMinutes;
-
-  // Step = buffer only; overlap with existing bookings is handled by isSlotBlocked
-  const stepMinutes = gapMinutes;
-  const businessOpenMinutes = businessOpenHour * 60;
-
-  for (
-    let timeInMinutes = businessOpenMinutes;
-    timeInMinutes <= latestStartMinutes;
-    timeInMinutes += stepMinutes
-  ) {
-    const startHour = Math.floor(timeInMinutes / 60);
-    const startMinute = timeInMinutes % 60;
-    const startTime = `${startHour.toString().padStart(2, "0")}:${startMinute.toString().padStart(2, "0")}`;
-
-    slots.push(startTime);
-  }
-
-  return slots;
-};
+}; 
 
 export function AdminBookingForm({
   open,
@@ -192,13 +175,26 @@ export function AdminBookingForm({
   const [users, setUsers] = useState<UserType[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [districts, setDistricts] = useState([]);
-  const [bookedTimeSlots, setBookedTimeSlots] = useState<
-    BookedTimeSlot[]
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<
+    string[]
   >([]);
+  const [bookableDateKeys, setBookableDateKeys] =
+    useState<Set<string> | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(
+    () => new Date(),
+  );
+  const [getBookableDatesState, setGetBookableDatesState] =
+    useState({ isLoading: false, hasError: false });
   const [getTimeSlotsState, setGetTimeSlotsState] = useState({
     isLoading: false,
     hasError: false,
   });
+  const [schedulePreference, setSchedulePreference] =
+    useState<SchedulePreference | null>(null);
+  const [isAssigningArtist, setIsAssigningArtist] =
+    useState(false);
+  const [showArtistOverride, setShowArtistOverride] =
+    useState(false);
   const [bufferMinutes, setBufferMinutes] =
     useState(GAP_MINUTES);
   const [bufferEffectiveFrom, setBufferEffectiveFrom] =
@@ -264,9 +260,8 @@ export function AdminBookingForm({
   >([]);
 
   const [loading, setLoading] = useState(false);
-  const [currentStep, setCurrentStep] = useState<
-    "user" | "treatments" | "schedule" | "artist" | "review"
-  >("user");
+  const [currentStep, setCurrentStep] =
+    useState<AdminStep>("user");
 
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [promoValidating, setPromoValidating] = useState(false);
@@ -284,6 +279,7 @@ export function AdminBookingForm({
   const adminDraftSnapshot = useMemo<AdminCreateBookingDraft>(
     () => ({
       currentStep,
+      schedulePreference,
       selectedUserId,
       showNewUserForm,
       newUser,
@@ -302,6 +298,7 @@ export function AdminBookingForm({
     }),
     [
       currentStep,
+      schedulePreference,
       selectedUserId,
       showNewUserForm,
       newUser,
@@ -344,6 +341,7 @@ export function AdminBookingForm({
         setSelectedTime(draft.selectedTime || "");
         setSelectedArtistId(draft.selectedArtistId || "");
         setSelectedArtistName(draft.selectedArtistName || "");
+        setSchedulePreference(draft.schedulePreference ?? null);
         if (draft.paymentStatus) {
           setPaymentStatus(draft.paymentStatus);
         }
@@ -452,6 +450,9 @@ export function AdminBookingForm({
 
     skipArtistResetRef.current = true;
     console.log("existingBooking ==>", existingBooking);
+    setSchedulePreference(
+      existingBooking.artist_id ? "artist" : "date",
+    );
     setSelectedUserId(existingBooking.user_id);
     setSelectedDate(
       new Date(existingBooking.appointment_date) < new Date()
@@ -517,20 +518,109 @@ export function AdminBookingForm({
     }, 0);
   };
 
-  const getTimeSlots = async () => {
+  const serviceIdsForSchedule = treatments
+    .map((t) => t.serviceId)
+    .filter(Boolean);
+
+  const treatmentServiceIdsKey = [...serviceIdsForSchedule]
+    .sort()
+    .join(",");
+
+  const activeBuffer = resolveActiveBuffer({
+    selectedDate,
+    bufferMinutes,
+    previousBufferMinutes,
+    bufferEffectiveFrom,
+  });
+
+  const excludeBookingId =
+    mode === "reschedule" && existingBooking?.id
+      ? existingBooking.id
+      : undefined;
+
+  const loadBookableDates = async () => {
+    if (!address.district || serviceIdsForSchedule.length === 0) {
+      setBookableDateKeys(new Set());
+      return;
+    }
+    if (schedulePreference === "artist" && !selectedArtistId) {
+      setBookableDateKeys(new Set());
+      return;
+    }
+
+    setGetBookableDatesState({ isLoading: true, hasError: false });
+    try {
+      const { fromDate, toDate } = monthDateRange(calendarMonth);
+      const bufferForRange = resolveActiveBuffer({
+        selectedDate: fromDate,
+        bufferMinutes,
+        previousBufferMinutes,
+        bufferEffectiveFrom,
+      });
+      const duration = totalDuration || 60;
+      const dates =
+        schedulePreference === "artist" && selectedArtistId
+          ? await getBookableDatesForArtist({
+              artistId: selectedArtistId,
+              districtName: address.district,
+              serviceIds: serviceIdsForSchedule,
+              fromDate,
+              toDate,
+              durationMinutes: duration,
+              bufferMinutes: bufferForRange,
+              excludeBookingId,
+            })
+          : await getBookableDatesForServices({
+              districtName: address.district,
+              serviceIds: serviceIdsForSchedule,
+              fromDate,
+              toDate,
+              durationMinutes: duration,
+              bufferMinutes: bufferForRange,
+              excludeBookingId,
+            });
+      setBookableDateKeys(toDateKeySet(dates));
+      setGetBookableDatesState({
+        isLoading: false,
+        hasError: false,
+      });
+    } catch (error) {
+      console.error("Failed to load bookable dates", error);
+      setBookableDateKeys(new Set());
+      setGetBookableDatesState({
+        isLoading: false,
+        hasError: true,
+      });
+    }
+  };
+
+  const loadAvailableTimes = async () => {
     if (!selectedDate) {
-      setBookedTimeSlots([]);
+      setAvailableTimeSlots([]);
       return;
     }
 
     setGetTimeSlotsState({ isLoading: true, hasError: false });
-
     try {
-      const [slots, workshopSlots] = await Promise.all([
-        getBookedTimesForDate(selectedDate),
-        getWorkshopTimesForDate(selectedDate),
-      ]);
-      setBookedTimeSlots([...workshopSlots, ...slots]);
+      const duration = totalDuration || 60;
+      const slots =
+        schedulePreference === "artist" && selectedArtistId
+          ? await getFreeTimesForArtist({
+              artistId: selectedArtistId,
+              appointmentDate: selectedDate,
+              durationMinutes: duration,
+              bufferMinutes: activeBuffer,
+              excludeBookingId,
+            })
+          : await getFreeTimesForServices({
+              districtName: address.district,
+              serviceIds: serviceIdsForSchedule,
+              appointmentDate: selectedDate,
+              durationMinutes: duration,
+              bufferMinutes: activeBuffer,
+              excludeBookingId,
+            });
+      setAvailableTimeSlots(slots);
       setGetTimeSlotsState({
         isLoading: false,
         hasError: false,
@@ -540,54 +630,9 @@ export function AdminBookingForm({
         isLoading: false,
         hasError: true,
       });
-      console.error("Failed to load booked time slots", error);
-      setBookedTimeSlots([]);
+      console.error("Failed to load available time slots", error);
+      setAvailableTimeSlots([]);
     }
-  };
-
-  const minutesFromTime = (time: string) => {
-    const [hours, minutes] = time.split(":").map(Number);
-    return hours * 60 + minutes;
-  };
-
-  const doesTimeRangeOverlap = (
-    startA: number,
-    endA: number,
-    startB: number,
-    endB: number,
-  ) => startA < endB && startB < endA;
-
-  // Active buffer for selected date: use new setting only on/after effective date
-  const activeBuffer = (() => {
-    if (!selectedDate || !bufferEffectiveFrom)
-      return bufferMinutes;
-    const d = selectedDate;
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    return dateStr >= bufferEffectiveFrom
-      ? bufferMinutes
-      : previousBufferMinutes;
-  })();
-
-  const isSlotBlocked = (slot: string) => {
-    const slotStart = minutesFromTime(slot);
-    const slotEnd =
-      slotStart + (totalDuration || 60) + activeBuffer;
-
-    return bookedTimeSlots.some(
-      (bookedSlot: BookedTimeSlot) => {
-        const bookedStart = minutesFromTime(
-          bookedSlot.appointment_time,
-        );
-        const bookedEnd =
-          bookedStart + bookedSlot.duration + activeBuffer;
-        return doesTimeRangeOverlap(
-          slotStart,
-          slotEnd,
-          bookedStart,
-          bookedEnd,
-        );
-      },
-    );
   };
 
   useEffect(() => {
@@ -622,29 +667,58 @@ export function AdminBookingForm({
           (numberOfPeople - 1) * GAP_MINUTES_PER_PEOPLE),
     );
     setTotalAmount(totalPrice);
-  }, [treatments]);
+  }, [treatments, numberOfPeople]);
 
   useEffect(() => {
-    if (!selectedDate) return;
-    getTimeSlots();
+    if (currentStep === "date") {
+      void loadBookableDates();
+    }
+  }, [
+    currentStep,
+    calendarMonth,
+    schedulePreference,
+    selectedArtistId,
+    address.district,
+    totalDuration,
+    treatmentServiceIdsKey,
+  ]);
+
+  useEffect(() => {
+    if (currentStep === "time") {
+      void loadAvailableTimes();
+    }
+  }, [
+    currentStep,
+    selectedDate,
+    schedulePreference,
+    selectedArtistId,
+    address.district,
+    totalDuration,
+    activeBuffer,
+    treatmentServiceIdsKey,
+  ]);
+
+  useEffect(() => {
+    if (skipArtistResetRef.current) return;
+    setSelectedArtistId("");
+    setSelectedArtistName("");
+  }, [address.district, treatmentServiceIdsKey]);
+
+  useEffect(() => {
+    if (skipArtistResetRef.current) return;
+    setSelectedTime("");
+    if (schedulePreference === "date") {
+      setSelectedArtistId("");
+      setSelectedArtistName("");
+    }
   }, [selectedDate]);
 
-  const treatmentServiceIdsKey = treatments
-    .map((t) => t.serviceId)
-    .filter(Boolean)
-    .sort()
-    .join(",");
-
   useEffect(() => {
     if (skipArtistResetRef.current) return;
-    setSelectedArtistId("");
-    setSelectedArtistName("");
-  }, [selectedDate, address.district, treatmentServiceIdsKey]);
-
-  useEffect(() => {
-    if (skipArtistResetRef.current) return;
-    setSelectedArtistId("");
-    setSelectedArtistName("");
+    if (schedulePreference === "date") {
+      setSelectedArtistId("");
+      setSelectedArtistName("");
+    }
   }, [selectedTime]);
 
   const handleServiceClick = (
@@ -730,7 +804,7 @@ export function AdminBookingForm({
     if (currentPersonIndex + 1 < numberOfPeople) {
       setCurrentPersonIndex(currentPersonIndex + 1);
     } else {
-      setCurrentStep("schedule");
+      setCurrentStep("preference");
     }
   };
 
@@ -1135,15 +1209,65 @@ export function AdminBookingForm({
   const selectedUser = users.find(
     (u) => u.id === selectedUserId,
   );
-  const timeSlots = generateTimeSlots(
-    totalDuration || 60,
-    selectedDate,
-    activeBuffer,
-  );
   const addOnServices = services.filter((s) => s.is_add_on);
-  const availableTimeSlots = selectedDate
-    ? timeSlots.filter((slot) => !isSlotBlocked(slot))
-    : timeSlots;
+
+  const handleContinueFromTime = async () => {
+    if (!selectedTime || !selectedDate) return;
+
+    if (schedulePreference === "artist") {
+      setCurrentStep("review");
+      return;
+    }
+
+    setIsAssigningArtist(true);
+    try {
+      const artist = await assignArtistForSlot({
+        districtName: address.district,
+        serviceIds: serviceIdsForSchedule,
+        appointmentDate: selectedDate,
+        appointmentTime: selectedTime,
+        durationMinutes: totalDuration || 60,
+        bufferMinutes: activeBuffer,
+        excludeBookingId,
+      });
+      if (!artist) {
+        alert(
+          "No artist is available for this time. Please choose another slot.",
+        );
+        return;
+      }
+      setSelectedArtistId(artist.id);
+      setSelectedArtistName(formatArtistDisplayName(artist));
+      setCurrentStep("review");
+    } catch (error) {
+      console.error("Failed to assign artist", error);
+      alert("Unable to assign an artist. Please try again.");
+    } finally {
+      setIsAssigningArtist(false);
+    }
+  };
+
+  const stepperSteps: AdminStep[] =
+    schedulePreference === "artist"
+      ? [
+          "user",
+          "treatments",
+          "preference",
+          "artist",
+          "date",
+          "time",
+          "review",
+        ]
+      : schedulePreference === "date"
+        ? [
+            "user",
+            "treatments",
+            "preference",
+            "date",
+            "time",
+            "review",
+          ]
+        : ["user", "treatments", "preference", "review"];
 
   console.log(
     "Admin BookingForm existingBooking =======>",
@@ -1184,13 +1308,7 @@ export function AdminBookingForm({
             className="flex items-center justify-between border-b-2 pb-4"
             style={{ borderColor: "#DCD4CD" }}
           >
-            {[
-              "user",
-              "treatments",
-              "schedule",
-              "artist",
-              "review",
-            ].map((step, index) => (
+            {stepperSteps.map((step, index) => (
               <div
                 key={step}
                 className={`flex items-center gap-2 ${currentStep === step ? "opacity-100" : "opacity-50"}`}
@@ -1478,130 +1596,81 @@ export function AdminBookingForm({
             </div>
           )}
 
-          {currentStep === "schedule" && (
+          {currentStep === "preference" && (
             <div className="space-y-4">
               <h3
                 className="font-semibold"
                 style={{ color: "#3D3935" }}
               >
-                Schedule Appointment
+                Schedule preference
               </h3>
-
-              <Card
-                className="p-4 border-2"
+              {!address.district && (
+                <p className="text-sm text-red-600">
+                  Select a client with a district (or set district
+                  on the user) before choosing an artist or date.
+                </p>
+              )}
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-auto py-5 px-4 flex flex-col items-start border-2 text-left"
                 style={{
-                  borderColor: "#DCD4CD",
-                  backgroundColor: "#FAF7F5",
+                  borderColor:
+                    schedulePreference === "artist"
+                      ? "#3D3935"
+                      : "#DCD4CD",
+                  backgroundColor:
+                    schedulePreference === "artist"
+                      ? "#E9CFCA"
+                      : "#FEFCFA",
+                  color: "#3D3935",
+                }}
+                onClick={() => {
+                  setSchedulePreference("artist");
+                  setSelectedArtistId("");
+                  setSelectedArtistName("");
+                  setSelectedDate(undefined);
+                  setSelectedTime("");
                 }}
               >
-                <h4
-                  className="font-medium mb-2"
-                  style={{ color: "#3D3935" }}
-                >
-                  Treatment Summary
-                </h4>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">
-                      Total Duration:
-                    </span>
-                    <span style={{ color: "#3D3935" }}>
-                      {totalDuration} minutes
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">
-                      Number of People:
-                    </span>
-                    <span style={{ color: "#3D3935" }}>
-                      {numberOfPeople}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">
-                      Total Amount:
-                    </span>
-                    <span
-                      className="font-semibold"
-                      style={{ color: "#3D3935" }}
-                    >
-                      £{totalAmount}
-                    </span>
-                  </div>
-                </div>
-              </Card>
-
-              <div>
-                <Label style={{ color: "#3D3935" }}>
-                  Select Appointment Date
-                </Label>
-                <Calendar
-                  mode="single"
-                  selected={selectedDate}
-                  onSelect={setSelectedDate}
-                  disabled={(date) => date < new Date()}
-                  className="border-2 rounded-md mt-2"
-                  style={{ borderColor: "#DCD4CD" }}
-                />
-              </div>
-
-              {selectedDate && (
-                <div>
-                  <Label style={{ color: "#3D3935" }}>
-                    Select Time Slot
-                  </Label>
-                  <div className="grid grid-cols-4 gap-2 mt-2 max-h-64 overflow-y-auto p-2">
-                    {getTimeSlotsState.isLoading ? (
-                      <div className="w-100 rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
-                        Loading available times…
-                      </div>
-                    ) : getTimeSlotsState.hasError ? (
-                      <div className="space-y-3 rounded-lg border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
-                        <p>Unable to load available times.</p>
-                        <Button
-                          type="button"
-                          onClick={loadBookedTimes}
-                          className="mx-auto"
-                        >
-                          Try again
-                        </Button>
-                      </div>
-                    ) : availableTimeSlots.length === 0 ? (
-                      <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-                        No available time slots found for this
-                        date.
-                      </div>
-                    ) : (
-                      availableTimeSlots.map((slot) => (
-                        <Button
-                          key={slot}
-                          type="button"
-                          variant="outline"
-                          className={`border-2 ${selectedTime === slot ? "bg-gray-800 text-white" : ""}`}
-                          style={{
-                            borderColor:
-                              selectedTime === slot
-                                ? "#3D3935"
-                                : "#DCD4CD",
-                            backgroundColor:
-                              selectedTime === slot
-                                ? "#3D3935"
-                                : "transparent",
-                            color:
-                              selectedTime === slot
-                                ? "#FEFCFA"
-                                : "#3D3935",
-                          }}
-                          onClick={() => setSelectedTime(slot)}
-                        >
-                          {slot}
-                        </Button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-
+                <span className="font-medium">
+                  Prefer a specific artist
+                </span>
+                <span className="text-xs opacity-70 mt-1">
+                  Choose artist, then available dates and times
+                </span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-auto py-5 px-4 flex flex-col items-start border-2 text-left"
+                style={{
+                  borderColor:
+                    schedulePreference === "date"
+                      ? "#3D3935"
+                      : "#DCD4CD",
+                  backgroundColor:
+                    schedulePreference === "date"
+                      ? "#E9CFCA"
+                      : "#FEFCFA",
+                  color: "#3D3935",
+                }}
+                onClick={() => {
+                  setSchedulePreference("date");
+                  setSelectedArtistId("");
+                  setSelectedArtistName("");
+                  setSelectedDate(undefined);
+                  setSelectedTime("");
+                }}
+              >
+                <span className="font-medium">
+                  Prefer a specific date
+                </span>
+                <span className="text-xs opacity-70 mt-1">
+                  Choose date and time; artist is assigned
+                  automatically (editable on review)
+                </span>
+              </Button>
               <div
                 className="flex justify-between pt-4 border-t-2"
                 style={{ borderColor: "#DCD4CD" }}
@@ -1623,27 +1692,32 @@ export function AdminBookingForm({
                 </Button>
                 <Button
                   type="button"
-                  disabled={!selectedDate || !selectedTime}
+                  disabled={!schedulePreference || !address.district}
                   className="border-2"
                   style={{
                     backgroundColor:
-                      selectedDate && selectedTime
+                      schedulePreference && address.district
                         ? "#E9CFCA"
                         : "#DCD4CD",
                     borderColor: "#3D3935",
                     color: "#3D3935",
                   }}
-                  onClick={() => setCurrentStep("artist")}
+                  onClick={() => {
+                    if (schedulePreference === "artist") {
+                      setCurrentStep("artist");
+                    } else {
+                      setCurrentStep("date");
+                    }
+                  }}
                 >
-                  Continue to Artist
+                  Continue
                 </Button>
               </div>
             </div>
           )}
 
           {currentStep === "artist" &&
-            selectedDate &&
-            selectedTime && (
+            schedulePreference === "artist" && (
               <div className="space-y-4">
                 <h3
                   className="font-semibold"
@@ -1653,18 +1727,7 @@ export function AdminBookingForm({
                 </h3>
                 <ArtistSelectionSection
                   districtName={address.district}
-                  serviceIds={treatments
-                    .map((t) => t.serviceId)
-                    .filter(Boolean)}
-                  date={selectedDate}
-                  time={selectedTime}
-                  durationMinutes={totalDuration || 60}
-                  bufferMinutes={activeBuffer}
-                  excludeBookingId={
-                    mode === "reschedule" && existingBooking?.id
-                      ? existingBooking.id
-                      : undefined
-                  }
+                  serviceIds={serviceIdsForSchedule}
                   selectedArtistId={selectedArtistId}
                   onSelect={(artistId, artist) => {
                     setSelectedArtistId(artistId);
@@ -1673,13 +1736,215 @@ export function AdminBookingForm({
                         ? formatArtistDisplayName(artist)
                         : "",
                     );
+                    setSelectedDate(undefined);
+                    setSelectedTime("");
                   }}
-                  onBack={() => setCurrentStep("schedule")}
-                  onContinue={() => setCurrentStep("review")}
-                  continueLabel="Continue to Review"
+                  onBack={() => setCurrentStep("preference")}
+                  onContinue={() => setCurrentStep("date")}
+                  continueLabel="Continue to Date"
                 />
               </div>
             )}
+
+          {currentStep === "date" && (
+            <div className="space-y-4">
+              <h3
+                className="font-semibold"
+                style={{ color: "#3D3935" }}
+              >
+                Select Date
+              </h3>
+              <Card
+                className="p-4 border-2"
+                style={{
+                  borderColor: "#DCD4CD",
+                  backgroundColor: "#FAF7F5",
+                }}
+              >
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">
+                      Duration
+                    </span>
+                    <span style={{ color: "#3D3935" }}>
+                      {totalDuration} min
+                    </span>
+                  </div>
+                  {selectedArtistName && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">
+                        Artist
+                      </span>
+                      <span style={{ color: "#3D3935" }}>
+                        {selectedArtistName}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </Card>
+              {getBookableDatesState.isLoading ? (
+                <div className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
+                  Loading available dates…
+                </div>
+              ) : getBookableDatesState.hasError ? (
+                <div className="space-y-3 rounded-lg border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
+                  <p>Unable to load available dates.</p>
+                  <Button
+                    type="button"
+                    onClick={() => void loadBookableDates()}
+                    className="mx-auto"
+                  >
+                    Try again
+                  </Button>
+                </div>
+              ) : (
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    setSelectedDate(date);
+                    if (date) setCurrentStep("time");
+                  }}
+                  month={calendarMonth}
+                  onMonthChange={setCalendarMonth}
+                  disabled={(date) =>
+                    isDateDisabledByBookableSet(
+                      date,
+                      bookableDateKeys,
+                    )
+                  }
+                  className="border-2 rounded-md mt-2"
+                  style={{ borderColor: "#DCD4CD" }}
+                />
+              )}
+              <div
+                className="flex justify-between pt-4 border-t-2"
+                style={{ borderColor: "#DCD4CD" }}
+              >
+                <Button
+                  type="button"
+                  className="border-2"
+                  style={{
+                    backgroundColor: "transparent",
+                    borderColor: "#3D3935",
+                    color: "#3D3935",
+                  }}
+                  onClick={() =>
+                    setCurrentStep(
+                      schedulePreference === "artist"
+                        ? "artist"
+                        : "preference",
+                    )
+                  }
+                >
+                  Back
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {currentStep === "time" && (
+            <div className="space-y-4">
+              <h3
+                className="font-semibold"
+                style={{ color: "#3D3935" }}
+              >
+                Select Time
+              </h3>
+              <p className="text-sm text-gray-600">
+                {selectedDate?.toLocaleDateString("en-GB")}
+                {selectedArtistName
+                  ? ` · ${selectedArtistName}`
+                  : ""}
+              </p>
+              <div className="grid grid-cols-4 gap-2 max-h-64 overflow-y-auto p-2">
+                {getTimeSlotsState.isLoading ? (
+                  <div className="col-span-4 rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
+                    Loading available times…
+                  </div>
+                ) : getTimeSlotsState.hasError ? (
+                  <div className="col-span-4 space-y-3 rounded-lg border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
+                    <p>Unable to load available times.</p>
+                    <Button
+                      type="button"
+                      onClick={() => void loadAvailableTimes()}
+                      className="mx-auto"
+                    >
+                      Try again
+                    </Button>
+                  </div>
+                ) : availableTimeSlots.length === 0 ? (
+                  <div className="col-span-4 rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+                    No available time slots found for this date.
+                  </div>
+                ) : (
+                  availableTimeSlots.map((slot) => (
+                    <Button
+                      key={slot}
+                      type="button"
+                      variant="outline"
+                      className="border-2"
+                      style={{
+                        borderColor:
+                          selectedTime === slot
+                            ? "#3D3935"
+                            : "#DCD4CD",
+                        backgroundColor:
+                          selectedTime === slot
+                            ? "#3D3935"
+                            : "transparent",
+                        color:
+                          selectedTime === slot
+                            ? "#FEFCFA"
+                            : "#3D3935",
+                      }}
+                      onClick={() => setSelectedTime(slot)}
+                    >
+                      {slot}
+                    </Button>
+                  ))
+                )}
+              </div>
+              <div
+                className="flex justify-between pt-4 border-t-2"
+                style={{ borderColor: "#DCD4CD" }}
+              >
+                <Button
+                  type="button"
+                  className="border-2"
+                  style={{
+                    backgroundColor: "transparent",
+                    borderColor: "#3D3935",
+                    color: "#3D3935",
+                  }}
+                  onClick={() => {
+                    setSelectedTime("");
+                    setCurrentStep("date");
+                  }}
+                >
+                  Back
+                </Button>
+                <Button
+                  type="button"
+                  disabled={!selectedTime || isAssigningArtist}
+                  className="border-2"
+                  style={{
+                    backgroundColor:
+                      selectedTime && !isAssigningArtist
+                        ? "#E9CFCA"
+                        : "#DCD4CD",
+                    borderColor: "#3D3935",
+                    color: "#3D3935",
+                  }}
+                  onClick={() => void handleContinueFromTime()}
+                >
+                  {isAssigningArtist
+                    ? "Assigning artist…"
+                    : "Continue to Review"}
+                </Button>
+              </div>
+            </div>
+          )}
 
           {currentStep === "treatments" && (
             <div className="space-y-4">
@@ -2234,7 +2499,7 @@ export function AdminBookingForm({
                       >
                         {currentPersonIndex + 1 < numberOfPeople
                           ? `Continue to Person ${currentPersonIndex + 2}`
-                          : "Continue to Schedule"}
+                          : "Continue"}
                       </Button>
                     </div>
                   </>
@@ -2283,7 +2548,7 @@ export function AdminBookingForm({
                       {selectedTime}
                     </span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center gap-2">
                     <span className="text-gray-600">
                       Artist:
                     </span>
@@ -2291,6 +2556,64 @@ export function AdminBookingForm({
                       {selectedArtistName || "—"}
                     </span>
                   </div>
+                  {schedulePreference === "date" &&
+                    selectedDate &&
+                    selectedTime && (
+                      <div className="pt-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="w-full border-2 text-sm"
+                          style={{
+                            borderColor: "#3D3935",
+                            color: "#3D3935",
+                          }}
+                          onClick={() =>
+                            setShowArtistOverride(
+                              (prev) => !prev,
+                            )
+                          }
+                        >
+                          {showArtistOverride
+                            ? "Hide artist change"
+                            : "Change assigned artist"}
+                        </Button>
+                        {showArtistOverride && (
+                          <div className="mt-3">
+                            <ArtistSelectionSection
+                              districtName={address.district}
+                              serviceIds={serviceIdsForSchedule}
+                              date={selectedDate}
+                              time={selectedTime}
+                              durationMinutes={
+                                totalDuration || 60
+                              }
+                              bufferMinutes={activeBuffer}
+                              excludeBookingId={excludeBookingId}
+                              selectedArtistId={selectedArtistId}
+                              onSelect={(artistId, artist) => {
+                                setSelectedArtistId(artistId);
+                                setSelectedArtistName(
+                                  artist
+                                    ? formatArtistDisplayName(
+                                        artist,
+                                      )
+                                    : "",
+                                );
+                              }}
+                              onBack={() =>
+                                setShowArtistOverride(false)
+                              }
+                              onContinue={() =>
+                                setShowArtistOverride(false)
+                              }
+                              continueLabel="Done"
+                              description="Override the auto-assigned artist for this slot."
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
                   <div className="flex justify-between">
                     <span className="text-gray-600">
                       Number of People:
@@ -2585,7 +2908,7 @@ export function AdminBookingForm({
                     borderColor: "#3D3935",
                     color: "#3D3935",
                   }}
-                  onClick={() => setCurrentStep("artist")}
+                  onClick={() => setCurrentStep("time")}
                 >
                   Back
                 </Button>

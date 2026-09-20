@@ -9,6 +9,8 @@ export * from "./users";
 export * from "./artists";
 export * from "./admin-artist";
 export * from "./artist-availability";
+export * from "./available-artists";
+export * from "./booking-schedule";
 export * from "./bookings";
 export * from "./booking-treatments";
 export * from "./booking-with-treatments";

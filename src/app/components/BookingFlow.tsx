@@ -39,11 +39,6 @@ import {
 } from "../src/lib/constants/country-codes";
 import { User as AppUser } from "../src/schema/user.schema";
 import {
-  getBookedTimesForDate,
-  type BookedTimeSlot,
-} from "../src/lib/db/bookings";
-import {
-  getBusinessHoursForDate,
   BookingStatus,
   PaymentStatus,
 } from "../src/schema/booking.schema";
@@ -60,10 +55,6 @@ import {
   normalizePostalCode,
 } from "../src/lib/utils";
 import { formatDate } from "../src/utils/formatDate";
-import {
-  getWorkshopSessionsByDate,
-  getWorkshopTimesForDate,
-} from "../src/lib/db/workshop-bookings";
 import { Service } from "../src/schema/service.schema";
 import {
   getActivePromoCodesForBooking,
@@ -76,7 +67,19 @@ import {
 import {
   GAP_MINUTES_PER_PEOPLE,
   GAP_MINUTES_PER_SERVICE,
-} from "../src/components/admin/AdminBookingForm";
+  isDateDisabledByBookableSet,
+  resolveActiveBuffer,
+  toDateKeySet,
+  type SchedulePreference,
+} from "../src/lib/booking-schedule";
+import {
+  assignArtistForSlot,
+  getBookableDatesForArtist,
+  getBookableDatesForServices,
+  getFreeTimesForArtist,
+  getFreeTimesForServices,
+  monthDateRange,
+} from "../src/lib/db/booking-schedule";
 import { getBusinessSettings } from "../src/lib/db/business-settings";
 import { ArtistSelectionSection } from "../src/components/booking/ArtistSelectionSection";
 import { formatArtistDisplayName } from "../src/lib/db/available-artists";
@@ -92,9 +95,10 @@ type BookingStep =
   | "address"
   | "people"
   | "service"
+  | "preference"
+  | "artist"
   | "date"
   | "time"
-  | "artist"
   | "confirmation"
   | "voucher"
   | "payment"
@@ -135,44 +139,6 @@ interface BookingData {
   discount: number;
   finalPrice: number;
 }
-
-const generateTimeSlots = (
-  totalDurationMinutes: number,
-  selectedDate?: Date,
-  gapMinutes = 30,
-) => {
-  const slots = [];
-
-  // Get business hours for the selected date
-  const date = selectedDate || new Date();
-  const {
-    startHour: businessOpenHour,
-    endHour: businessCloseHour,
-  } = getBusinessHoursForDate(date);
-
-  // Latest valid start: the appointment must finish by close (buffer handled by isSlotBlocked)
-  const businessCloseMinutes = businessCloseHour * 60;
-  const latestStartMinutes =
-    businessCloseMinutes - totalDurationMinutes;
-
-  // Step = buffer only — slots are offered every <buffer> minutes; overlap is filtered by isSlotBlocked
-  const stepMinutes = gapMinutes;
-  const businessOpenMinutes = businessOpenHour * 60;
-
-  for (
-    let timeInMinutes = businessOpenMinutes;
-    timeInMinutes <= latestStartMinutes;
-    timeInMinutes += stepMinutes
-  ) {
-    const startHour = Math.floor(timeInMinutes / 60);
-    const startMinute = timeInMinutes % 60;
-    const startTime = `${startHour.toString().padStart(2, "0")}:${startMinute.toString().padStart(2, "0")}`;
-
-    slots.push(startTime);
-  }
-
-  return slots;
-};
 
 export function BookingFlow({
   open,
@@ -244,9 +210,20 @@ export function BookingFlow({
   const [tempAddOns, setTempAddOns] = useState<
     Array<{ name: string; price: number; duration: number }>
   >([]);
-  const [bookedTimeSlots, setBookedTimeSlots] = useState<
-    BookedTimeSlot[]
+  const [availableTimeSlots, setAvailableTimeSlots] = useState<
+    string[]
   >([]);
+  const [bookableDateKeys, setBookableDateKeys] =
+    useState<Set<string> | null>(null);
+  const [calendarMonth, setCalendarMonth] = useState(
+    () => new Date(),
+  );
+  const [getBookableDatesState, setGetBookableDatesState] =
+    useState({ isLoading: false, hasError: false });
+  const [schedulePreference, setSchedulePreference] =
+    useState<SchedulePreference | null>(null);
+  const [isAssigningArtist, setIsAssigningArtist] =
+    useState(false);
   const [availableServices, setAvailableServices] = useState<
     ServiceBooking[]
   >([]);
@@ -332,77 +309,121 @@ export function BookingFlow({
   });
 
   // Determine which buffer applies for the currently selected date
-  const activeBuffer = (() => {
-    if (!bookingData.date || !bufferEffectiveFrom)
-      return bufferMinutes;
-    const d = bookingData.date;
-    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-    return dateStr >= bufferEffectiveFrom
-      ? bufferMinutes
-      : previousBufferMinutes;
-  })();
+  const activeBuffer = resolveActiveBuffer({
+    selectedDate: bookingData.date,
+    bufferMinutes,
+    previousBufferMinutes,
+    bufferEffectiveFrom,
+  });
 
-  const timeSlots = generateTimeSlots(
-    bookingData.totalDuration || 60,
-    bookingData.date,
-    activeBuffer,
-  );
+  const serviceIdsForSchedule = bookingData.services
+    .map((s) => s.id)
+    .filter(Boolean);
 
-  const minutesFromTime = (time: string) => {
-    const [hours, minutes] = time.split(":").map(Number);
-    return hours * 60 + minutes;
-  };
+  const loadBookableDates = useCallback(async () => {
+    if (
+      !bookingData.district ||
+      serviceIdsForSchedule.length === 0
+    ) {
+      setBookableDateKeys(new Set());
+      return;
+    }
 
-  const doesTimeRangeOverlap = (
-    startA: number,
-    endA: number,
-    startB: number,
-    endB: number,
-  ) => startA < endB && startB < endA;
+    if (
+      schedulePreference === "artist" &&
+      !bookingData.artistId
+    ) {
+      setBookableDateKeys(new Set());
+      return;
+    }
 
-  const isSlotBlocked = (slot: string) => {
-    const slotStart = minutesFromTime(slot);
-    const slotEnd =
-      slotStart +
-      (bookingData.totalDuration || 60) +
-      activeBuffer;
+    setGetBookableDatesState({
+      isLoading: true,
+      hasError: false,
+    });
 
-    return bookedTimeSlots.some(
-      (bookedSlot: BookedTimeSlot) => {
-        const bookedStart = minutesFromTime(
-          bookedSlot.appointment_time,
-        );
-        const bookedEnd =
-          bookedStart + bookedSlot.duration + activeBuffer;
-        return doesTimeRangeOverlap(
-          slotStart,
-          slotEnd,
-          bookedStart,
-          bookedEnd,
-        );
-      },
-    );
-  };
+    try {
+      const { fromDate, toDate } = monthDateRange(calendarMonth);
+      const bufferForRange = resolveActiveBuffer({
+        selectedDate: fromDate,
+        bufferMinutes,
+        previousBufferMinutes,
+        bufferEffectiveFrom,
+      });
+      const duration = bookingData.totalDuration || 60;
 
-  const availableTimeSlots = bookingData.date
-    ? timeSlots.filter((slot) => !isSlotBlocked(slot))
-    : timeSlots;
+      const dates =
+        schedulePreference === "artist" && bookingData.artistId
+          ? await getBookableDatesForArtist({
+              artistId: bookingData.artistId,
+              districtName: bookingData.district,
+              serviceIds: serviceIdsForSchedule,
+              fromDate,
+              toDate,
+              durationMinutes: duration,
+              bufferMinutes: bufferForRange,
+            })
+          : await getBookableDatesForServices({
+              districtName: bookingData.district,
+              serviceIds: serviceIdsForSchedule,
+              fromDate,
+              toDate,
+              durationMinutes: duration,
+              bufferMinutes: bufferForRange,
+            });
 
-  const loadBookedTimes = useCallback(async () => {
+      setBookableDateKeys(toDateKeySet(dates));
+      setGetBookableDatesState({
+        isLoading: false,
+        hasError: false,
+      });
+    } catch (error) {
+      console.error("Failed to load bookable dates", error);
+      setBookableDateKeys(new Set());
+      setGetBookableDatesState({
+        isLoading: false,
+        hasError: true,
+      });
+    }
+  }, [
+    bookingData.district,
+    bookingData.artistId,
+    bookingData.totalDuration,
+    schedulePreference,
+    calendarMonth,
+    bufferMinutes,
+    previousBufferMinutes,
+    bufferEffectiveFrom,
+    serviceIdsForSchedule.join(","),
+  ]);
+
+  const loadAvailableTimes = useCallback(async () => {
     if (!bookingData.date) {
-      setBookedTimeSlots([]);
+      setAvailableTimeSlots([]);
       return;
     }
 
     setGetTimeSlotsState({ isLoading: true, hasError: false });
 
     try {
-      const [workshopSlots, slots] = await Promise.all([
-        getWorkshopTimesForDate(bookingData.date),
-        getBookedTimesForDate(bookingData.date),
-      ]);
+      const duration = bookingData.totalDuration || 60;
+      const slots =
+        schedulePreference === "artist" && bookingData.artistId
+          ? await getFreeTimesForArtist({
+              artistId: bookingData.artistId,
+              appointmentDate: bookingData.date,
+              durationMinutes: duration,
+              bufferMinutes: activeBuffer,
+            })
+          : await getFreeTimesForServices({
+              districtName: bookingData.district,
+              serviceIds: serviceIdsForSchedule,
+              appointmentDate: bookingData.date,
+              durationMinutes: duration,
+              bufferMinutes: activeBuffer,
+            });
 
-      setBookedTimeSlots([...workshopSlots, ...slots]);
+      setAvailableTimeSlots(slots);
       setGetTimeSlotsState({
         isLoading: false,
         hasError: false,
@@ -412,10 +433,30 @@ export function BookingFlow({
         isLoading: false,
         hasError: true,
       });
-      console.error("Failed to load booked time slots", error);
-      setBookedTimeSlots([]);
+      console.error("Failed to load available time slots", error);
+      setAvailableTimeSlots([]);
     }
-  }, [bookingData.date]);
+  }, [
+    bookingData.date,
+    bookingData.artistId,
+    bookingData.district,
+    bookingData.totalDuration,
+    schedulePreference,
+    activeBuffer,
+    serviceIdsForSchedule.join(","),
+  ]);
+
+  useEffect(() => {
+    if (step === "date") {
+      void loadBookableDates();
+    }
+  }, [step, loadBookableDates]);
+
+  useEffect(() => {
+    if (step === "time") {
+      void loadAvailableTimes();
+    }
+  }, [step, loadAvailableTimes]);
 
   const loadActivePromoCodesForBooking = async () => {
     try {
@@ -432,10 +473,6 @@ export function BookingFlow({
       setIsLoadingPromoCodes(false);
     }
   };
-
-  useEffect(() => {
-    loadBookedTimes();
-  }, [loadBookedTimes]);
 
   const loadAvailableServices = async () => {
     try {
@@ -498,10 +535,15 @@ export function BookingFlow({
       setBookingData((prev) => ({
         ...prev,
         timeSlot: "",
-        artistId: "",
+        ...(schedulePreference === "date"
+          ? { artistId: "" }
+          : {}),
       }));
-      setSelectedArtistName("");
+      if (schedulePreference === "date") {
+        setSelectedArtistName("");
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only reset when date changes
   }, [bookingData.date]);
 
   const serviceIdsKey = bookingData.services
@@ -510,8 +552,14 @@ export function BookingFlow({
     .join(",");
 
   useEffect(() => {
-    setBookingData((prev) => ({ ...prev, artistId: "" }));
+    setBookingData((prev) => ({
+      ...prev,
+      artistId: "",
+      date: undefined,
+      timeSlot: "",
+    }));
     setSelectedArtistName("");
+    setSchedulePreference(null);
   }, [bookingData.district, serviceIdsKey]);
 
   const getDistricts = async () => {
@@ -824,7 +872,7 @@ export function BookingFlow({
     if (currentPersonIndex + 1 < bookingData.numberOfPeople) {
       setCurrentPersonIndex(currentPersonIndex + 1);
     } else {
-      setStep("date");
+      setStep("preference");
     }
   };
 
@@ -858,9 +906,51 @@ export function BookingFlow({
     setBookingData({
       ...bookingData,
       timeSlot: time,
-      artistId: "",
+      ...(schedulePreference === "date" ? { artistId: "" } : {}),
     });
-    setSelectedArtistName("");
+    if (schedulePreference === "date") {
+      setSelectedArtistName("");
+    }
+  };
+
+  const handleContinueFromTime = async () => {
+    if (!bookingData.timeSlot || !bookingData.date) return;
+
+    if (schedulePreference === "artist") {
+      setStep("voucher");
+      return;
+    }
+
+    setIsAssigningArtist(true);
+    try {
+      const artist = await assignArtistForSlot({
+        districtName: bookingData.district,
+        serviceIds: serviceIdsForSchedule,
+        appointmentDate: bookingData.date,
+        appointmentTime: bookingData.timeSlot,
+        durationMinutes: bookingData.totalDuration || 60,
+        bufferMinutes: activeBuffer,
+      });
+
+      if (!artist) {
+        alert(
+          "No artist is available for this time. Please choose another slot.",
+        );
+        return;
+      }
+
+      setBookingData((prev) => ({
+        ...prev,
+        artistId: artist.id,
+      }));
+      setSelectedArtistName(formatArtistDisplayName(artist));
+      setStep("voucher");
+    } catch (error) {
+      console.error("Failed to assign artist", error);
+      alert("Unable to assign an artist. Please try again.");
+    } finally {
+      setIsAssigningArtist(false);
+    }
   };
 
   const handleConfirmBooking = () => {
@@ -1069,6 +1159,9 @@ export function BookingFlow({
     setVoucherSuccess("");
     setAppliedVoucherCode("");
     setSelectedArtistName("");
+    setSchedulePreference(null);
+    setAvailableTimeSlots([]);
+    setBookableDateKeys(null);
     onOpenChange(false);
   };
 
@@ -2047,13 +2140,13 @@ export function BookingFlow({
                       {currentPersonIndex + 1 <
                       bookingData.numberOfPeople
                         ? `Continue to Person ${currentPersonIndex + 2}`
-                        : "Continue to Date Selection"}
+                        : "Continue"}
                     </span>
                   ) : currentPersonIndex + 1 <
                     bookingData.numberOfPeople ? (
                     `Continue to Person ${currentPersonIndex + 2}`
                   ) : (
-                    "Continue to Date Selection"
+                    "Continue"
                   )}
                 </Button>
               </div>
@@ -2061,17 +2154,168 @@ export function BookingFlow({
           </>
         )}
 
-        {/* Step 5: Date Selection */}
+        {/* Preference: artist vs date */}
+        {step === "preference" && (
+          <>
+            <DialogHeader>
+              <DialogTitle>How would you like to book?</DialogTitle>
+              <DialogDescription>
+                Prefer a specific artist, or start with a date that
+                works for you
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-auto py-5 px-4 flex flex-col items-start border-2 text-left"
+                style={{
+                  borderColor:
+                    schedulePreference === "artist"
+                      ? "#3D3935"
+                      : "#DCD4CD",
+                  backgroundColor:
+                    schedulePreference === "artist"
+                      ? "#E9CFCA"
+                      : "#FEFCFA",
+                  color: "#3D3935",
+                }}
+                onClick={() => {
+                  setSchedulePreference("artist");
+                  setBookingData((prev) => ({
+                    ...prev,
+                    artistId: "",
+                    date: undefined,
+                    timeSlot: "",
+                  }));
+                  setSelectedArtistName("");
+                }}
+              >
+                <span className="font-medium">
+                  Prefer a specific artist
+                </span>
+                <span className="text-xs opacity-70 mt-1">
+                  Choose your artist, then pick from their available
+                  dates and times
+                </span>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full h-auto py-5 px-4 flex flex-col items-start border-2 text-left"
+                style={{
+                  borderColor:
+                    schedulePreference === "date"
+                      ? "#3D3935"
+                      : "#DCD4CD",
+                  backgroundColor:
+                    schedulePreference === "date"
+                      ? "#E9CFCA"
+                      : "#FEFCFA",
+                  color: "#3D3935",
+                }}
+                onClick={() => {
+                  setSchedulePreference("date");
+                  setBookingData((prev) => ({
+                    ...prev,
+                    artistId: "",
+                    date: undefined,
+                    timeSlot: "",
+                  }));
+                  setSelectedArtistName("");
+                }}
+              >
+                <span className="font-medium">
+                  Prefer a specific date
+                </span>
+                <span className="text-xs opacity-70 mt-1">
+                  Choose a date and time; we will assign an available
+                  artist for you
+                </span>
+              </Button>
+            </div>
+            <div className="flex gap-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCurrentPersonIndex(
+                    bookingData.numberOfPeople - 1,
+                  );
+                  setStep("service");
+                }}
+                className="flex-1 hover:bg-[#DCD4CD]"
+              >
+                Back
+              </Button>
+              <Button
+                disabled={!schedulePreference}
+                className="flex-1"
+                style={{
+                  backgroundColor: schedulePreference
+                    ? "#3D3935"
+                    : "#DCD4CD",
+                  color: schedulePreference ? "#FEFCFA" : "#3D3935",
+                }}
+                onClick={() => {
+                  if (schedulePreference === "artist") {
+                    setStep("artist");
+                  } else if (schedulePreference === "date") {
+                    setStep("date");
+                  }
+                }}
+              >
+                Continue
+              </Button>
+            </div>
+          </>
+        )}
+
+        {/* Artist browse (Path A) */}
+        {step === "artist" && schedulePreference === "artist" && (
+          <>
+            <DialogHeader>
+              <DialogTitle>Select Artist</DialogTitle>
+              <DialogDescription>
+                Choose an artist who can perform your selected
+                services
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+              <ArtistSelectionSection
+                districtName={bookingData.district}
+                serviceIds={serviceIdsForSchedule}
+                selectedArtistId={bookingData.artistId}
+                onSelect={(artistId, artist) => {
+                  setBookingData((prev) => ({
+                    ...prev,
+                    artistId,
+                    date: undefined,
+                    timeSlot: "",
+                  }));
+                  setSelectedArtistName(
+                    artist ? formatArtistDisplayName(artist) : "",
+                  );
+                }}
+                onBack={() => setStep("preference")}
+                onContinue={() => setStep("date")}
+                continueLabel="Continue to Date"
+              />
+            </div>
+          </>
+        )}
+
+        {/* Date Selection */}
         {step === "date" && (
           <>
             <DialogHeader>
               <DialogTitle>Select Date</DialogTitle>
               <DialogDescription>
-                Choose your preferred appointment date
+                {schedulePreference === "artist"
+                  ? "Only days when your artist has a free slot are available"
+                  : "Only days with at least one available artist are shown"}
               </DialogDescription>
             </DialogHeader>
             <div className="py-4">
-              {/* Minimal Summary */}
               <div
                 className="mb-4 p-3 rounded border-2"
                 style={{
@@ -2107,10 +2351,14 @@ export function BookingFlow({
                       );
                     },
                   )}
+                  {selectedArtistName && (
+                    <div className="text-gray-900 pt-1">
+                      Artist: {selectedArtistName}
+                    </div>
+                  )}
                 </div>
               </div>
 
-              {/* Overall Total */}
               <div
                 className="mb-4 p-2 rounded"
                 style={{
@@ -2130,24 +2378,49 @@ export function BookingFlow({
                 </div>
               </div>
 
-              <div className="flex justify-center">
-                <Calendar
-                  mode="single"
-                  selected={bookingData.date}
-                  onSelect={handleDateSelect}
-                  disabled={(date) => date < new Date()}
-                  className="rounded-lg border border-gray-200"
-                  style={{ backgroundColor: "#FEFCFA" }}
-                />
-              </div>
+              {getBookableDatesState.isLoading ? (
+                <div className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500 mb-4">
+                  Loading available dates…
+                </div>
+              ) : getBookableDatesState.hasError ? (
+                <div className="space-y-3 rounded-lg border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700 mb-4">
+                  <p>Unable to load available dates.</p>
+                  <Button
+                    type="button"
+                    onClick={() => void loadBookableDates()}
+                    className="mx-auto"
+                  >
+                    Try again
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex justify-center">
+                  <Calendar
+                    mode="single"
+                    selected={bookingData.date}
+                    onSelect={handleDateSelect}
+                    month={calendarMonth}
+                    onMonthChange={setCalendarMonth}
+                    disabled={(date) =>
+                      isDateDisabledByBookableSet(
+                        date,
+                        bookableDateKeys,
+                      )
+                    }
+                    className="rounded-lg border border-gray-200"
+                    style={{ backgroundColor: "#FEFCFA" }}
+                  />
+                </div>
+              )}
             </div>
             <Button
               variant="outline"
               onClick={() => {
-                setCurrentPersonIndex(
-                  bookingData.numberOfPeople - 1,
-                );
-                setStep("service");
+                if (schedulePreference === "artist") {
+                  setStep("artist");
+                } else {
+                  setStep("preference");
+                }
               }}
               className="w-full hover:bg-[#DCD4CD]"
             >
@@ -2156,7 +2429,7 @@ export function BookingFlow({
           </>
         )}
 
-        {/* Step 6: Time Slot Selection */}
+        {/* Time Slot Selection */}
         {step === "time" && (
           <>
             <DialogHeader>
@@ -2203,7 +2476,6 @@ export function BookingFlow({
                                 0,
                               );
 
-                            // Calculate start time for this person (including 5-min gaps)
                             const GAP_MINUTES = 5;
                             const previousDuration =
                               bookingData.services
@@ -2239,7 +2511,6 @@ export function BookingFlow({
                                 },
                               );
 
-                            // Calculate end time
                             const endDate = new Date(startDate);
                             endDate.setMinutes(
                               endDate.getMinutes() +
@@ -2338,6 +2609,9 @@ export function BookingFlow({
               <p className="text-sm text-gray-600 mb-4">
                 Available times for{" "}
                 {bookingData.date?.toLocaleDateString("en-GB")}
+                {selectedArtistName
+                  ? ` · ${selectedArtistName}`
+                  : ""}
               </p>
               <div className="mb-4">
                 {getTimeSlotsState.isLoading ? (
@@ -2349,7 +2623,7 @@ export function BookingFlow({
                     <p>Unable to load available times.</p>
                     <Button
                       type="button"
-                      onClick={loadBookedTimes}
+                      onClick={() => void loadAvailableTimes()}
                       className="mx-auto"
                     >
                       Try again
@@ -2390,7 +2664,6 @@ export function BookingFlow({
                 )}
               </div>
 
-              {/* Action Buttons */}
               <div className="flex gap-3 pt-2 border-t">
                 <Button
                   variant="outline"
@@ -2406,107 +2679,36 @@ export function BookingFlow({
                   Back
                 </Button>
                 <Button
-                  onClick={() => setStep("artist")}
-                  disabled={!bookingData.timeSlot}
+                  onClick={() => void handleContinueFromTime()}
+                  disabled={
+                    !bookingData.timeSlot || isAssigningArtist
+                  }
                   className="flex-1 transition-all"
                   style={{
-                    backgroundColor: bookingData.timeSlot
-                      ? "#3D3935"
-                      : "#DCD4CD",
-                    background: bookingData.timeSlot
-                      ? "#3D3935"
-                      : "#DCD4CD",
-                    color: bookingData.timeSlot
-                      ? "transparent"
-                      : "#3D3935",
-                    cursor: bookingData.timeSlot
-                      ? "pointer"
-                      : "not-allowed",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (bookingData.timeSlot) {
-                      e.currentTarget.style.backgroundColor =
-                        "#1F1F1F";
-                      e.currentTarget.style.background =
-                        "#1F1F1F";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (bookingData.timeSlot) {
-                      e.currentTarget.style.backgroundColor =
-                        "#3D3935";
-                      e.currentTarget.style.background =
-                        "#3D3935";
-                    }
+                    backgroundColor:
+                      bookingData.timeSlot && !isAssigningArtist
+                        ? "#3D3935"
+                        : "#DCD4CD",
+                    color:
+                      bookingData.timeSlot && !isAssigningArtist
+                        ? "#FEFCFA"
+                        : "#3D3935",
+                    cursor:
+                      bookingData.timeSlot && !isAssigningArtist
+                        ? "pointer"
+                        : "not-allowed",
                   }}
                 >
-                  {bookingData.timeSlot ? (
-                    <span
-                      style={{
-                        background:
-                          "linear-gradient(to right, #FCEAE0, #EACAB8)",
-                        WebkitBackgroundClip: "text",
-                        backgroundClip: "text",
-                        WebkitTextFillColor: "transparent",
-                        color: "transparent",
-                      }}
-                    >
-                      Continue
-                    </span>
-                  ) : (
-                    "Continue"
-                  )}
+                  {isAssigningArtist
+                    ? "Assigning artist…"
+                    : "Continue"}
                 </Button>
               </div>
             </div>
           </>
         )}
 
-        {/* Step 7: Artist Selection */}
-        {step === "artist" &&
-          bookingData.date &&
-          bookingData.timeSlot && (
-            <>
-              <DialogHeader>
-                <DialogTitle>Select Artist</DialogTitle>
-                <DialogDescription>
-                  Choose an available artist for your
-                  appointment
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <ArtistSelectionSection
-                  districtName={bookingData.district}
-                  serviceIds={bookingData.services.map(
-                    (s) => s.id,
-                  )}
-                  date={bookingData.date}
-                  time={bookingData.timeSlot}
-                  durationMinutes={
-                    bookingData.totalDuration || 60
-                  }
-                  bufferMinutes={activeBuffer}
-                  selectedArtistId={bookingData.artistId}
-                  onSelect={(artistId, artist) => {
-                    setBookingData((prev) => ({
-                      ...prev,
-                      artistId,
-                    }));
-                    setSelectedArtistName(
-                      artist
-                        ? formatArtistDisplayName(artist)
-                        : "",
-                    );
-                  }}
-                  onBack={() => setStep("time")}
-                  onContinue={() => setStep("voucher")}
-                  continueLabel="Continue to Voucher"
-                />
-              </div>
-            </>
-          )}
-
-        {/* Step 8: Gift Voucher */}
+        {/* Step: Gift Voucher */}
         {step === "voucher" && (
           <>
             <DialogHeader>
@@ -2625,7 +2827,7 @@ export function BookingFlow({
               <div className="flex gap-3">
                 <Button
                   variant="outline"
-                  onClick={() => setStep("artist")}
+                  onClick={() => setStep("time")}
                   className="flex-1 hover:bg-[#DCD4CD]"
                 >
                   Back

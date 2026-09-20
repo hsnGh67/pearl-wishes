@@ -5,14 +5,16 @@ import {
   getAvailableArtistsForBooking,
   type AvailableArtistForBooking,
 } from "../../lib/db/available-artists";
+import { listArtistsForServices } from "../../lib/db/booking-schedule";
 
 type ArtistSelectionSectionProps = {
   districtName: string;
   serviceIds: string[];
-  date: Date;
-  time: string;
-  durationMinutes: number;
-  bufferMinutes: number;
+  /** When omitted (browse mode), lists artists by district + services only. */
+  date?: Date;
+  time?: string;
+  durationMinutes?: number;
+  bufferMinutes?: number;
   excludeBookingId?: string;
   selectedArtistId: string;
   onSelect: (
@@ -22,6 +24,9 @@ type ArtistSelectionSectionProps = {
   onBack: () => void;
   onContinue: () => void;
   continueLabel?: string;
+  /** Override description under the title area. */
+  description?: string;
+  emptyMessage?: string;
 };
 
 export function ArtistSelectionSection({
@@ -29,15 +34,18 @@ export function ArtistSelectionSection({
   serviceIds,
   date,
   time,
-  durationMinutes,
-  bufferMinutes,
+  durationMinutes = 60,
+  bufferMinutes = 30,
   excludeBookingId,
   selectedArtistId,
   onSelect,
   onBack,
   onContinue,
   continueLabel = "Continue",
+  description,
+  emptyMessage,
 }: ArtistSelectionSectionProps) {
+  const browseMode = !date || !time;
   const [artists, setArtists] = useState<
     AvailableArtistForBooking[]
   >([]);
@@ -48,15 +56,20 @@ export function ArtistSelectionSection({
     setIsLoading(true);
     setHasError(false);
     try {
-      const result = await getAvailableArtistsForBooking({
-        districtName,
-        serviceIds,
-        appointmentDate: date,
-        appointmentTime: time,
-        durationMinutes,
-        bufferMinutes,
-        excludeBookingId,
-      });
+      const result = browseMode
+        ? await listArtistsForServices({
+            districtName,
+            serviceIds,
+          })
+        : await getAvailableArtistsForBooking({
+            districtName,
+            serviceIds,
+            appointmentDate: date!,
+            appointmentTime: time!,
+            durationMinutes,
+            bufferMinutes,
+            excludeBookingId,
+          });
       setArtists(result);
       if (
         selectedArtistId &&
@@ -71,6 +84,7 @@ export function ArtistSelectionSection({
       setIsLoading(false);
     }
   }, [
+    browseMode,
     districtName,
     serviceIds,
     date,
@@ -86,11 +100,18 @@ export function ArtistSelectionSection({
     void loadArtists();
   }, [loadArtists]);
 
+  const defaultDescription = browseMode
+    ? "Choose an artist who can perform your selected services."
+    : `Choose an artist for your appointment on ${date!.toLocaleDateString("en-GB")} at ${time}.`;
+
+  const defaultEmpty = browseMode
+    ? "No active artists support these services in your district."
+    : "No artists are available for this district, service, and time. Try another time slot or date.";
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">
-        Choose an artist for your appointment on{" "}
-        {date.toLocaleDateString("en-GB")} at {time}.
+        {description ?? defaultDescription}
       </p>
 
       {isLoading ? (
@@ -110,8 +131,7 @@ export function ArtistSelectionSection({
         </div>
       ) : artists.length === 0 ? (
         <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
-          No artists are available for this district, service,
-          and time. Try another time slot or date.
+          {emptyMessage ?? defaultEmpty}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
