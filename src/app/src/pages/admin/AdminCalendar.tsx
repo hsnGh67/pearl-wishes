@@ -12,6 +12,7 @@ import {
   Search,
   GraduationCap,
   Plus,
+  Star,
 } from "lucide-react";
 import { Card } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
@@ -36,7 +37,9 @@ import {
   PaymentStatus,
   getBusinessHoursForDate,
 } from "../../schema/booking.schema";
-import { getAllUsers } from "../../lib/db/users";
+import { getAllUsers, getUsersByRole } from "../../lib/db/users";
+import { getAllArtists } from "../../lib/db/artists";
+import { formatArtistDisplayName } from "../../lib/db/available-artists";
 import { getAllServices } from "../../lib/db/services";
 import { getAllWorkshops } from "../../lib/db/workshops";
 import {
@@ -45,7 +48,11 @@ import {
   getWorkshopSessionsByDate,
   getAllWorkshopSessions,
 } from "../../lib/db/workshop-bookings";
-import { User as UserType } from "../../schema/user.schema";
+import {
+  User as UserType,
+  UserRole,
+} from "../../schema/user.schema";
+import { Artist } from "../../schema/artist.schema";
 import { Service } from "../../schema/service.schema";
 import { Workshop } from "../../schema/workshop.schema";
 import {
@@ -85,6 +92,11 @@ import EditScheduleWorkshopDrawer from "../../components/admin/EditScheduleWorks
 
 type ViewType = "day" | "week" | "month";
 
+type StaffFilter =
+  | { kind: "admin"; id: string }
+  | { kind: "artist"; id: string }
+  | null;
+
 interface ScheduledRun {
   sessions: GeneratedSession[];
   workshopTitle: string;
@@ -99,19 +111,14 @@ const getStatusDotColor = (status?: string) => {
   return "#34D399"; // green
 };
 
-const NAIL_ARTISTS = [
-  { id: "sara", name: "Sara Rossi" },
-  { id: "mia", name: "Mia Chen" },
-  { id: "jade", name: "Jade Williams" },
-  { id: "leah", name: "Leah Park" },
-];
-
 export function AdminCalendar() {
   const [viewType, setViewType] = useState<ViewType>("week");
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedArtist, setSelectedArtist] = useState<string>("arezoo");
+  const [staffFilter, setStaffFilter] = useState<StaffFilter>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [users, setUsers] = useState<UserType[]>([]);
+  const [admins, setAdmins] = useState<UserType[]>([]);
+  const [artists, setArtists] = useState<Artist[]>([]);
   const [services, setServices] = useState<Service[]>([]);
   const [workshops, setWorkshops] = useState<Workshop[]>([]);
   const [workshopBookings, setWorkshopBookings] = useState<
@@ -158,6 +165,8 @@ export function AdminCalendar() {
 
       let bookingsData: Booking[] = [];
       let usersData: UserType[] = [];
+      let adminsData: UserType[] = [];
+      let artistsData: Artist[] = [];
       let servicesData: Service[] = [];
       let workshopsData: Workshop[] = [];
       let workshopSessionsData: WorkshopSession[] = [];
@@ -171,6 +180,20 @@ export function AdminCalendar() {
 
       try {
         ({ data: usersData } = await getAllUsers());
+      } catch (err) {
+        // Silently handle - error already logged by dbLogger
+      }
+
+      try {
+        adminsData = await getUsersByRole(UserRole.ADMIN);
+      } catch (err) {
+        // Silently handle - error already logged by dbLogger
+      }
+
+      try {
+        artistsData = (await getAllArtists()).filter(
+          (artist) => artist.is_active,
+        );
       } catch (err) {
         // Silently handle - error already logged by dbLogger
       }
@@ -206,6 +229,8 @@ export function AdminCalendar() {
       console.log("📅 Calendar Data Loaded:", {
         bookings: bookingsData.length,
         users: usersData.length,
+        admins: adminsData.length,
+        artists: artistsData.length,
         services: servicesData.length,
         workshops: workshopsData.length,
         workshopBookings: workshopBookingsData.length,
@@ -213,6 +238,8 @@ export function AdminCalendar() {
       });
       setBookings(bookingsData);
       setUsers(usersData);
+      setAdmins(adminsData);
+      setArtists(artistsData);
       setServices(servicesData);
       setWorkshops(workshopsData);
       setWorkshopBookings(workshopBookingsData);
@@ -350,13 +377,24 @@ export function AdminCalendar() {
     return new Date(d.setDate(diff));
   };
 
-  // Filter bookings based on search query
+  // Filter bookings by selected staff chip, then search query
+  const bookingsForStaff = (bookingsToFilter: Booking[]) => {
+    if (!staffFilter) return bookingsToFilter;
+    if (staffFilter.kind === "admin") {
+      return bookingsToFilter.filter((booking) => !booking.artist_id);
+    }
+    return bookingsToFilter.filter(
+      (booking) => booking.artist_id === staffFilter.id,
+    );
+  };
+
   const filterBookings = (bookingsToFilter: Booking[]) => {
-    if (!searchQuery.trim()) return bookingsToFilter;
+    const staffFiltered = bookingsForStaff(bookingsToFilter);
+    if (!searchQuery.trim()) return staffFiltered;
 
     const query = searchQuery.toLowerCase().trim();
 
-    return bookingsToFilter.filter((booking) => {
+    return staffFiltered.filter((booking) => {
       // Search by customer name
       const user = getUser(booking.user_id);
       const customerName = user?.full_name?.toLowerCase() || "";
@@ -372,6 +410,26 @@ export function AdminCalendar() {
         phone.includes(searchPhone)
       );
     });
+  };
+
+  const showWorkshops =
+    !staffFilter || staffFilter.kind === "admin";
+
+  const isStaffSelected = (
+    kind: "admin" | "artist",
+    id: string,
+  ) =>
+    staffFilter?.kind === kind && staffFilter.id === id;
+
+  const toggleStaffFilter = (
+    kind: "admin" | "artist",
+    id: string,
+  ) => {
+    setStaffFilter((prev) =>
+      prev?.kind === kind && prev.id === id
+        ? null
+        : { kind, id },
+    );
   };
 
   const getBookingsForDate = (date: Date) => {
@@ -418,7 +476,9 @@ export function AdminCalendar() {
   const getBookingsCount = (date: Date) => {
     return (
       getBookingsForDate(date).length +
-      getWorkshopSessionssForDate(date).length
+      (showWorkshops
+        ? getWorkshopSessionssForDate(date).length
+        : 0)
     );
   };
 
@@ -762,33 +822,48 @@ export function AdminCalendar() {
         </div>
       </Card>
 
-      {/* Artist Chip Selector */}
+      {/* Staff Chip Selector */}
       <div className="flex items-center gap-2 mb-6 flex-wrap">
-        <button
-          onClick={() => setSelectedArtist("arezoo")}
-          className="px-4 py-1.5 text-sm font-medium border-2 transition-colors"
-          style={{
-            borderColor: selectedArtist === "arezoo" ? "#3D3935" : "#DCD4CD",
-            backgroundColor: selectedArtist === "arezoo" ? "#3D3935" : "#FEFCFA",
-            color: selectedArtist === "arezoo" ? "#FEFCFA" : "#3D3935",
-          }}
-        >
-          Arezoo
-        </button>
-        {NAIL_ARTISTS.map((artist) => (
-          <button
-            key={artist.id}
-            onClick={() => setSelectedArtist(artist.id)}
-            className="px-4 py-1.5 text-sm font-medium border-2 transition-colors"
-            style={{
-              borderColor: selectedArtist === artist.id ? "#3D3935" : "#DCD4CD",
-              backgroundColor: selectedArtist === artist.id ? "#E9CFCA" : "#FEFCFA",
-              color: "#3D3935",
-            }}
-          >
-            {artist.name}
-          </button>
-        ))}
+        {admins.map((admin) => {
+          const selected = isStaffSelected("admin", admin.id);
+          return (
+            <button
+              key={`admin-${admin.id}`}
+              type="button"
+              onClick={() => toggleStaffFilter("admin", admin.id)}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 text-sm font-medium border-2 transition-colors"
+              style={{
+                borderColor: selected ? "#3D3935" : "#DCD4CD",
+                backgroundColor: selected ? "#3D3935" : "#FEFCFA",
+                color: selected ? "#FEFCFA" : "#3D3935",
+              }}
+            >
+              <Star
+                className="w-3.5 h-3.5"
+                fill={selected ? "#FEFCFA" : "#3D3935"}
+              />
+              {admin.full_name || admin.email}
+            </button>
+          );
+        })}
+        {artists.map((artist) => {
+          const selected = isStaffSelected("artist", artist.id);
+          return (
+            <button
+              key={`artist-${artist.id}`}
+              type="button"
+              onClick={() => toggleStaffFilter("artist", artist.id)}
+              className="px-4 py-1.5 text-sm font-medium border-2 transition-colors"
+              style={{
+                borderColor: selected ? "#3D3935" : "#DCD4CD",
+                backgroundColor: selected ? "#E9CFCA" : "#FEFCFA",
+                color: "#3D3935",
+              }}
+            >
+              {formatArtistDisplayName(artist)}
+            </button>
+          );
+        })}
       </div>
 
       {/* Calendar Views */}
@@ -804,19 +879,19 @@ export function AdminCalendar() {
           scheduledSessions={getScheduledSessionsForDate(
             currentDate,
           )}
-          showWorkshops={selectedArtist === "arezoo"}
+          showWorkshops={showWorkshops}
         />
       )}
       {viewType === "week" && (
         <WeekView
           date={currentDate}
-          bookings={bookings}
+          bookings={filterBookings(bookings)}
           workshopBookings={workshopSessions}
           getUserName={getUserName}
           getServiceName={getServiceName}
           getBookingsForDate={getBookingsForDate}
           onBookingClick={handleBookingClick}
-          showWorkshops={selectedArtist === "arezoo"}
+          showWorkshops={showWorkshops}
         />
       )}
       {viewType === "month" && (
