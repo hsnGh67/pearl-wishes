@@ -8,7 +8,7 @@ import {
 import { listArtistsForServices } from "../../lib/db/booking-schedule";
 
 type ArtistSelectionSectionProps = {
-  districtName: string;
+  districtId: string;
   serviceIds: string[];
   /** When omitted (browse mode), lists artists by district + services only. */
   date?: Date;
@@ -30,7 +30,7 @@ type ArtistSelectionSectionProps = {
 };
 
 export function ArtistSelectionSection({
-  districtName,
+  districtId,
   serviceIds,
   date,
   time,
@@ -53,16 +53,21 @@ export function ArtistSelectionSection({
   const [hasError, setHasError] = useState(false);
 
   const loadArtists = useCallback(async () => {
+    if (!districtId) {
+      setArtists([]);
+      return;
+    }
+
     setIsLoading(true);
     setHasError(false);
     try {
       const result = browseMode
         ? await listArtistsForServices({
-            districtName,
+            districtId,
             serviceIds,
           })
         : await getAvailableArtistsForBooking({
-            districtName,
+            districtId,
             serviceIds,
             appointmentDate: date!,
             appointmentTime: time!,
@@ -85,7 +90,7 @@ export function ArtistSelectionSection({
     }
   }, [
     browseMode,
-    districtName,
+    districtId,
     serviceIds,
     date,
     time,
@@ -114,7 +119,11 @@ export function ArtistSelectionSection({
         {description ?? defaultDescription}
       </p>
 
-      {isLoading ? (
+      {!districtId ? (
+        <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+          Select a district before choosing an artist.
+        </div>
+      ) : isLoading ? (
         <div className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
           Loading available artists…
         </div>

@@ -9,12 +9,12 @@ export type ScheduleDateRange = {
 };
 
 export type ListArtistsForServicesParams = {
-  districtName: string;
+  districtId: string;
   serviceIds: string[];
 };
 
 export type BookableDatesParams = {
-  districtName: string;
+  districtId: string;
   serviceIds: string[];
   fromDate: Date;
   toDate: Date;
@@ -36,7 +36,7 @@ export type FreeTimesForArtistParams = {
 };
 
 export type FreeTimesForServicesParams = {
-  districtName: string;
+  districtId: string;
   serviceIds: string[];
   appointmentDate: Date;
   durationMinutes: number;
@@ -45,7 +45,7 @@ export type FreeTimesForServicesParams = {
 };
 
 export type AssignArtistForSlotParams = {
-  districtName: string;
+  districtId: string;
   serviceIds: string[];
   appointmentDate: Date;
   appointmentTime: string;
@@ -113,14 +113,14 @@ export async function listArtistsForServices(
   params: ListArtistsForServicesParams,
 ): Promise<AvailableArtistForBooking[]> {
   const serviceIds = distinctServiceIds(params.serviceIds);
-  if (!params.districtName || serviceIds.length === 0) {
+  if (!params.districtId || serviceIds.length === 0) {
     return [];
   }
 
   try {
     dbLogger.info("Listing artists for services", {
       data: {
-        districtName: params.districtName,
+        districtId: params.districtId,
         serviceCount: serviceIds.length,
       },
     });
@@ -128,7 +128,7 @@ export async function listArtistsForServices(
     const { data, error } = await supabase.rpc(
       "list_artists_for_services",
       {
-        p_district_name: params.districtName,
+        p_district_id: params.districtId,
         p_service_ids: serviceIds,
       },
     );
@@ -153,7 +153,7 @@ export async function getBookableDatesForArtist(
   const serviceIds = distinctServiceIds(params.serviceIds);
   if (
     !params.artistId ||
-    !params.districtName ||
+    !params.districtId ||
     serviceIds.length === 0
   ) {
     return [];
@@ -164,7 +164,7 @@ export async function getBookableDatesForArtist(
       "get_bookable_dates_for_artist",
       {
         p_artist_id: params.artistId,
-        p_district_name: params.districtName,
+        p_district_id: params.districtId,
         p_service_ids: serviceIds,
         p_from_date: formatDate(params.fromDate),
         p_to_date: formatDate(params.toDate),
@@ -194,7 +194,7 @@ export async function getBookableDatesForServices(
   params: BookableDatesParams,
 ): Promise<Date[]> {
   const serviceIds = distinctServiceIds(params.serviceIds);
-  if (!params.districtName || serviceIds.length === 0) {
+  if (!params.districtId || serviceIds.length === 0) {
     return [];
   }
 
@@ -202,7 +202,7 @@ export async function getBookableDatesForServices(
     const { data, error } = await supabase.rpc(
       "get_bookable_dates_for_services",
       {
-        p_district_name: params.districtName,
+        p_district_id: params.districtId,
         p_service_ids: serviceIds,
         p_from_date: formatDate(params.fromDate),
         p_to_date: formatDate(params.toDate),
@@ -264,7 +264,7 @@ export async function getFreeTimesForServices(
   params: FreeTimesForServicesParams,
 ): Promise<string[]> {
   const serviceIds = distinctServiceIds(params.serviceIds);
-  if (!params.districtName || serviceIds.length === 0) {
+  if (!params.districtId || serviceIds.length === 0) {
     return [];
   }
 
@@ -272,7 +272,7 @@ export async function getFreeTimesForServices(
     const { data, error } = await supabase.rpc(
       "get_free_times_for_services",
       {
-        p_district_name: params.districtName,
+        p_district_id: params.districtId,
         p_service_ids: serviceIds,
         p_appointment_date: formatDate(params.appointmentDate),
         p_duration_minutes: params.durationMinutes,
@@ -300,7 +300,7 @@ export async function assignArtistForSlot(
 ): Promise<AvailableArtistForBooking | null> {
   const serviceIds = distinctServiceIds(params.serviceIds);
   if (
-    !params.districtName ||
+    !params.districtId ||
     serviceIds.length === 0 ||
     !params.appointmentTime
   ) {
@@ -311,7 +311,7 @@ export async function assignArtistForSlot(
     const { data, error } = await supabase.rpc(
       "assign_artist_for_slot",
       {
-        p_district_name: params.districtName,
+        p_district_id: params.districtId,
         p_service_ids: serviceIds,
         p_appointment_date: formatDate(params.appointmentDate),
         p_appointment_time: params.appointmentTime,

@@ -8,6 +8,15 @@ export const GAP_MINUTES_PER_SERVICE = 5;
 
 export type SchedulePreference = "artist" | "date";
 
+/** Resolve district UUID from a loaded districts list by display name. */
+export function resolveDistrictIdByName(
+  districts: Array<{ id?: string; name: string }>,
+  districtName: string,
+): string | undefined {
+  if (!districtName) return undefined;
+  return districts.find((d) => d.name === districtName)?.id;
+}
+
 export function resolveActiveBuffer(params: {
   selectedDate?: Date | null;
   bufferMinutes: number;

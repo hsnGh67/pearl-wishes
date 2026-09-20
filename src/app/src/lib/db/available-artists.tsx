@@ -10,7 +10,7 @@ export type AvailableArtistForBooking = {
 };
 
 export type GetAvailableArtistsForBookingParams = {
-  districtName: string;
+  districtId: string;
   serviceIds: string[];
   appointmentDate: Date;
   appointmentTime: string;
@@ -34,7 +34,7 @@ export const getAvailableArtistsForBooking = async (
   params: GetAvailableArtistsForBookingParams,
 ): Promise<AvailableArtistForBooking[]> => {
   const {
-    districtName,
+    districtId,
     serviceIds,
     appointmentDate,
     appointmentTime,
@@ -46,14 +46,14 @@ export const getAvailableArtistsForBooking = async (
   const distinctServiceIds = [
     ...new Set(serviceIds.filter(Boolean)),
   ];
-  if (!districtName || distinctServiceIds.length === 0) {
+  if (!districtId || distinctServiceIds.length === 0) {
     return [];
   }
 
   try {
     dbLogger.info("Fetching available artists for booking", {
       data: {
-        districtName,
+        districtId,
         serviceCount: distinctServiceIds.length,
         appointmentDate: formatDate(appointmentDate),
         appointmentTime,
@@ -63,7 +63,7 @@ export const getAvailableArtistsForBooking = async (
     const { data, error } = await supabase.rpc(
       "get_available_artists_for_booking",
       {
-        p_district_name: districtName,
+        p_district_id: districtId,
         p_service_ids: distinctServiceIds,
         p_appointment_date: formatDate(appointmentDate),
         p_appointment_time: appointmentTime,

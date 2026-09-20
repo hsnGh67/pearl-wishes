@@ -82,6 +82,7 @@ import {
   GAP_MINUTES_PER_SERVICE,
   isDateDisabledByBookableSet,
   resolveActiveBuffer,
+  resolveDistrictIdByName,
   toDateKeySet,
   type SchedulePreference,
 } from "../../lib/booking-schedule";
@@ -538,8 +539,13 @@ export function AdminBookingForm({
       ? existingBooking.id
       : undefined;
 
+  const scheduleDistrictId = resolveDistrictIdByName(
+    districts,
+    address.district,
+  );
+
   const loadBookableDates = async () => {
-    if (!address.district || serviceIdsForSchedule.length === 0) {
+    if (!scheduleDistrictId || serviceIdsForSchedule.length === 0) {
       setBookableDateKeys(new Set());
       return;
     }
@@ -562,7 +568,7 @@ export function AdminBookingForm({
         schedulePreference === "artist" && selectedArtistId
           ? await getBookableDatesForArtist({
               artistId: selectedArtistId,
-              districtName: address.district,
+              districtId: scheduleDistrictId,
               serviceIds: serviceIdsForSchedule,
               fromDate,
               toDate,
@@ -571,7 +577,7 @@ export function AdminBookingForm({
               excludeBookingId,
             })
           : await getBookableDatesForServices({
-              districtName: address.district,
+              districtId: scheduleDistrictId,
               serviceIds: serviceIdsForSchedule,
               fromDate,
               toDate,
@@ -612,14 +618,16 @@ export function AdminBookingForm({
               bufferMinutes: activeBuffer,
               excludeBookingId,
             })
-          : await getFreeTimesForServices({
-              districtName: address.district,
-              serviceIds: serviceIdsForSchedule,
-              appointmentDate: selectedDate,
-              durationMinutes: duration,
-              bufferMinutes: activeBuffer,
-              excludeBookingId,
-            });
+          : scheduleDistrictId
+            ? await getFreeTimesForServices({
+                districtId: scheduleDistrictId,
+                serviceIds: serviceIdsForSchedule,
+                appointmentDate: selectedDate,
+                durationMinutes: duration,
+                bufferMinutes: activeBuffer,
+                excludeBookingId,
+              })
+            : [];
       setAvailableTimeSlots(slots);
       setGetTimeSlotsState({
         isLoading: false,
@@ -678,7 +686,7 @@ export function AdminBookingForm({
     calendarMonth,
     schedulePreference,
     selectedArtistId,
-    address.district,
+    scheduleDistrictId,
     totalDuration,
     treatmentServiceIdsKey,
   ]);
@@ -692,7 +700,7 @@ export function AdminBookingForm({
     selectedDate,
     schedulePreference,
     selectedArtistId,
-    address.district,
+    scheduleDistrictId,
     totalDuration,
     activeBuffer,
     treatmentServiceIdsKey,
@@ -1221,8 +1229,14 @@ export function AdminBookingForm({
 
     setIsAssigningArtist(true);
     try {
+      if (!scheduleDistrictId) {
+        alert(
+          "Unable to resolve district. Please set the client district.",
+        );
+        return;
+      }
       const artist = await assignArtistForSlot({
-        districtName: address.district,
+        districtId: scheduleDistrictId,
         serviceIds: serviceIdsForSchedule,
         appointmentDate: selectedDate,
         appointmentTime: selectedTime,
@@ -1692,11 +1706,11 @@ export function AdminBookingForm({
                 </Button>
                 <Button
                   type="button"
-                  disabled={!schedulePreference || !address.district}
+                  disabled={!schedulePreference || !scheduleDistrictId}
                   className="border-2"
                   style={{
                     backgroundColor:
-                      schedulePreference && address.district
+                      schedulePreference && scheduleDistrictId
                         ? "#E9CFCA"
                         : "#DCD4CD",
                     borderColor: "#3D3935",
@@ -1726,7 +1740,7 @@ export function AdminBookingForm({
                   Select Artist
                 </h3>
                 <ArtistSelectionSection
-                  districtName={address.district}
+                  districtId={scheduleDistrictId ?? ""}
                   serviceIds={serviceIdsForSchedule}
                   selectedArtistId={selectedArtistId}
                   onSelect={(artistId, artist) => {
@@ -2581,7 +2595,7 @@ export function AdminBookingForm({
                         {showArtistOverride && (
                           <div className="mt-3">
                             <ArtistSelectionSection
-                              districtName={address.district}
+                              districtId={scheduleDistrictId ?? ""}
                               serviceIds={serviceIdsForSchedule}
                               date={selectedDate}
                               time={selectedTime}

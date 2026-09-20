@@ -69,6 +69,7 @@ import {
   GAP_MINUTES_PER_SERVICE,
   isDateDisabledByBookableSet,
   resolveActiveBuffer,
+  resolveDistrictIdByName,
   toDateKeySet,
   type SchedulePreference,
 } from "../src/lib/booking-schedule";
@@ -320,9 +321,14 @@ export function BookingFlow({
     .map((s) => s.id)
     .filter(Boolean);
 
+  const scheduleDistrictId = resolveDistrictIdByName(
+    districts,
+    bookingData.district,
+  );
+
   const loadBookableDates = useCallback(async () => {
     if (
-      !bookingData.district ||
+      !scheduleDistrictId ||
       serviceIdsForSchedule.length === 0
     ) {
       setBookableDateKeys(new Set());
@@ -356,7 +362,7 @@ export function BookingFlow({
         schedulePreference === "artist" && bookingData.artistId
           ? await getBookableDatesForArtist({
               artistId: bookingData.artistId,
-              districtName: bookingData.district,
+              districtId: scheduleDistrictId,
               serviceIds: serviceIdsForSchedule,
               fromDate,
               toDate,
@@ -364,7 +370,7 @@ export function BookingFlow({
               bufferMinutes: bufferForRange,
             })
           : await getBookableDatesForServices({
-              districtName: bookingData.district,
+              districtId: scheduleDistrictId,
               serviceIds: serviceIdsForSchedule,
               fromDate,
               toDate,
@@ -386,7 +392,7 @@ export function BookingFlow({
       });
     }
   }, [
-    bookingData.district,
+    scheduleDistrictId,
     bookingData.artistId,
     bookingData.totalDuration,
     schedulePreference,
@@ -415,13 +421,15 @@ export function BookingFlow({
               durationMinutes: duration,
               bufferMinutes: activeBuffer,
             })
-          : await getFreeTimesForServices({
-              districtName: bookingData.district,
-              serviceIds: serviceIdsForSchedule,
-              appointmentDate: bookingData.date,
-              durationMinutes: duration,
-              bufferMinutes: activeBuffer,
-            });
+          : scheduleDistrictId
+            ? await getFreeTimesForServices({
+                districtId: scheduleDistrictId,
+                serviceIds: serviceIdsForSchedule,
+                appointmentDate: bookingData.date,
+                durationMinutes: duration,
+                bufferMinutes: activeBuffer,
+              })
+            : [];
 
       setAvailableTimeSlots(slots);
       setGetTimeSlotsState({
@@ -439,7 +447,7 @@ export function BookingFlow({
   }, [
     bookingData.date,
     bookingData.artistId,
-    bookingData.district,
+    scheduleDistrictId,
     bookingData.totalDuration,
     schedulePreference,
     activeBuffer,
@@ -523,7 +531,7 @@ export function BookingFlow({
     console.log("step ==>", step);
     if (step === "service") {
       loadAvailableServices();
-    } else if (step === "address") {
+    } else if (step === "address" || step === "preference") {
       getDistricts();
     } else if (step === "voucher") {
       loadActivePromoCodesForBooking();
@@ -923,8 +931,14 @@ export function BookingFlow({
 
     setIsAssigningArtist(true);
     try {
+      if (!scheduleDistrictId) {
+        alert(
+          "Unable to resolve district. Please go back and reselect your district.",
+        );
+        return;
+      }
       const artist = await assignArtistForSlot({
-        districtName: bookingData.district,
+        districtId: scheduleDistrictId,
         serviceIds: serviceIdsForSchedule,
         appointmentDate: bookingData.date,
         appointmentTime: bookingData.timeSlot,
@@ -2282,7 +2296,7 @@ export function BookingFlow({
             </DialogHeader>
             <div className="py-4">
               <ArtistSelectionSection
-                districtName={bookingData.district}
+                districtId={scheduleDistrictId ?? ""}
                 serviceIds={serviceIdsForSchedule}
                 selectedArtistId={bookingData.artistId}
                 onSelect={(artistId, artist) => {
